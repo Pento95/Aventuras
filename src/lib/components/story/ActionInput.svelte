@@ -277,13 +277,15 @@
     ui.clearActionChoices(); // Clear previous action choices
 
     try {
-      // Build world state for AI context
+      // Build world state for AI context (including chapters for summarization)
       const worldState = {
         characters: story.characters,
         locations: story.locations,
         items: story.items,
         storyBeats: story.storyBeats,
         currentLocation: story.currentLocation,
+        chapters: story.chapters,
+        memoryConfig: story.memoryConfig,
       };
 
       log('World state built', {
@@ -291,7 +293,40 @@
         locations: worldState.locations.length,
         items: worldState.items.length,
         storyBeats: worldState.storyBeats.length,
+        chapters: worldState.chapters.length,
       });
+
+      // Phase 0.5: Memory retrieval - get relevant chapter context
+      // Per design doc section 3.1.3: Retrieval Flow
+      let retrievedChapterContext: string | null = null;
+      if (story.chapters.length > 0 && story.memoryConfig.enableRetrieval) {
+        try {
+          log('Starting memory retrieval...', { chaptersCount: story.chapters.length });
+          const retrievalDecision = await aiService.decideRetrieval(
+            userActionContent,
+            story.visibleEntries.slice(-5), // Recent visible entries for context
+            story.chapters,
+            story.memoryConfig
+          );
+
+          if (retrievalDecision.relevantChapterIds.length > 0) {
+            retrievedChapterContext = aiService.buildRetrievedContextBlock(
+              story.chapters,
+              retrievalDecision
+            );
+            log('Memory retrieval complete', {
+              relevantChapters: retrievalDecision.relevantChapterIds.length,
+              contextLength: retrievedChapterContext?.length ?? 0,
+            });
+          } else {
+            log('No relevant chapters found for retrieval');
+          }
+        } catch (retrievalError) {
+          // Retrieval failure shouldn't block generation
+          log('Memory retrieval failed (non-fatal)', retrievalError);
+          console.warn('Memory retrieval failed:', retrievalError);
+        }
+      }
 
       let fullResponse = '';
       let chunkCount = 0;
@@ -299,9 +334,22 @@
       // Capture current story reference for use after streaming
       const currentStoryRef = story.currentStory;
 
-      // Use streaming response (pass style review for guidance injection)
-      log('Starting stream iteration...', { hasStyleReview: !!ui.lastStyleReview });
-      for await (const chunk of aiService.streamResponse(story.entries, worldState, currentStoryRef, true, ui.lastStyleReview)) {
+      // Use streaming response with visible entries only (non-summarized)
+      // Per design doc section 3.1.2: summarized entries are excluded from context
+      log('Starting stream iteration...', {
+        hasStyleReview: !!ui.lastStyleReview,
+        visibleEntries: story.visibleEntries.length,
+        totalEntries: story.entries.length,
+        hasRetrievedContext: !!retrievedChapterContext,
+      });
+      for await (const chunk of aiService.streamResponse(
+        story.visibleEntries,
+        worldState,
+        currentStoryRef,
+        true,
+        ui.lastStyleReview,
+        retrievedChapterContext
+      )) {
         chunkCount++;
         if (chunk.content) {
           fullResponse += chunk.content;

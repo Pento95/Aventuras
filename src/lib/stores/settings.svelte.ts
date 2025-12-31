@@ -154,14 +154,22 @@ Extract ONLY significant, named entities that matter to the ongoing story. Be pr
 3. Use the exact names from the text, don't invent or embellish
 4. Respond with valid JSON only - no markdown, no explanation`,
 
-  chapterAnalysis: `You analyze story content to find optimal chapter break points.
+  chapterAnalysis: `# Role
+You are Auto Summarize Endpoint Selector. Your task is to identify the single best chapter endpoint in the provided message range.
 
-A good chapter break:
-- Falls at a natural pause in the story (scene change, time skip, revelation)
-- Doesn't split the middle of an important scene or dialogue
-- Creates a satisfying sense of closure for what came before
+## Task
+Select the message ID that represents the longest self-contained narrative arc within the given range. The endpoint should be at a natural narrative beat: resolution, decision, scene change, or clear transition.
 
-Respond with valid JSON only.`,
+## Output Format
+Return ONLY a JSON object with these fields:
+{ "chapterEnd": <integer message ID>, "suggestedTitle": "<short evocative title>" }
+
+## Rules
+- Select exactly ONE endpoint
+- The endpoint must be within the provided message range
+- Choose the point that creates the most complete, self-contained chapter
+- Prefer later messages that still complete the arc (avoid cutting mid-beat)
+- Look for: scene changes, emotional resolutions, decisions made, revelations`,
 
   chapterSummarization: `You are a story analyst. Extract key information from story chapters. Respond with valid JSON only.`,
 

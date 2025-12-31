@@ -118,7 +118,8 @@ export class MemoryService {
     }
 
     // Ask AI to find optimal chapter break point
-    const prompt = this.buildChapterAnalysisPrompt(chapterEntries);
+    // Pass startIndex so message IDs are correctly numbered
+    const prompt = this.buildChapterAnalysisPrompt(chapterEntries, startIndex);
 
     try {
       const response = await this.provider.generateResponse({
@@ -309,28 +310,28 @@ Guidelines:
     return contextBlock;
   }
 
-  private buildChapterAnalysisPrompt(entries: StoryEntry[]): string {
-    const content = entries.map((e, i) => {
+  private buildChapterAnalysisPrompt(entries: StoryEntry[], startIndex: number): string {
+    // Format messages with their actual IDs (1-based for clarity)
+    const messagesInRange = entries.map((e, i) => {
+      const messageId = startIndex + i + 1; // 1-based message ID
       const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
-      return `${i + 1}. ${prefix} ${e.content.substring(0, 200)}${e.content.length > 200 ? '...' : ''}`;
-    }).join('\n\n');
+      const truncatedContent = e.content.length > 300
+        ? e.content.substring(0, 300) + '...'
+        : e.content;
+      return `Message ${messageId}:\n${prefix} ${truncatedContent}`;
+    }).join('\n\n---\n\n');
 
-    return `Analyze this story content and find the optimal chapter break point.
+    const firstValidId = startIndex + 1;
+    const lastValidId = startIndex + entries.length;
 
-STORY CONTENT (${entries.length} messages):
-"""
-${content}
-"""
+    return `# Message Range for Auto-Summarize
+First valid message ID: ${firstValidId}
+Last valid message ID: ${lastValidId}
 
-Find the best message number (1-${entries.length}) to end this chapter.
-Look for natural story beats: scene changes, resolutions, revelations.
+# Messages in Range:
+${messagesInRange}
 
-Respond with JSON:
-{
-  "optimalEndIndex": <number 1-${entries.length}>,
-  "suggestedTitle": "Short evocative title for this chapter",
-  "reasoning": "Brief explanation of why this is a good break point"
-}`;
+Select the single best chapter endpoint from this range.`;
   }
 
   private parseChapterAnalysis(
@@ -346,11 +347,34 @@ Respond with JSON:
       jsonStr = jsonStr.trim();
 
       const parsed = JSON.parse(jsonStr);
-      const relativeIndex = Math.min(Math.max(1, parsed.optimalEndIndex || entryCount), entryCount);
+
+      // Handle both old format (optimalEndIndex) and new format (chapterEnd)
+      // chapterEnd is 1-based message ID, optimalEndIndex is relative to startIndex
+      let endIndex: number;
+      if (parsed.chapterEnd !== undefined) {
+        // New format: chapterEnd is absolute 1-based message ID
+        // Convert to 0-based array index
+        endIndex = Math.min(Math.max(startIndex + 1, parsed.chapterEnd), startIndex + entryCount);
+      } else if (parsed.optimalEndIndex !== undefined) {
+        // Old format: relative index within the chunk
+        const relativeIndex = Math.min(Math.max(1, parsed.optimalEndIndex), entryCount);
+        endIndex = startIndex + relativeIndex;
+      } else {
+        // Fallback: use end of range
+        endIndex = startIndex + entryCount;
+      }
+
+      log('Parsed chapter endpoint', {
+        chapterEnd: parsed.chapterEnd,
+        optimalEndIndex: parsed.optimalEndIndex,
+        startIndex,
+        entryCount,
+        finalEndIndex: endIndex,
+      });
 
       return {
         shouldCreateChapter: true,
-        optimalEndIndex: startIndex + relativeIndex,
+        optimalEndIndex: endIndex,
         suggestedTitle: parsed.suggestedTitle || null,
       };
     } catch (e) {

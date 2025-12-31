@@ -97,6 +97,29 @@ class StoryStore {
     return this.entries.length - this.lastChapterEndIndex;
   }
 
+  /**
+   * Get entries that are NOT part of any chapter (visible in context).
+   * These are entries after the last chapter's endEntryId.
+   * Per design doc section 3.1.2: summarized entries should be excluded from context.
+   */
+  get visibleEntries(): StoryEntry[] {
+    if (this.chapters.length === 0) {
+      // No chapters yet, all entries are visible
+      return this.entries;
+    }
+    // Return only entries after the last chapter
+    return this.entries.slice(this.lastChapterEndIndex);
+  }
+
+  /**
+   * Check if a specific entry has been summarized into a chapter.
+   */
+  isEntrySummarized(entryId: string): boolean {
+    const entryIndex = this.entries.findIndex(e => e.id === entryId);
+    if (entryIndex === -1) return false;
+    return entryIndex < this.lastChapterEndIndex;
+  }
+
   // Load all stories for library view
   async loadAllStories(): Promise<void> {
     this.allStories = await database.getAllStories();

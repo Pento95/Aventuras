@@ -111,7 +111,8 @@ class AIService {
     worldState: WorldState,
     story?: Story | null,
     useTieredContext = true,
-    styleReview?: StyleReviewResult | null
+    styleReview?: StyleReviewResult | null,
+    retrievedChapterContext?: string | null
   ): AsyncIterable<StreamChunk> {
     log('streamResponse called', {
       entriesCount: entries.length,
@@ -119,6 +120,8 @@ class AIService {
       templateId: story?.templateId,
       mode: story?.mode,
       useTieredContext,
+      hasChapters: (worldState.chapters?.length ?? 0) > 0,
+      hasRetrievedContext: !!retrievedChapterContext,
       worldState: {
         characters: worldState.characters.length,
         locations: worldState.locations.length,
@@ -143,7 +146,7 @@ class AIService {
           worldState,
           userInput,
           entries.slice(-10), // Recent entries for name matching
-          undefined // Retrieved chapter context could be passed here
+          retrievedChapterContext ?? undefined
         );
         tieredContextBlock = contextResult.contextBlock;
         log('Tiered context built', {
@@ -171,6 +174,15 @@ class AIService {
       pov
     );
 
+    // Inject chapter summaries if chapters exist
+    // Per design doc: summarized entries are excluded from context,
+    // but their summaries are included for continuity
+    if (worldState.chapters && worldState.chapters.length > 0) {
+      const chapterSummariesBlock = this.buildChapterSummariesBlock(worldState.chapters);
+      systemPrompt += chapterSummariesBlock;
+      log('Chapter summaries injected', { chapterCount: worldState.chapters.length });
+    }
+
     // Inject style guidance if available
     if (styleReview && styleReview.phrases.length > 0) {
       const styleGuidance = StyleReviewerService.formatForPromptInjection(styleReview);
@@ -190,15 +202,17 @@ class AIService {
     const primingMessage = this.buildPrimingMessage(mode, pov, tense);
     messages.push({ role: 'user', content: primingMessage });
 
-    // Add recent entries as conversation history
-    const recentEntries = entries.slice(-20);
-    for (const entry of recentEntries) {
+    // Add ALL visible entries as conversation history
+    // These are entries that have NOT been summarized into chapters
+    // Per design doc section 3.1.2: only non-summarized entries are in direct context
+    for (const entry of entries) {
       if (entry.type === 'user_action') {
         messages.push({ role: 'user', content: entry.content });
       } else if (entry.type === 'narration') {
         messages.push({ role: 'assistant', content: entry.content });
       }
     }
+    log('Conversation history built', { visibleEntries: entries.length });
 
     // Build extra body for provider-specific options
     const extraBody: Record<string, unknown> = {};
@@ -436,6 +450,48 @@ class AIService {
     });
 
     return result;
+  }
+
+  /**
+   * Build a block containing chapter summaries for injection into the system prompt.
+   * Per design doc: summarized entries are excluded from direct context,
+   * but their summaries provide narrative continuity.
+   */
+  private buildChapterSummariesBlock(chapters: Chapter[]): string {
+    if (chapters.length === 0) return '';
+
+    let block = '\n\n<story_history>\n';
+    block += '## Previous Chapters\n';
+    block += 'The following chapters have occurred earlier in the story. Use them for continuity and context.\n\n';
+
+    for (const chapter of chapters) {
+      block += `### Chapter ${chapter.number}`;
+      if (chapter.title) {
+        block += `: ${chapter.title}`;
+      }
+      block += '\n';
+      block += chapter.summary;
+      block += '\n';
+
+      // Add metadata for context
+      const metadata: string[] = [];
+      if (chapter.characters.length > 0) {
+        metadata.push(`Characters: ${chapter.characters.join(', ')}`);
+      }
+      if (chapter.locations.length > 0) {
+        metadata.push(`Locations: ${chapter.locations.join(', ')}`);
+      }
+      if (chapter.emotionalTone) {
+        metadata.push(`Tone: ${chapter.emotionalTone}`);
+      }
+      if (metadata.length > 0) {
+        block += `*${metadata.join(' | ')}*\n`;
+      }
+      block += '\n';
+    }
+
+    block += '</story_history>';
+    return block;
   }
 
   /**
