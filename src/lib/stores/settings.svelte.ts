@@ -488,7 +488,7 @@ class SettingsStore {
     defaultModel: 'z-ai/glm-4.7',
     temperature: 0.8,
     maxTokens: 8192,
-    enableThinking: true,
+    enableThinking: false,
   });
 
   uiSettings = $state<UISettings>({
@@ -789,7 +789,7 @@ class SettingsStore {
       defaultModel: 'z-ai/glm-4.7',
       temperature: 0.8,
       maxTokens: 8192,
-      enableThinking: true,
+      enableThinking: false,
     };
 
     // Reset UI settings
