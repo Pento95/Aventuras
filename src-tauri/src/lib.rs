@@ -21,6 +21,12 @@ pub fn run() {
             sql: include_str!("../migrations/003_entries.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "add_entry_lore_blacklist",
+            sql: include_str!("../migrations/004_entry_lore_blacklist.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

@@ -172,7 +172,7 @@ export function getDefaultAdvancedSettings(): AdvancedWizardSettings {
     },
     openingGeneration: {
       model: 'z-ai/glm-4.7', // GLM-4.7 with z-ai provider for opening generation
-      systemPrompt: DEFAULT_PROMPTS.openingGeneration,
+      systemPrompt: '', // Empty = use mode-specific prompts (adventure vs creative-writing)
       temperature: 0.8,
       topP: 0.95,
       maxTokens: 8192,
@@ -694,8 +694,55 @@ Generate ${count} interesting supporting characters who would create compelling 
         .replace(/\{mode\}/g, mode)
         .replace(/\{tense\}/g, tenseInstruction)
         .replace(/\{tone\}/g, writingStyle.tone || 'immersive and engaging');
+    } else if (mode === 'creative-writing') {
+      // Creative writing mode: The user is the AUTHOR, not the protagonist
+      // The AI can and should write the protagonist's actions, thoughts, and dialogue
+      systemPrompt = `You are crafting the opening scene of a ${genreLabel} story in collaboration with an author.
+
+<critical_understanding>
+The person reading this opening is the AUTHOR, not a character. They sit outside the story, directing what happens. The protagonist (${userName}) is a fictional character you write—not a stand-in for the author.
+</critical_understanding>
+
+<style>
+- POV: Third person limited (through ${userName}'s perspective)
+- ${tenseInstruction}
+- Tone: ${writingStyle.tone || 'immersive and engaging'}
+- 2-3 paragraphs of literary prose
+- Concrete sensory details grounded in character perception
+</style>
+
+<what_to_write>
+Write a compelling opening that:
+- Establishes the scene through ${userName}'s perspective and actions
+- Shows ${userName} engaged in the world—what they're doing, thinking, noticing
+- Introduces tension, stakes, or interesting elements
+- Includes other characters if appropriate, with their own actions and dialogue
+- Ends at a natural narrative beat that invites the author to direct what happens next
+</what_to_write>
+
+<protagonist_as_character>
+${userName} is a character you control. Write their:
+- Actions and movements
+- Dialogue (if appropriate)
+- Thoughts and perceptions
+- Reactions to the environment and other characters
+
+NEVER use second person ("you"). Always use "${userName}" or "he/she/they".
+</protagonist_as_character>
+
+Respond with valid JSON:
+{
+  "scene": "string - the opening (2-3 paragraphs of third-person narrative featuring ${userName})",
+  "title": "string - story title",
+  "initialLocation": {
+    "name": "string - location name",
+    "description": "string - 1-2 sentences"
+  }
+}`;
     } else {
-      systemPrompt = `You are crafting the opening scene of an interactive ${genreLabel} ${mode === 'adventure' ? 'adventure' : 'story'}.
+      // Adventure mode: The user IS the protagonist
+      // The AI should NOT write the protagonist's actions—the player decides those
+      systemPrompt = `You are crafting the opening scene of an interactive ${genreLabel} adventure.
 
 <critical_constraints>
 # ABSOLUTE RULES - VIOLATION IS FAILURE
@@ -879,8 +926,36 @@ Describe the environment and situation. Do NOT write anything ${userName} does, 
         .replace(/\{tone\}/g, writingStyle.tone || 'immersive and engaging');
       // Add prose-only instruction for streaming
       systemPrompt += '\n\nWrite ONLY prose. No JSON, no metadata.';
+    } else if (mode === 'creative-writing') {
+      // Creative writing mode: The user is the AUTHOR, not the protagonist
+      systemPrompt = `You are crafting the opening scene of a ${genreLabel} story in collaboration with an author.
+
+<critical_understanding>
+The person reading this opening is the AUTHOR, not a character. They sit outside the story, directing what happens. The protagonist (${userName}) is a fictional character you write—not a stand-in for the author.
+</critical_understanding>
+
+<style>
+- POV: Third person limited (through ${userName}'s perspective)
+- ${tenseInstruction}
+- Tone: ${writingStyle.tone || 'immersive and engaging'}
+- 2-3 paragraphs of literary prose
+</style>
+
+<what_to_write>
+Write a compelling opening that:
+- Establishes the scene through ${userName}'s perspective and actions
+- Shows ${userName} engaged in the world—what they're doing, thinking, noticing
+- Introduces tension, stakes, or interesting elements
+- Ends at a natural narrative beat that invites the author to direct what happens next
+
+${userName} is a character you control. Write their actions, dialogue, thoughts, and perceptions.
+NEVER use second person ("you"). Always use "${userName}" or "he/she/they".
+</what_to_write>
+
+Write ONLY prose. No JSON, no metadata.`;
     } else {
-      systemPrompt = `You are crafting the opening scene of an interactive ${genreLabel} ${mode === 'adventure' ? 'adventure' : 'story'}.
+      // Adventure mode: The user IS the protagonist
+      systemPrompt = `You are crafting the opening scene of an interactive ${genreLabel} adventure.
 
 <critical_constraints>
 # ABSOLUTE RULES - VIOLATION IS FAILURE
@@ -917,6 +992,25 @@ NO questions. Just the pregnant moment.
 Write ONLY prose. No JSON, no metadata.`;
     }
 
+    // Build user message based on mode
+    const userMessage = mode === 'creative-writing'
+      ? `Write the opening scene:
+
+SETTING: ${expandedSetting?.name || 'Unknown World'}
+${expandedSetting?.description || wizardData.settingSeed}
+
+PROTAGONIST: ${userName}
+
+Write the opening featuring ${userName} as the main character. Use third person.`
+      : `Write the opening scene:
+
+SETTING: ${expandedSetting?.name || 'Unknown World'}
+${expandedSetting?.description || wizardData.settingSeed}
+
+PROTAGONIST: ${userName}
+
+Describe the environment and situation only. Do NOT write anything ${userName} does, says, thinks, or perceives.`;
+
     const messages: Message[] = [
       {
         role: 'system',
@@ -924,14 +1018,7 @@ Write ONLY prose. No JSON, no metadata.`;
       },
       {
         role: 'user',
-        content: `Write the opening scene:
-
-SETTING: ${expandedSetting?.name || 'Unknown World'}
-${expandedSetting?.description || wizardData.settingSeed}
-
-PROTAGONIST: ${userName}
-
-Describe the environment and situation only. Do NOT write anything ${userName} does, says, thinks, or perceives.`
+        content: userMessage
       }
     ];
 
@@ -1028,20 +1115,26 @@ Describe the environment and situation only. Do NOT write anything ${userName} d
       : 'Use past tense.';
 
     if (mode === 'creative-writing') {
-      return `You are a skilled fiction writer co-authoring a ${genreLabel} story with ${userName}'s player. You control all NPCs, environments, and plot progression. You are the narrator -never ${userName}'s character.
+      return `You are a skilled fiction writer collaborating with an author on a ${genreLabel} story.
+
+<critical_understanding>
+The person giving you directions is the AUTHOR, not a character. They sit outside the story, directing what happens. ${userName} is the PROTAGONIST—a fictional character you write, not a stand-in for the author. When the author says "I do X", they mean "write ${userName} doing X."
+</critical_understanding>
 
 <setting>
 ${setting?.name || 'A unique world'}
 ${setting?.description || ''}
 </setting>
 
-<critical_constraints>
-# HARD RULES (Absolute Priority)
-1. **NEVER write dialogue, actions, decisions, or internal thoughts for ${userName}**
-2. **You control NPCs, environment, and plot -never ${userName}'s character**
-3. **End with a natural opening for ${userName} to act or respond -NOT a direct question**
-4. **Continue directly from the previous beat -no recaps, no scene-setting preamble**
-</critical_constraints>
+<author_vs_protagonist>
+You control ALL characters, including ${userName}. Write their:
+- Actions and movements
+- Dialogue
+- Thoughts and perceptions
+- Reactions to the environment and other characters
+
+The author's messages are DIRECTIONS, not character actions. Interpret "I do X" as "write ${userName} doing X."
+</author_vs_protagonist>
 
 <prose_architecture>
 ## Sensory Grounding
@@ -1068,15 +1161,14 @@ ${setting?.themes?.map(t => `- ${t}`).join('\n') || '- Adventure and discovery'}
 </themes>
 
 <ending_instruction>
-End each response with ${userName} in a moment of potential action -an NPC waiting for response, a door that could be opened, a sound that demands investigation. Create a **pregnant pause** that naturally invites ${userName}'s next move without explicitly asking what they do.
+End each response at a natural narrative beat that invites the author to direct what happens next.
 </ending_instruction>
 
 <forbidden_patterns>
-- Writing any actions, dialogue, or thoughts for ${userName}
-- Ending with a direct question to ${userName}
+- Second person ("you/your") for the protagonist—always use "${userName}" or "he/she/they"
+- Treating the author as a character in the story
 - Melodramatic phrases: hearts shattering, waves of emotion, breath catching
-- Summarizing what ${userName} thinks or feels
-- Echo phrasing: restating what ${userName} just wrote
+- Echo phrasing: restating what the author just wrote
 - Breaking the narrative voice or referencing being an AI
 </forbidden_patterns>`;
     } else {

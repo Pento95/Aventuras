@@ -727,6 +727,9 @@
     // Clear any previous error
     ui.clearGenerationError();
 
+    // Clear suggestions immediately when user sends a message
+    suggestions = [];
+
     // Build action content:
     // - Creative writing mode: use raw input as direction
     // - Raw action choice (from ActionChoices): use as-is (already formatted by AI)
