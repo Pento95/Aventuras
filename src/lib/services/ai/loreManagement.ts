@@ -353,7 +353,7 @@ export class LoreManagementService {
   }
 
   private get maxIterations(): number {
-    return this.settingsOverride?.maxIterations ?? settings.systemServicesSettings.loreManagement?.maxIterations ?? 20;
+    return this.settingsOverride?.maxIterations ?? settings.systemServicesSettings.loreManagement?.maxIterations ?? 50;
   }
 
   private get systemPrompt(): string {
@@ -391,6 +391,8 @@ export class LoreManagementService {
 
     let complete = false;
     let iterations = 0;
+    let consecutiveNoToolCalls = 0;
+    const MAX_NO_TOOL_CALL_RETRIES = 3;
 
     while (!complete && iterations < this.maxIterations) {
       iterations++;
@@ -429,13 +431,43 @@ export class LoreManagementService {
           log('Agent reasoning:', response.reasoning.substring(0, 500));
         }
 
-        // If no tool calls and finish reason is stop, agent is done thinking
+        // Handle no tool calls - model may need prompting
         if (!response.tool_calls || response.tool_calls.length === 0) {
+          consecutiveNoToolCalls++;
+          log(`No tool calls (${consecutiveNoToolCalls}/${MAX_NO_TOOL_CALL_RETRIES})`, {
+            content: response.content?.substring(0, 200),
+          });
+
+          // Add the assistant's response to maintain context
           if (response.content) {
-            log('Agent finished without tool call, content:', response.content.substring(0, 200));
+            messages.push({
+              role: 'assistant',
+              content: response.content,
+              reasoning: response.reasoning ?? null,
+            });
           }
-          break;
+
+          if (consecutiveNoToolCalls >= MAX_NO_TOOL_CALL_RETRIES) {
+            // Force finish after too many retries without tool calls
+            log('Max no-tool-call retries reached, forcing finish');
+            this.changes.push({
+              type: 'complete',
+              summary: `Session ended after ${this.changes.length} changes (model stopped making tool calls)`,
+            });
+            complete = true;
+            break;
+          }
+
+          // Prompt the model to use tools
+          messages.push({
+            role: 'user',
+            content: 'Please use the available tools to make any necessary changes, or call finish_lore_management if you are done reviewing the lorebook.',
+          });
+          continue;
         }
+
+        // Reset counter on successful tool call
+        consecutiveNoToolCalls = 0;
 
         // Add assistant response to messages, including reasoning for context continuity
         messages.push({
@@ -462,12 +494,22 @@ export class LoreManagementService {
         }
       } catch (error) {
         log('Error in lore management iteration:', error);
+        // Don't break immediately - add to changes and force finish
+        this.changes.push({
+          type: 'complete',
+          summary: `Session ended due to error after ${this.changes.length} changes`,
+        });
+        complete = true;
         break;
       }
     }
 
-    if (iterations >= this.maxIterations) {
-      log('Max iterations reached');
+    if (iterations >= this.maxIterations && !complete) {
+      log('Max iterations reached, forcing finish');
+      this.changes.push({
+        type: 'complete',
+        summary: `Session ended at max iterations (${this.maxIterations}) with ${this.changes.length} changes`,
+      });
     }
 
     const summary = this.changes.find(c => c.type === 'complete')?.summary || 'Session completed';
@@ -800,7 +842,7 @@ export function getDefaultLoreManagementSettings(): LoreManagementSettings {
   return {
     model: 'minimax/minimax-m2.1', // Good for agentic tool calling with reasoning
     temperature: 0.3,
-    maxIterations: 20,
+    maxIterations: 50,
     systemPrompt: DEFAULT_LORE_MANAGEMENT_PROMPT,
   };
 }

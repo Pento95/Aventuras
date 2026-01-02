@@ -1,6 +1,9 @@
 export interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  // Reasoning/thinking output if model supports it (e.g., minimax-m2.1)
+  // Only present for assistant messages
+  reasoning?: string | null;
 }
 
 // Extended message type for tool calling
