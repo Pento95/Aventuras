@@ -156,6 +156,19 @@
     'Action-packed and fast-paced',
   ];
 
+  // Update default POV and tense when mode changes
+  // Creative writing: third person, past tense (literary standard)
+  // Adventure: first person, present tense (immersive)
+  $effect(() => {
+    if (selectedMode === 'creative-writing') {
+      selectedPOV = 'third';
+      selectedTense = 'past';
+    } else {
+      selectedPOV = 'first';
+      selectedTense = 'present';
+    }
+  });
+
   // Step validation
   function canProceed(): boolean {
     switch (currentStep) {

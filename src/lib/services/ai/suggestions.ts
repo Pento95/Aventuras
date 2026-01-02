@@ -1,5 +1,5 @@
 import type { OpenRouterProvider } from './openrouter';
-import type { StoryEntry, StoryBeat } from '$lib/types';
+import type { StoryEntry, StoryBeat, Entry } from '$lib/types';
 import { settings, type SuggestionsSettings } from '$lib/stores/settings.svelte';
 
 const DEBUG = true;
@@ -51,12 +51,14 @@ export class SuggestionsService {
   async generateSuggestions(
     recentEntries: StoryEntry[],
     activeThreads: StoryBeat[],
-    genre?: string | null
+    genre?: string | null,
+    lorebookEntries?: Entry[]
   ): Promise<SuggestionsResult> {
     log('generateSuggestions called', {
       recentEntriesCount: recentEntries.length,
       activeThreadsCount: activeThreads.length,
       genre,
+      lorebookEntriesCount: lorebookEntries?.length ?? 0,
     });
 
     // Get the last few entries for context
@@ -71,6 +73,23 @@ export class SuggestionsService {
       ? activeThreads.map(t => `• ${t.title}${t.description ? `: ${t.description}` : ''}`).join('\n')
       : '(none)';
 
+    // Format lorebook entries for context
+    let lorebookContext = '';
+    if (lorebookEntries && lorebookEntries.length > 0) {
+      const entryDescriptions = lorebookEntries.slice(0, 15).map(e => {
+        let desc = `• ${e.name} (${e.type})`;
+        if (e.description) {
+          // Truncate long descriptions
+          const shortDesc = e.description.length > 150
+            ? e.description.slice(0, 150) + '...'
+            : e.description;
+          desc += `: ${shortDesc}`;
+        }
+        return desc;
+      }).join('\n');
+      lorebookContext = `\n\n## Lorebook/World Elements\nThe following characters, locations, and concepts exist in this world and can be incorporated into suggestions:\n${entryDescriptions}`;
+    }
+
     const prompt = `Based on the current story moment, suggest 3 distinct directions the story could go next.
 
 ## Recent Story Content
@@ -81,7 +100,7 @@ ${lastContent}
 ## Active Story Threads
 ${threadsContext}
 
-${genre ? `## Genre: ${genre}` : ''}
+${genre ? `## Genre: ${genre}` : ''}${lorebookContext}
 
 ## Your Task
 Generate 3 diverse story direction suggestions. Each should be:
@@ -89,6 +108,7 @@ Generate 3 diverse story direction suggestions. Each should be:
 - Varied in approach (don't give 3 similar options)
 - Specific enough to write toward, vague enough to allow creativity
 - Appropriate to the established tone and genre
+- May reference lorebook elements if they fit naturally
 
 Consider including:
 - An action/plot progression option

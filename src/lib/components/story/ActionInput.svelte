@@ -66,13 +66,18 @@
 
     suggestionsLoading = true;
     try {
+      // Use only the lorebook entries that were activated for the previous response
+      // Extract the Entry objects from RetrievedEntry wrappers
+      const activeLorebookEntries = (ui.lastLorebookRetrieval?.all ?? []).map(r => r.entry);
+
       const result = await aiService.generateSuggestions(
         story.entries,
         story.pendingQuests,
-        story.currentStory?.genre
+        story.currentStory?.genre,
+        activeLorebookEntries
       );
       suggestions = result.suggestions;
-      log('Suggestions refreshed:', suggestions.length);
+      log('Suggestions refreshed:', suggestions.length, 'with', activeLorebookEntries.length, 'active lorebook entries');
 
       // Emit SuggestionsReady event
       emitSuggestionsReady(suggestions.map(s => ({ text: s.text, type: s.type })));

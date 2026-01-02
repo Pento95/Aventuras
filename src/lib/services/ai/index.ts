@@ -316,17 +316,19 @@ class AIService {
   async generateSuggestions(
     entries: StoryEntry[],
     activeThreads: StoryBeat[],
-    genre?: string | null
+    genre?: string | null,
+    lorebookEntries?: Entry[]
   ): Promise<SuggestionsResult> {
     log('generateSuggestions called', {
       entriesCount: entries.length,
       threadsCount: activeThreads.length,
       genre,
+      lorebookEntriesCount: lorebookEntries?.length ?? 0,
     });
 
     const provider = this.getProvider();
     const suggestions = new SuggestionsService(provider);
-    return await suggestions.generateSuggestions(entries, activeThreads, genre);
+    return await suggestions.generateSuggestions(entries, activeThreads, genre, lorebookEntries);
   }
 
   /**
@@ -737,15 +739,15 @@ class AIService {
     }
 
     if (mode === 'creative-writing') {
-      return `You are the narrator of this collaborative story. Write in ${tenseInstruction}, ${povInstruction}.
+      return `You are a skilled fiction writer. Write in ${tenseInstruction}, ${povInstruction}.
 
 Your role:
-- Describe the world, NPCs, and events
-- React to my story directions with vivid prose
-- NEVER write dialogue, actions, or thoughts for the protagonist
-- When I describe what happens, narrate the scene without controlling the main character
+- Write prose based on my directions
+- Bring scenes to life with vivid detail
+- Write for any character I direct you to, including dialogue, actions, and thoughts
+- Maintain consistent characterization throughout
 
-I will provide story directions. You narrate everything except the protagonist's direct actions and words.`;
+I am the author directing the story. Write what I ask for.`;
     } else {
       return `You are the narrator of this interactive adventure. Write in ${tenseInstruction}, ${povInstruction}.
 
@@ -884,12 +886,31 @@ Do NOT use "you" to refer to the player character.
       basePrompt += '\n───────────────────────────────────────';
     }
 
-    // Final instruction - reinforcing the core rules
-    const povInstruction = pov === 'third'
-      ? 'Use THIRD PERSON (they/the protagonist) to describe what the character does.'
-      : 'Use SECOND PERSON (you/your) to describe what the player does. If the player writes "I do X", respond with "You do X".';
+    // Final instruction - reinforcing the core rules (mode-specific)
+    if (mode === 'creative-writing') {
+      const povInstruction = pov === 'third'
+        ? 'Use THIRD PERSON for all characters.'
+        : 'Use the POV specified by the author.';
 
-    basePrompt += `\n\n<response_instruction>
+      basePrompt += `\n\n<response_instruction>
+Write prose based on the author's direction:
+1. Bring the scene to life with sensory detail
+2. Write dialogue, actions, and thoughts for any character as directed
+3. Maintain consistent characterization
+
+STYLE:
+- ${povInstruction}
+- Write vivid, engaging prose
+- Follow the author's lead on what happens
+
+End at a natural narrative beat.
+</response_instruction>`;
+    } else {
+      const povInstruction = pov === 'third'
+        ? 'Use THIRD PERSON (they/the protagonist) to describe what the character does.'
+        : 'Use SECOND PERSON (you/your) to describe what the player does. If the player writes "I do X", respond with "You do X".';
+
+      basePrompt += `\n\n<response_instruction>
 Respond to the player's action with an engaging narrative continuation:
 1. Show the immediate results of their action through sensory detail
 2. Bring NPCs and environment to life with their own reactions
@@ -903,6 +924,7 @@ CRITICAL VOICE RULES:
 
 End with a natural opening for action, not a direct question.
 </response_instruction>`;
+    }
 
     return basePrompt;
   }
