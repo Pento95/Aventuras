@@ -298,6 +298,11 @@ class DatabaseService {
     await db.execute(`UPDATE locations SET ${setClauses.join(', ')} WHERE id = ?`, values);
   }
 
+  async deleteLocation(id: string): Promise<void> {
+    const db = await this.getDb();
+    await db.execute('DELETE FROM locations WHERE id = ?', [id]);
+  }
+
   // Item operations
   async getItems(storyId: string): Promise<Item[]> {
     const db = await this.getDb();

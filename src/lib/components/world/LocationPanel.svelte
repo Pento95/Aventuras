@@ -1,10 +1,11 @@
 <script lang="ts">
   import { story } from '$lib/stores/story.svelte';
-  import { Plus, MapPin, Eye, Navigation } from 'lucide-svelte';
+  import { Plus, MapPin, Eye, EyeOff, Navigation, Trash2 } from 'lucide-svelte';
 
   let showAddForm = $state(false);
   let newName = $state('');
   let newDescription = $state('');
+  let confirmingDeleteId = $state<string | null>(null);
 
   async function addLocation() {
     if (!newName.trim()) return;
@@ -17,6 +18,15 @@
 
   async function goToLocation(locationId: string) {
     await story.setCurrentLocation(locationId);
+  }
+
+  async function toggleVisited(locationId: string) {
+    await story.toggleLocationVisited(locationId);
+  }
+
+  async function deleteLocation(locationId: string) {
+    await story.deleteLocation(locationId);
+    confirmingDeleteId = null;
   }
 </script>
 
@@ -86,22 +96,52 @@
               </div>
               <div>
                 <span class="font-medium text-surface-100">{location.name}</span>
-                {#if location.visited}
-                  <span class="ml-2 text-xs text-surface-500">
+                <button
+                  class="ml-2 text-xs transition-colors {location.visited ? 'text-surface-500 hover:text-surface-300' : 'text-surface-600 hover:text-surface-400'}"
+                  onclick={() => toggleVisited(location.id)}
+                  title={location.visited ? 'Click to mark as unvisited' : 'Click to mark as visited'}
+                >
+                  {#if location.visited}
                     <Eye class="inline h-3 w-3" /> visited
-                  </span>
-                {/if}
+                  {:else}
+                    <EyeOff class="inline h-3 w-3" /> unvisited
+                  {/if}
+                </button>
                 {#if location.description}
                   <p class="mt-1 text-sm text-surface-400">{location.description}</p>
                 {/if}
               </div>
             </div>
-            <button
-              class="btn-ghost rounded px-2 py-1 text-xs"
-              onclick={() => goToLocation(location.id)}
-            >
-              Go
-            </button>
+            <div class="flex items-center gap-1">
+              {#if confirmingDeleteId === location.id}
+                <button
+                  class="btn-ghost rounded px-2 py-1 text-xs text-red-400 hover:bg-red-500/20"
+                  onclick={() => deleteLocation(location.id)}
+                >
+                  Confirm
+                </button>
+                <button
+                  class="btn-ghost rounded px-2 py-1 text-xs"
+                  onclick={() => confirmingDeleteId = null}
+                >
+                  Cancel
+                </button>
+              {:else}
+                <button
+                  class="btn-ghost rounded px-2 py-1 text-xs"
+                  onclick={() => goToLocation(location.id)}
+                >
+                  Go
+                </button>
+                <button
+                  class="btn-ghost rounded p-1 text-surface-500 hover:text-red-400"
+                  onclick={() => confirmingDeleteId = location.id}
+                  title="Delete location"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
+              {/if}
+            </div>
           </div>
         </div>
       {/each}

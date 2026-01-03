@@ -561,6 +561,33 @@ class StoryStore {
     }));
   }
 
+  // Toggle location visited status
+  async toggleLocationVisited(locationId: string): Promise<void> {
+    if (!this.currentStory) throw new Error('No story loaded');
+
+    const location = this.locations.find(l => l.id === locationId);
+    if (!location) throw new Error('Location not found');
+
+    const newVisited = !location.visited;
+    await database.updateLocation(locationId, { visited: newVisited });
+    this.locations = this.locations.map(l =>
+      l.id === locationId ? { ...l, visited: newVisited } : l
+    );
+    log('Location visited toggled:', location.name, newVisited);
+  }
+
+  // Delete a location
+  async deleteLocation(locationId: string): Promise<void> {
+    if (!this.currentStory) throw new Error('No story loaded');
+
+    const location = this.locations.find(l => l.id === locationId);
+    if (!location) throw new Error('Location not found');
+
+    await database.deleteLocation(locationId);
+    this.locations = this.locations.filter(l => l.id !== locationId);
+    log('Location deleted:', location.name);
+  }
+
   // Add an item to inventory
   async addItem(name: string, description?: string, quantity = 1): Promise<Item> {
     if (!this.currentStory) throw new Error('No story loaded');
