@@ -44,6 +44,13 @@ interface PersistedSuggestions {
   suggestions: StorySuggestion[];
 }
 
+// Persisted activation data structure (for lorebook stickiness)
+interface PersistedActivationData {
+  storyId: string;
+  activationData: Record<string, number>;
+  storyPosition: number;
+}
+
 // UI State using Svelte 5 runes
 class UIStore {
   activePanel = $state<ActivePanel>('story');
@@ -596,6 +603,9 @@ class UIStore {
 
   // Activation tracking methods for lorebook stickiness
 
+  // Track the current story ID for activation persistence
+  private currentActivationStoryId: string | null = null;
+
   /**
    * Create an activation tracker for the current story position.
    * The tracker maintains references to our state so activations are persisted.
@@ -611,11 +621,17 @@ class UIStore {
    * Update activation data after retrieval completes.
    * Called with the tracker that was modified during retrieval.
    */
-  updateActivationData(tracker: SimpleActivationTracker) {
+  updateActivationData(tracker: SimpleActivationTracker, storyId?: string) {
     this.activationData = tracker.getActivationData();
     // Prune old activations (beyond max stickiness of 10 turns)
     tracker.pruneOldActivations(10);
     this.activationData = tracker.getActivationData();
+
+    // Persist to database
+    const targetStoryId = storyId || this.currentActivationStoryId;
+    if (targetStoryId) {
+      this.saveActivationData(targetStoryId);
+    }
   }
 
   /**
@@ -624,6 +640,55 @@ class UIStore {
   clearActivationData() {
     this.activationData = {};
     this.currentStoryPosition = 0;
+    this.currentActivationStoryId = null;
+  }
+
+  /**
+   * Save activation data to the database for persistence.
+   */
+  saveActivationData(storyId: string) {
+    this.currentActivationStoryId = storyId;
+    const data: PersistedActivationData = {
+      storyId,
+      activationData: { ...this.activationData },
+      storyPosition: this.currentStoryPosition,
+    };
+    database.setSetting('lorebook_activation', JSON.stringify(data)).catch(err => {
+      console.warn('[UI] Failed to persist activation data:', err);
+    });
+  }
+
+  /**
+   * Load activation data from the database for a story.
+   * Called when a story is loaded.
+   */
+  async loadActivationData(storyId: string) {
+    try {
+      const data = await database.getSetting('lorebook_activation');
+      if (data) {
+        const parsed: PersistedActivationData = JSON.parse(data);
+        // Only restore if it's for the same story
+        if (parsed.storyId === storyId) {
+          this.activationData = parsed.activationData;
+          this.currentStoryPosition = parsed.storyPosition;
+          this.currentActivationStoryId = storyId;
+          console.log('[UI] Restored activation data for story:', storyId, {
+            entriesCount: Object.keys(parsed.activationData).length,
+            storyPosition: parsed.storyPosition,
+          });
+          return;
+        }
+      }
+      // No matching data found, start fresh
+      this.activationData = {};
+      this.currentStoryPosition = 0;
+      this.currentActivationStoryId = storyId;
+    } catch (err) {
+      console.warn('[UI] Failed to load persisted activation data:', err);
+      this.activationData = {};
+      this.currentStoryPosition = 0;
+      this.currentActivationStoryId = storyId;
+    }
   }
 
   /**

@@ -533,7 +533,12 @@
 
   // Create Story
   async function createStory() {
+    // Sanity checks
     if (!storyTitle.trim()) return;
+    if (!generatedOpening) {
+      openingError = 'Please generate an opening scene first';
+      return;
+    }
 
     const wizardData: WizardData = {
       mode: selectedMode,
@@ -551,16 +556,6 @@
       title: storyTitle,
       openingGuidance: selectedMode === 'creative-writing' && openingGuidance.trim() ? openingGuidance.trim() : undefined,
     };
-
-    // Generate opening if not already done
-    if (!generatedOpening) {
-      await generateOpeningScene();
-    }
-
-    if (!generatedOpening) {
-      openingError = 'Failed to generate opening scene';
-      return;
-    }
 
     // Prepare story data
     const storyData = scenarioService.prepareStoryData(wizardData, generatedOpening);
@@ -1241,6 +1236,13 @@
               {/if}
             </div>
 
+            <!-- Hint when no protagonist is defined -->
+            {#if !protagonist && !showManualInput}
+              <p class="text-xs text-surface-500 italic">
+                Tip: While optional, having a protagonist helps the AI create more personalized story content.
+              </p>
+            {/if}
+
             <!-- Supporting Characters (Creative Mode Only) -->
             {#if selectedMode === 'creative-writing'}
               <div class="space-y-3 pt-4 border-t border-surface-700">
@@ -1522,19 +1524,26 @@
           {/if}
 
           {#if storyTitle.trim()}
-            <button
-              class="btn btn-secondary flex items-center gap-2"
-              onclick={generateOpeningScene}
-              disabled={isGeneratingOpening}
-            >
-              {#if isGeneratingOpening}
-                <Loader2 class="h-4 w-4 animate-spin" />
-                Generating Opening...
-              {:else}
-                <PenTool class="h-4 w-4" />
-                {generatedOpening ? 'Regenerate Opening' : 'Generate Opening Scene'}
+            <div class="flex items-center gap-3">
+              <button
+                class="btn btn-secondary flex items-center gap-2"
+                onclick={generateOpeningScene}
+                disabled={isGeneratingOpening}
+              >
+                {#if isGeneratingOpening}
+                  <Loader2 class="h-4 w-4 animate-spin" />
+                  Generating Opening...
+                {:else}
+                  <PenTool class="h-4 w-4" />
+                  {generatedOpening ? 'Regenerate Opening' : 'Generate Opening Scene'}
+                {/if}
+              </button>
+              {#if !generatedOpening && !isGeneratingOpening}
+                <span class="text-sm text-amber-400">Required to begin story</span>
               {/if}
-            </button>
+            </div>
+          {:else}
+            <p class="text-sm text-surface-500">Enter a title to generate the opening scene</p>
           {/if}
 
           {#if openingError}
@@ -1595,7 +1604,8 @@
         <button
           class="btn btn-primary flex items-center gap-2"
           onclick={createStory}
-          disabled={!storyTitle.trim() || isGeneratingOpening}
+          disabled={!storyTitle.trim() || isGeneratingOpening || !generatedOpening}
+          title={!generatedOpening ? 'Generate an opening scene first' : ''}
         >
           <Play class="h-4 w-4" />
           Begin Story

@@ -540,8 +540,8 @@
             lorebookContext = entryResult.contextBlock;
             // Store retrieval result for debug panel
             ui.setLastLorebookRetrieval(entryResult);
-            // Update activation data with recorded activations
-            ui.updateActivationData(activationTracker);
+            // Update activation data with recorded activations (and persist to database)
+            ui.updateActivationData(activationTracker, story.currentStory?.id);
             log('Lorebook retrieval complete', {
               tier1: entryResult.tier1.length,
               tier2: entryResult.tier2.length,

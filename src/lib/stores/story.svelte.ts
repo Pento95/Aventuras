@@ -298,8 +298,8 @@ class StoryStore {
       checkpoints: checkpoints.length,
     });
 
-    // Clear activation data from previous story (stickiness tracking is story-specific)
-    ui.clearActivationData();
+    // Load persisted activation data for this story (stickiness tracking)
+    await ui.loadActivationData(storyId);
 
     // Clear retry backup from previous story
     ui.clearRetryBackup();
