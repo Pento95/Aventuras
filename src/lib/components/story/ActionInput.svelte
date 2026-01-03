@@ -379,7 +379,6 @@
     }
 
     ui.setGenerating(true);
-    ui.startStreaming();
     ui.clearGenerationError(); // Clear any previous error
     ui.clearActionChoices(); // Clear previous action choices
 
@@ -567,6 +566,9 @@
       // Retry logic for empty responses
       const MAX_EMPTY_RESPONSE_RETRIES = 3;
       let retryCount = 0;
+
+      // Start streaming indicator now that retrieval is complete
+      ui.startStreaming();
 
       while (retryCount < MAX_EMPTY_RESPONSE_RETRIES) {
         // Reset for each attempt

@@ -18,6 +18,7 @@ export interface ClassificationResult {
     characterUpdates: CharacterUpdate[];
     locationUpdates: LocationUpdate[];
     itemUpdates: ItemUpdate[];
+    storyBeatUpdates: StoryBeatUpdate[];
 
     // New entries discovered in the narrative
     newCharacters: NewCharacter[];
@@ -87,6 +88,14 @@ export interface NewStoryBeat {
   description: string;
   type: 'milestone' | 'quest' | 'revelation' | 'event' | 'plot_point';
   status: 'pending' | 'active' | 'completed';
+}
+
+export interface StoryBeatUpdate {
+  title: string;
+  changes: {
+    status?: 'pending' | 'active' | 'completed' | 'failed';
+    description?: string;
+  };
 }
 
 // Context for classification
@@ -190,6 +199,12 @@ export class ClassifierService {
     const existingItemNames = context.existingItems.map(i => i.name);
     const isCreativeMode = context.storyMode === 'creative-writing';
 
+    // Format existing story beats with their status
+    const existingBeatsList = context.existingStoryBeats
+      .filter(b => b.status === 'pending' || b.status === 'active')
+      .map(b => `• "${b.title}" [${b.status}]: ${b.description || '(no description)'}`)
+      .join('\n');
+
     // Mode-specific terminology
     const inputLabel = isCreativeMode ? "The Author's Direction" : "The Player's Action";
     const sceneLocationDesc = isCreativeMode
@@ -222,10 +237,14 @@ Characters: ${existingCharacterNames.length > 0 ? existingCharacterNames.join(',
 Locations: ${existingLocationNames.length > 0 ? existingLocationNames.join(', ') : '(none)'}
 Items: ${existingItemNames.length > 0 ? existingItemNames.join(', ') : '(none)'}
 
+## Active Story Beats (update these when resolved!)
+${existingBeatsList || '(none)'}
+
 ## Your Task
 1. Check if any EXISTING entities need updates (status change, new info learned, etc.)
-2. Identify any NEW significant entities introduced (apply the extraction rules strictly)
-3. Determine the current scene state
+2. **IMPORTANT**: Check if any active story beats have been COMPLETED or FAILED in this passage - mark them accordingly to keep the list clean
+3. Identify any NEW significant entities introduced (apply the extraction rules strictly)
+4. Determine the current scene state
 
 ## Response Format (JSON only)
 {
@@ -233,6 +252,7 @@ Items: ${existingItemNames.length > 0 ? existingItemNames.join(', ') : '(none)'}
     "characterUpdates": [],
     "locationUpdates": [],
     "itemUpdates": [],
+    "storyBeatUpdates": [],
     "newCharacters": [],
     "newLocations": [],
     "newItems": [],
@@ -252,6 +272,11 @@ characterUpdates: [{"name": "ExistingName", "changes": {"status": "active|inacti
 locationUpdates: [{"name": "ExistingName", "changes": {"visited": true, "current": true, "descriptionAddition": "new detail learned"}}]
 
 itemUpdates: [{"name": "ExistingName", "changes": {"quantity": 1, "equipped": true, "location": "${itemLocationOptions}"}}]
+
+storyBeatUpdates: [{"title": "ExistingBeatTitle", "changes": {"status": "completed|failed", "description": "optional updated description"}}]
+- Mark as "completed" when a quest is finished, goal achieved, mystery solved, or plot point resolved
+- Mark as "failed" when a quest becomes impossible, opportunity is lost, or goal is abandoned
+- Clean up old beats that are no longer relevant to the current story
 
 newCharacters: [{"name": "ProperName", "description": "one sentence", "relationship": "friend|enemy|ally|neutral|unknown", "traits": ["trait1"]}]
 
@@ -295,6 +320,8 @@ Return valid JSON only. Empty arrays are fine - don't invent entities that aren'
             ? parsed.entryUpdates.locationUpdates : [],
           itemUpdates: Array.isArray(parsed.entryUpdates?.itemUpdates)
             ? parsed.entryUpdates.itemUpdates : [],
+          storyBeatUpdates: Array.isArray(parsed.entryUpdates?.storyBeatUpdates)
+            ? parsed.entryUpdates.storyBeatUpdates : [],
           newCharacters: Array.isArray(parsed.entryUpdates?.newCharacters)
             ? parsed.entryUpdates.newCharacters : [],
           newLocations: Array.isArray(parsed.entryUpdates?.newLocations)
@@ -323,6 +350,7 @@ Return valid JSON only. Empty arrays are fine - don't invent entities that aren'
         characterUpdates: [],
         locationUpdates: [],
         itemUpdates: [],
+        storyBeatUpdates: [],
         newCharacters: [],
         newLocations: [],
         newItems: [],

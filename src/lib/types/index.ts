@@ -93,6 +93,7 @@ export interface StoryBeat {
   type: 'milestone' | 'quest' | 'revelation' | 'event' | 'plot_point';
   status: 'pending' | 'active' | 'completed' | 'failed';
   triggeredAt: number | null;
+  resolvedAt?: number | null;
   metadata: Record<string, unknown> | null;
 }
 

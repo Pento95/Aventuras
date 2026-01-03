@@ -20,12 +20,104 @@
     return story.getChapterEntries(chapter);
   }
 
+  /**
+   * Run lore management after manual chapter creation.
+   * Same as ActionInput's lore management, triggered per design doc section 3.4.
+   */
+  async function runLoreManagement() {
+    if (!story.currentStory) return;
+
+    console.log('[MemoryView] Starting lore management...');
+    ui.startLoreManagement();
+
+    let changeCount = 0;
+    const bumpChanges = (delta = 1) => {
+      changeCount += delta;
+      return changeCount;
+    };
+
+    try {
+      const result = await aiService.runLoreManagement(
+        story.currentStory.id,
+        [...story.lorebookEntries],
+        [],
+        story.chapters,
+        {
+          onCreateEntry: async (entry) => {
+            await story.addLorebookEntry({
+              name: entry.name,
+              type: entry.type,
+              description: entry.description,
+              hiddenInfo: entry.hiddenInfo,
+              aliases: entry.aliases,
+              state: entry.state,
+              adventureState: entry.adventureState,
+              creativeState: entry.creativeState,
+              injection: entry.injection,
+              firstMentioned: entry.firstMentioned,
+              lastMentioned: entry.lastMentioned,
+              mentionCount: entry.mentionCount,
+              createdBy: entry.createdBy,
+              loreManagementBlacklisted: entry.loreManagementBlacklisted,
+            });
+            ui.updateLoreManagementProgress('Creating entries...', bumpChanges());
+          },
+          onUpdateEntry: async (id, updates) => {
+            await story.updateLorebookEntry(id, updates);
+            ui.updateLoreManagementProgress('Updating entries...', bumpChanges());
+          },
+          onDeleteEntry: async (id) => {
+            await story.deleteLorebookEntry(id);
+            ui.updateLoreManagementProgress('Cleaning up entries...', bumpChanges());
+          },
+          onMergeEntries: async (entryIds, mergedEntry) => {
+            await story.deleteLorebookEntries(entryIds);
+            await story.addLorebookEntry({
+              name: mergedEntry.name,
+              type: mergedEntry.type,
+              description: mergedEntry.description,
+              hiddenInfo: mergedEntry.hiddenInfo,
+              aliases: mergedEntry.aliases,
+              state: mergedEntry.state,
+              adventureState: mergedEntry.adventureState,
+              creativeState: mergedEntry.creativeState,
+              injection: mergedEntry.injection,
+              firstMentioned: mergedEntry.firstMentioned,
+              lastMentioned: mergedEntry.lastMentioned,
+              mentionCount: mergedEntry.mentionCount,
+              createdBy: mergedEntry.createdBy,
+              loreManagementBlacklisted: mergedEntry.loreManagementBlacklisted,
+            });
+            ui.updateLoreManagementProgress('Merging entries...', bumpChanges());
+          },
+        }
+      );
+
+      console.log('[MemoryView] Lore management complete', {
+        changesCount: result.changes.length,
+        summary: result.summary,
+      });
+
+      ui.updateLoreManagementProgress(`Complete: ${result.summary}`, result.changes.length);
+    } finally {
+      setTimeout(() => {
+        ui.finishLoreManagement();
+      }, 2000);
+    }
+  }
+
   // Handle manual chapter creation
   async function handleCreateManualChapter(endEntryIndex: number) {
     ui.setMemoryLoading(true);
     try {
       await story.createManualChapter(endEntryIndex);
       ui.closeManualChapterModal();
+
+      // Trigger lore management after successful chapter creation
+      runLoreManagement().catch(err => {
+        console.error('[MemoryView] Lore management failed:', err);
+        ui.finishLoreManagement();
+      });
     } finally {
       ui.setMemoryLoading(false);
     }

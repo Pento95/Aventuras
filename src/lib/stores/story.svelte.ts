@@ -680,6 +680,7 @@ class StoryStore {
       characterUpdates: result.entryUpdates.characterUpdates.length,
       locationUpdates: result.entryUpdates.locationUpdates.length,
       itemUpdates: result.entryUpdates.itemUpdates.length,
+      storyBeatUpdates: result.entryUpdates.storyBeatUpdates.length,
       newCharacters: result.entryUpdates.newCharacters.length,
       newLocations: result.entryUpdates.newLocations.length,
       newItems: result.entryUpdates.newItems.length,
@@ -765,6 +766,29 @@ class StoryStore {
         await database.updateItem(existing.id, changes);
         this.items = this.items.map(i =>
           i.id === existing.id ? { ...i, ...changes } : i
+        );
+      }
+    }
+
+    // Apply story beat updates (mark as completed/failed)
+    for (const update of result.entryUpdates.storyBeatUpdates) {
+      const existing = this.storyBeats.find(b =>
+        b.title.toLowerCase() === update.title.toLowerCase()
+      );
+      if (existing) {
+        log('Updating story beat:', update.title, update.changes);
+        const changes: Partial<StoryBeat> = {};
+        if (update.changes.status) {
+          changes.status = update.changes.status;
+          // Set resolvedAt timestamp when completing or failing
+          if (update.changes.status === 'completed' || update.changes.status === 'failed') {
+            changes.resolvedAt = Date.now();
+          }
+        }
+        if (update.changes.description) changes.description = update.changes.description;
+        await database.updateStoryBeat(existing.id, changes);
+        this.storyBeats = this.storyBeats.map(b =>
+          b.id === existing.id ? { ...b, ...changes } : b
         );
       }
     }
@@ -896,14 +920,15 @@ class StoryStore {
       result.entryUpdates.newStoryBeats.length > 0 ||
       result.entryUpdates.characterUpdates.length > 0 ||
       result.entryUpdates.locationUpdates.length > 0 ||
-      result.entryUpdates.itemUpdates.length > 0;
+      result.entryUpdates.itemUpdates.length > 0 ||
+      result.entryUpdates.storyBeatUpdates.length > 0;
 
     if (hasChanges) {
       emitStateUpdated({
         characters: result.entryUpdates.newCharacters.length + result.entryUpdates.characterUpdates.length,
         locations: result.entryUpdates.newLocations.length + result.entryUpdates.locationUpdates.length,
         items: result.entryUpdates.newItems.length + result.entryUpdates.itemUpdates.length,
-        storyBeats: result.entryUpdates.newStoryBeats.length,
+        storyBeats: result.entryUpdates.newStoryBeats.length + result.entryUpdates.storyBeatUpdates.length,
       });
     }
   }

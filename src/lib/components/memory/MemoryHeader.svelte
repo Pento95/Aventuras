@@ -16,9 +16,9 @@
   const messagesSinceLastChapter = $derived(story.messagesSinceLastChapter);
   const bufferSize = $derived(story.memoryConfig.chapterBuffer);
 
-  const percentage = $derived(Math.min(100, Math.round((tokensOutsideBuffer / threshold) * 100)));
+  const percentage = $derived(threshold > 0 ? Math.min(100, Math.round((tokensOutsideBuffer / threshold) * 100)) : 0);
   const isNearThreshold = $derived(percentage >= 80);
-  const isOverThreshold = $derived(tokensOutsideBuffer >= threshold);
+  const isOverThreshold = $derived(percentage >= 100);
 
   function formatNumber(num: number): string {
     return num.toLocaleString();
@@ -61,10 +61,10 @@
     <div class="relative h-3 rounded-full bg-surface-700 overflow-hidden">
       <div
         class="absolute inset-y-0 left-0 rounded-full transition-all duration-300"
-        class:bg-primary-500={!isNearThreshold}
-        class:bg-yellow-500={isNearThreshold && !isOverThreshold}
+        class:bg-accent-500={!isNearThreshold}
+        class:bg-amber-500={isNearThreshold && !isOverThreshold}
         class:bg-red-500={isOverThreshold}
-        style="width: {percentage}%"
+        style:width="{percentage}%"
       ></div>
     </div>
 

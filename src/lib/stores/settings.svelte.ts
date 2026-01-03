@@ -228,11 +228,19 @@ Note: The story may be in Adventure mode (player as protagonist) or Creative Wri
 - Example: "The truth about the king's murder is revealed" = YES (revelation)
 - Example: "They enjoy a nice meal" = NO
 
+### Story Beat Updates - CRITICAL for cleanup:
+- Always check if existing story beats have been RESOLVED in this passage
+- Mark beats as "completed" when: quest finished, goal achieved, mystery solved, plot point resolved
+- Mark beats as "failed" when: quest becomes impossible, opportunity lost, goal abandoned
+- This prevents story beats from stacking up indefinitely
+- Example: If "Find the missing brother" was active and the brother is found, mark it completed
+
 ## Critical Rules
 1. When in doubt, DO NOT extract - false positives pollute the world state
 2. Only extract what ACTUALLY HAPPENED, not what might happen
 3. Use the exact names from the text, don't invent or embellish
-4. Respond with valid JSON only - no markdown, no explanation`,
+4. ALWAYS check if active story beats should be marked completed or failed
+5. Respond with valid JSON only - no markdown, no explanation`,
 
   chapterAnalysis: `# Role
 You are Auto Summarize Endpoint Selector. Your task is to identify the single best chapter endpoint in the provided message range.
