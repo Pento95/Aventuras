@@ -709,6 +709,7 @@ The person reading this opening is the AUTHOR, not a character. They sit outside
 - Tone: ${writingStyle.tone || 'immersive and engaging'}
 - 2-3 paragraphs of literary prose
 - Concrete sensory details grounded in character perception
+- Reach past the first cliché; invisible prose serves the story better than showy prose
 </style>
 
 <what_to_write>
@@ -717,6 +718,7 @@ Write a compelling opening that:
 - Shows ${userName} engaged in the world—what they're doing, thinking, noticing
 - Introduces tension, stakes, or interesting elements
 - Includes other characters if appropriate, with their own actions and dialogue
+- Builds toward one crystallizing moment—the image or line the reader remembers
 - Ends at a natural narrative beat that invites the author to direct what happens next
 </what_to_write>
 
@@ -730,12 +732,29 @@ ${userName} is a character you control. Write their:
 NEVER use second person ("you"). Always use "${userName}" or "he/she/they".
 </protagonist_as_character>
 
+<dialogue_craft>
+If dialogue appears:
+- Characters rarely answer directly—they deflect, interrupt, talk past each other
+- Compress rather than explain: don't spell out "A, therefore B, therefore C"
+- Interruptions cut mid-phrase, not after complete clauses
+- Status through brevity: authority figures state and act; they don't justify
+- Single-word responses can carry weight: "Evidence." "Always."
+- "Said" is invisible—use fancy tags sparingly
+- Mix clipped lines with fuller ones; vary rhythm naturally
+</dialogue_craft>
+
 <prohibited_patterns>
 Avoid cliché phrases: "like a physical blow," "ribs like a trapped bird," "heart hammering against ribs," "dust motes dancing," "silence stretched," "metallic tang," "voice dropping an octave," "for the first time in years"
 
 Banned words: ozone, orbs (for eyes), tresses, alabaster, porcelain
 
-Also avoid: purple prose, "not X but Y" constructs, telling emotions directly
+Also avoid:
+- Purple prose, "not X but Y" constructs, telling emotions directly
+- Explanation chains: characters spelling out logical steps
+- Formal hedging: "Protocol dictates," "It would suggest"
+- Over-clipped dialogue: not every line should be a fragment
+- Melodrama: hearts shattering, waves of emotion
+- Narrative bows: tying scenes with conclusions or realizations
 </prohibited_patterns>
 
 Respond with valid JSON:
@@ -767,6 +786,7 @@ Write ONLY:
 - What NPCs are doing, saying, or how they're positioned
 - Objects, details, and atmosphere of the scene
 - Tension, stakes, or interesting elements present
+- Build toward one crystallizing moment—the image or detail that anchors the scene
 
 Do NOT write:
 - "${userName} walks into..." / "${userName} looks at..." / "${userName} feels..."
@@ -779,7 +799,19 @@ Do NOT write:
 - Tone: ${writingStyle.tone || 'immersive and engaging'}
 - 2-3 paragraphs of environmental and situational detail
 - Concrete sensory details, not abstractions
+- Reach past the first cliché; favor specific, grounded imagery
 </style>
+
+<npc_dialogue>
+If NPCs speak:
+- Dialogue is imperfect—false starts, evasions, non sequiturs; not prepared speeches
+- Compress rather than explain: don't spell out "A, therefore B, therefore C"
+- Interruptions cut mid-phrase, not after complete clauses
+- Status through brevity: authority figures state and act; they don't justify
+- Single-word responses can carry weight
+- "Said" is invisible—use fancy tags sparingly
+- Characters talk past each other—they advance their own concerns
+</npc_dialogue>
 
 <ending>
 End by presenting a situation that naturally invites ${userName} to act:
@@ -796,7 +828,12 @@ Avoid cliché phrases: "like a physical blow," "dust motes dancing," "silence st
 
 Banned words: ozone, orbs (for eyes), tresses, alabaster, porcelain
 
-Also avoid: purple prose, "not X but Y" constructs
+Also avoid:
+- Purple prose, "not X but Y" constructs
+- Explanation chains: NPCs spelling out logical steps
+- Formal hedging: "Protocol dictates," "It would suggest"
+- Over-clipped dialogue: not every line should be a fragment
+- Dialogue tag overload: "said" is invisible; use fancy tags sparingly
 </prohibited_patterns>
 
 Respond with valid JSON:
@@ -955,6 +992,7 @@ The person reading this opening is the AUTHOR, not a character. They sit outside
 - ${tenseInstruction}
 - Tone: ${writingStyle.tone || 'immersive and engaging'}
 - 2-3 paragraphs of literary prose
+- Reach past the first cliché; invisible prose serves the story better than showy prose
 </style>
 
 <what_to_write>
@@ -962,18 +1000,34 @@ Write a compelling opening that:
 - Establishes the scene through ${userName}'s perspective and actions
 - Shows ${userName} engaged in the world—what they're doing, thinking, noticing
 - Introduces tension, stakes, or interesting elements
+- Builds toward one crystallizing moment—the image or line the reader remembers
 - Ends at a natural narrative beat that invites the author to direct what happens next
 
 ${userName} is a character you control. Write their actions, dialogue, thoughts, and perceptions.
 NEVER use second person ("you"). Always use "${userName}" or "he/she/they".
 </what_to_write>
 
+<dialogue_craft>
+If dialogue appears:
+- Characters rarely answer directly—they deflect, interrupt, talk past each other
+- Compress rather than explain: don't spell out "A, therefore B, therefore C"
+- Interruptions cut mid-phrase, not after complete clauses
+- Status through brevity: authority figures state and act; they don't justify
+- "Said" is invisible—use fancy tags sparingly
+- Mix clipped lines with fuller ones; vary rhythm naturally
+</dialogue_craft>
+
 <prohibited_patterns>
 Avoid cliché phrases: "like a physical blow," "ribs like a trapped bird," "heart hammering against ribs," "dust motes dancing," "silence stretched," "metallic tang," "voice dropping an octave," "for the first time in years"
 
 Banned words: ozone, orbs (for eyes), tresses, alabaster, porcelain
 
-Also avoid: purple prose, "not X but Y" constructs, telling emotions directly
+Also avoid:
+- Purple prose, "not X but Y" constructs, telling emotions directly
+- Explanation chains: characters spelling out logical steps
+- Formal hedging: "Protocol dictates," "It would suggest"
+- Over-clipped dialogue: not every line should be a fragment
+- Melodrama: hearts shattering, waves of emotion
 </prohibited_patterns>
 
 Write ONLY prose. No JSON, no metadata.`;
@@ -995,6 +1049,7 @@ Write ONLY:
 - The physical environment (sights, sounds, smells, textures)
 - What NPCs are doing, saying, or how they're positioned
 - Objects, details, and atmosphere of the scene
+- Build toward one crystallizing moment—the image or detail that anchors the scene
 
 Do NOT write:
 - "${userName} walks..." / "${userName} looks..." / "${userName} feels..."
@@ -1006,7 +1061,18 @@ Do NOT write:
 - ${tenseInstruction}
 - Tone: ${writingStyle.tone || 'immersive and engaging'}
 - 2-3 paragraphs of environmental and situational detail
+- Reach past the first cliché; favor specific, grounded imagery
 </style>
+
+<npc_dialogue>
+If NPCs speak:
+- Dialogue is imperfect—false starts, evasions, non sequiturs; not prepared speeches
+- Compress rather than explain: don't spell out "A, therefore B, therefore C"
+- Interruptions cut mid-phrase, not after complete clauses
+- Status through brevity: authority figures state and act; they don't justify
+- "Said" is invisible—use fancy tags sparingly
+- Characters talk past each other—they advance their own concerns
+</npc_dialogue>
 
 <ending>
 End with a situation inviting action: an NPC waiting, a door ajar, an object within reach.
@@ -1018,7 +1084,11 @@ Avoid cliché phrases: "like a physical blow," "dust motes dancing," "silence st
 
 Banned words: ozone, orbs (for eyes), tresses, alabaster, porcelain
 
-Also avoid: purple prose, "not X but Y" constructs
+Also avoid:
+- Purple prose, "not X but Y" constructs
+- Explanation chains: NPCs spelling out logical steps
+- Formal hedging: "Protocol dictates," "It would suggest"
+- Over-clipped dialogue: not every line should be a fragment
 </prohibited_patterns>
 
 Write ONLY prose. No JSON, no metadata.`;
@@ -1173,12 +1243,30 @@ The author's messages are DIRECTIONS, not character actions. Interpret "I do X" 
 Anchor every scene in concrete physical detail. Abstract nouns require physical correlatives.
 - Avoid: "felt nervous" → Instead show the physical symptom
 - Vary sentence rhythm: fragments for impact, longer clauses when moments need weight
+- Reach past the first cliché; invisible prose serves the story better than showy prose
+
+## Scene Structure
+- Build each response toward one crystallizing moment—the image or line the reader remembers
+- Structure: Setup → Setup → MOMENT → Brief aftermath
+- For reversals: setup intent clearly, let action play, land the gap
+- End scenes on concrete action, sensory detail, or dialogue—never by naming the emotional state
 
 ## Dialogue
-Characters should rarely answer questions directly. Map each line to:
-- What is said (text)
-- What is meant (subtext)
-- What the body does (status transaction)
+Characters should rarely answer questions directly:
+- Dialogue is imperfect—false starts, evasions, non sequiturs; not prepared speeches
+- Compress rather than explain: don't spell out "A, therefore B, therefore C"
+- Interruptions cut mid-phrase, not after complete clauses
+- Characters talk past each other—they advance their own concerns while nominally replying
+- Status through brevity: authority figures state and act; they don't justify
+- Expert characters USE knowledge in action; they don't LECTURE through their lines
+- "Said" is invisible—use fancy tags sparingly
+- Mix clipped lines with fuller ones; not every line should be a fragment
+
+## Relationship & Knowledge Dynamics
+- Characters with history should feel different from strangers—show accumulated weight
+- Leverage knowledge asymmetries: what characters don't know creates dramatic irony
+- Let characters act on false beliefs; protect the irony until the story earns revelation
+- Unresolved tension creates undertow in dialogue—they dance around it, avoid topics
 
 ## Style
 - ${povInstruction}
@@ -1201,6 +1289,11 @@ End each response at a natural narrative beat that invites the author to direct 
 - Treating the author as a character in the story
 - Melodramatic phrases: hearts shattering, waves of emotion, breath catching
 - Echo phrasing: restating what the author just wrote
+- Explanation chains: characters spelling out "A, therefore B, therefore C"
+- Formal hedging: "Protocol dictates," "It would suggest," "My assessment remains"
+- Over-clipped dialogue: not every line should be a fragment—vary rhythm naturally
+- Narrative bows: tying scenes with conclusions or realizations
+- Comfort smoothing: sanding down awkward moments into resolution
 - Breaking the narrative voice or referencing being an AI
 </forbidden_patterns>`;
     } else {
@@ -1224,11 +1317,28 @@ ${setting?.description || ''}
 Anchor every scene in concrete physical detail -sights, sounds, textures, smells.
 - Avoid abstract emotion words without physical correlatives
 - Not "felt nervous" → show the symptom: fidgeting hands, dry throat
+- Reach past the first cliché; favor specific, grounded imagery
 
-## Dialogue
-NPCs should feel like real people with their own agendas.
-- Characters deflect, interrupt, talk past each other
-- Power dynamics shift spatially -who claims space, who shrinks
+## Scene Structure
+- Build each response toward one crystallizing moment—the image or detail the player remembers
+- End at a moment of potential action that invites the player's next move
+
+## NPC Dialogue
+NPCs should feel like real people with their own agendas:
+- Dialogue is imperfect—false starts, evasions, non sequiturs; not prepared speeches
+- Compress rather than explain: don't spell out "A, therefore B, therefore C"
+- Interruptions cut mid-phrase, not after complete clauses
+- Characters talk past each other—they advance their own concerns while nominally replying
+- Status through brevity: authority figures state and act; they don't justify
+- Expert NPCs USE knowledge in action; they don't LECTURE through their lines
+- "Said" is invisible—use fancy tags sparingly
+- Mix clipped lines with fuller ones; not every line should be a fragment
+
+## Relationship & Knowledge Dynamics
+- NPCs with history feel different from strangers—show accumulated weight
+- Leverage knowledge asymmetries: what NPCs don't know creates dramatic irony
+- Let NPCs act on false beliefs; protect the irony until the story earns revelation
+- Unresolved tension creates undertow in dialogue—they dance around it, avoid topics
 
 ## Style
 - ${povInstruction}
@@ -1259,6 +1369,10 @@ End each response with ${userName} in a moment of potential action -an NPC waiti
 - Making decisions for ${userName} or assuming their next action
 - Melodramatic phrases: hearts shattering, waves of emotion
 - Describing what ${userName} thinks or feels unless they implied it
+- Explanation chains: NPCs spelling out "A, therefore B, therefore C"
+- Formal hedging: "Protocol dictates," "It would suggest," "My assessment remains"
+- Over-clipped dialogue: not every line should be a fragment—vary rhythm naturally
+- Dialogue tag overload: "said" is invisible; use fancy tags sparingly
 - Breaking character or referencing being an AI
 - Repeating information ${userName} already knows
 </forbidden_patterns>`;

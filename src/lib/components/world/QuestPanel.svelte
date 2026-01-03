@@ -43,6 +43,7 @@
       case 'quest': return 'Quest';
       case 'revelation': return 'Revelation';
       case 'event': return 'Event';
+      case 'plot_point': return 'Plot Point';
       default: return type;
     }
   }

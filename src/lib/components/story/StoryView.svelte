@@ -25,15 +25,10 @@
     return storyContainer.scrollHeight - storyContainer.scrollTop - storyContainer.clientHeight < threshold;
   }
 
-  // Check if device is mobile (Tailwind's sm breakpoint)
-  function isMobile(): boolean {
-    return typeof window !== 'undefined' && window.innerWidth < 640;
-  }
-
   // Handle scroll events during streaming
   function handleScroll() {
-    // Only track user scroll-ups on mobile during streaming
-    if (!isMobile() || !ui.isStreaming) return;
+    // Only track scroll during streaming
+    if (!ui.isStreaming) return;
 
     // If user scrolled away from bottom, break auto-scroll
     if (!isNearBottom()) {
