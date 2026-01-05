@@ -13,6 +13,7 @@
 
   let showNewStoryModal = $state(false);
   let showSetupWizard = $state(false);
+  let setupWizardKey = $state(0);
   let newStoryTitle = $state('');
   let selectedTemplateId = $state<string | null>(null);
   let selectedMode = $state<StoryMode>('adventure');
@@ -82,6 +83,11 @@
     selectedMode = 'adventure';
     selectedPOV = 'first';
     step = 'template';
+  }
+
+  function openSetupWizard() {
+    setupWizardKey += 1;
+    showSetupWizard = true;
   }
 
   function goBackToTemplates() {
@@ -191,7 +197,7 @@
         </button>
         <button
           class="btn btn-primary flex items-center gap-1.5 sm:gap-2 min-h-[44px] px-3 sm:px-4 text-sm"
-          onclick={() => showSetupWizard = true}
+          onclick={openSetupWizard}
         >
           <Sparkles class="h-4 w-4 sm:h-5 sm:w-5" />
           <span class="xs:hidden">New</span>
@@ -223,7 +229,7 @@
           </button>
           <button
             class="btn btn-primary flex items-center justify-center gap-2 min-h-[48px] w-full xs:w-auto"
-            onclick={() => showSetupWizard = true}
+            onclick={openSetupWizard}
           >
             <Sparkles class="h-5 w-5" />
             Create Story
@@ -483,5 +489,7 @@
 
 <!-- Setup Wizard -->
 {#if showSetupWizard}
-  <SetupWizard onClose={() => showSetupWizard = false} />
+  {#key setupWizardKey}
+    <SetupWizard onClose={() => showSetupWizard = false} />
+  {/key}
 {/if}

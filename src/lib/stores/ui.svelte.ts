@@ -314,6 +314,8 @@ class UIStore {
    */
   async loadActionChoices(storyId: string) {
     try {
+      // Reset in-memory choices when switching stories
+      this.actionChoices = [];
       const data = await database.getSetting('action_choices');
       if (data) {
         const parsed: PersistedActionChoices = JSON.parse(data);
