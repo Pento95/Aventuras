@@ -13,6 +13,8 @@ import type {
   ToolCall,
   AgenticMessage,
 } from './types';
+import { settings } from '$lib/stores/settings.svelte';
+import { ui } from '$lib/stores/ui.svelte';
 
 export const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/' //Used as the default.
 const DEBUG = true;
@@ -63,6 +65,17 @@ export class OpenAIProvider implements AIProvider {
       ? this.settings.openaiApiURL
       : this.settings.openaiApiURL + '/';
 
+    // Debug logging - log request if debug mode enabled
+    const startTime = Date.now();
+    let debugRequestId: string | undefined;
+    if (settings.uiSettings.debugMode) {
+      debugRequestId = ui.addDebugRequest('generateResponse', {
+        url: baseUrl + 'chat/completions',
+        method: 'POST',
+        body: requestBody,
+      });
+    }
+
     const response = await fetch(baseUrl + 'chat/completions', {
       method: 'POST',
       headers: {
@@ -80,6 +93,10 @@ export class OpenAIProvider implements AIProvider {
     if (!response.ok) {
       const error = await response.text();
       log('API error', { status: response.status, error });
+      // Debug logging - log error response
+      if (settings.uiSettings.debugMode && debugRequestId) {
+        ui.addDebugResponse(debugRequestId, 'generateResponse', { status: response.status, error }, startTime, error);
+      }
       throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
     }
 
@@ -89,6 +106,11 @@ export class OpenAIProvider implements AIProvider {
       contentLength: data.choices[0]?.message?.content?.length ?? 0,
       usage: data.usage,
     });
+
+    // Debug logging - log success response
+    if (settings.uiSettings.debugMode && debugRequestId) {
+      ui.addDebugResponse(debugRequestId, 'generateResponse', data, startTime);
+    }
 
     return {
       content: data.choices[0]?.message?.content ?? '',
@@ -131,6 +153,17 @@ export class OpenAIProvider implements AIProvider {
       ? this.settings.openaiApiURL
       : this.settings.openaiApiURL + '/';
 
+    // Debug logging - log request if debug mode enabled
+    const startTime = Date.now();
+    let debugRequestId: string | undefined;
+    if (settings.uiSettings.debugMode) {
+      debugRequestId = ui.addDebugRequest('generateWithTools', {
+        url: baseUrl + 'chat/completions',
+        method: 'POST',
+        body: requestBody,
+      });
+    }
+
     const response = await fetch(baseUrl + 'chat/completions', {
       method: 'POST',
       headers: {
@@ -148,6 +181,10 @@ export class OpenAIProvider implements AIProvider {
     if (!response.ok) {
       const error = await response.text();
       log('Tool API error', { status: response.status, error });
+      // Debug logging - log error response
+      if (settings.uiSettings.debugMode && debugRequestId) {
+        ui.addDebugResponse(debugRequestId, 'generateWithTools', { status: response.status, error }, startTime, error);
+      }
       throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
     }
 
@@ -190,6 +227,11 @@ export class OpenAIProvider implements AIProvider {
         arguments: tc.function.arguments,
       },
     }));
+
+    // Debug logging - log success response
+    if (settings.uiSettings.debugMode && debugRequestId) {
+      ui.addDebugResponse(debugRequestId, 'generateWithTools', data, startTime);
+    }
 
     return {
       content: message?.content ?? null,
@@ -238,6 +280,17 @@ export class OpenAIProvider implements AIProvider {
       ? this.settings.openaiApiURL
       : this.settings.openaiApiURL + '/';
 
+    // Debug logging - log request if debug mode enabled
+    const startTime = Date.now();
+    let debugRequestId: string | undefined;
+    if (settings.uiSettings.debugMode) {
+      debugRequestId = ui.addDebugRequest('streamResponse', {
+        url: baseUrl + 'chat/completions',
+        method: 'POST',
+        body: requestBody,
+      });
+    }
+
     const response = await fetch(baseUrl + 'chat/completions', {
       method: 'POST',
       headers: {
@@ -255,6 +308,10 @@ export class OpenAIProvider implements AIProvider {
     if (!response.ok) {
       const error = await response.text();
       log('Stream API error', { status: response.status, error });
+      // Debug logging - log error response
+      if (settings.uiSettings.debugMode && debugRequestId) {
+        ui.addDebugResponse(debugRequestId, 'streamResponse', { status: response.status, error }, startTime, error);
+      }
       throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
     }
 
@@ -269,6 +326,7 @@ export class OpenAIProvider implements AIProvider {
     const decoder = new TextDecoder();
     let buffer = '';
     let chunkCount = 0;
+    let fullContent = ''; // Accumulate content for debug logging
 
     while (true) {
       const { done, value } = await reader.read();
@@ -286,6 +344,14 @@ export class OpenAIProvider implements AIProvider {
           const data = line.slice(6);
           if (data === '[DONE]') {
             log('Received [DONE] signal');
+            // Debug logging - log accumulated response
+            if (settings.uiSettings.debugMode && debugRequestId) {
+              ui.addDebugResponse(debugRequestId, 'streamResponse', {
+                content: fullContent,
+                chunks: chunkCount,
+                streaming: true,
+              }, startTime);
+            }
             yield { content: '', done: true };
             return;
           }
@@ -295,6 +361,7 @@ export class OpenAIProvider implements AIProvider {
             const content = parsed.choices[0]?.delta?.content ?? '';
             if (content) {
               chunkCount++;
+              fullContent += content; // Accumulate for debug logging
               if (chunkCount <= 3) {
                 log('Stream chunk received', { chunkCount, contentLength: content.length });
               }
@@ -306,6 +373,15 @@ export class OpenAIProvider implements AIProvider {
           }
         }
       }
+    }
+
+    // Debug logging - log accumulated response if stream ended without [DONE]
+    if (settings.uiSettings.debugMode && debugRequestId) {
+      ui.addDebugResponse(debugRequestId, 'streamResponse', {
+        content: fullContent,
+        chunks: chunkCount,
+        streaming: true,
+      }, startTime);
     }
 
     log('Stream finished', { totalChunks: chunkCount });

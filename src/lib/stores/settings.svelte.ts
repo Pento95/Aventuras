@@ -911,6 +911,7 @@ class SettingsStore {
     showWordCount: true,
     autoSave: true,
     spellcheckEnabled: true,
+    debugMode: false,
   });
 
   advancedRequestSettings = $state<AdvancedRequestSettings>(getDefaultAdvancedRequestSettings());
@@ -1042,6 +1043,9 @@ class SettingsStore {
       if (showWordCount) this.uiSettings.showWordCount = showWordCount === 'true';
       if (autoSave) this.uiSettings.autoSave = autoSave === 'true';
       if (spellcheckEnabled !== null) this.uiSettings.spellcheckEnabled = spellcheckEnabled === 'true';
+
+      const debugMode = await database.getSetting('debug_mode');
+      if (debugMode !== null) this.uiSettings.debugMode = debugMode === 'true';
 
       const manualMode = await database.getSetting('advanced_manual_mode');
       if (manualMode !== null) {
@@ -1620,6 +1624,11 @@ class SettingsStore {
     await database.setSetting('spellcheck_enabled', enabled.toString());
   }
 
+  async setDebugMode(enabled: boolean) {
+    this.uiSettings.debugMode = enabled;
+    await database.setSetting('debug_mode', enabled.toString());
+  }
+
   async setAdvancedManualMode(enabled: boolean) {
     this.advancedRequestSettings.manualMode = enabled;
     await database.setSetting('advanced_manual_mode', enabled.toString());
@@ -1795,6 +1804,7 @@ class SettingsStore {
       showWordCount: true,
       autoSave: true,
       spellcheckEnabled: true,
+      debugMode: false,
     };
 
     this.advancedRequestSettings = getDefaultAdvancedRequestSettings();
@@ -1824,6 +1834,7 @@ class SettingsStore {
     await database.setSetting('show_word_count', this.uiSettings.showWordCount.toString());
     await database.setSetting('auto_save', this.uiSettings.autoSave.toString());
     await database.setSetting('spellcheck_enabled', this.uiSettings.spellcheckEnabled.toString());
+    await database.setSetting('debug_mode', this.uiSettings.debugMode.toString());
     await database.setSetting('advanced_manual_mode', this.advancedRequestSettings.manualMode.toString());
     await this.saveWizardSettings();
     await this.saveStoryGenerationSettings();

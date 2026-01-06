@@ -8,6 +8,17 @@ import { database } from '$lib/services/database';
 
 type ActionInputType = 'do' | 'say' | 'think' | 'story' | 'free';
 
+// Debug log entry for request/response logging
+export interface DebugLogEntry {
+  id: string;
+  timestamp: number;
+  type: 'request' | 'response';
+  serviceName: string;
+  data: Record<string, unknown>;
+  duration?: number; // For responses, time taken in ms
+  error?: string; // For error responses
+}
+
 // Backup for retry functionality - captures state before each user message
 export interface RetryBackup {
   storyId: string;
@@ -121,6 +132,11 @@ class UIStore {
   loreManagementActive = $state(false);
   loreManagementProgress = $state('');
   loreManagementChanges = $state<number>(0);
+
+  // Debug mode state - session-only request/response logging
+  debugLogs = $state<DebugLogEntry[]>([]);
+  debugModalOpen = $state(false);
+  private debugLogIdCounter = 0;
 
   // Lorebook activation tracking for stickiness
   // Maps entry ID -> last activation position (story entry index)
@@ -767,6 +783,82 @@ class UIStore {
       data: { ...this.activationData },
       position: this.currentStoryPosition,
     };
+  }
+
+  // Debug log methods
+
+  /**
+   * Add a request log entry. Returns the entry ID for pairing with response.
+   */
+  addDebugRequest(serviceName: string, data: Record<string, unknown>): string {
+    const id = `debug-${++this.debugLogIdCounter}-${Date.now()}`;
+    const entry: DebugLogEntry = {
+      id,
+      timestamp: Date.now(),
+      type: 'request',
+      serviceName,
+      data,
+    };
+    this.debugLogs = [...this.debugLogs, entry];
+    // Keep only last 100 entries to prevent memory issues
+    if (this.debugLogs.length > 100) {
+      this.debugLogs = this.debugLogs.slice(-100);
+    }
+    return id;
+  }
+
+  /**
+   * Add a response log entry paired with a request.
+   */
+  addDebugResponse(
+    requestId: string,
+    serviceName: string,
+    data: Record<string, unknown>,
+    startTime: number,
+    error?: string
+  ) {
+    const entry: DebugLogEntry = {
+      id: `${requestId}-response`,
+      timestamp: Date.now(),
+      type: 'response',
+      serviceName,
+      data,
+      duration: Date.now() - startTime,
+      error,
+    };
+    this.debugLogs = [...this.debugLogs, entry];
+    // Keep only last 100 entries to prevent memory issues
+    if (this.debugLogs.length > 100) {
+      this.debugLogs = this.debugLogs.slice(-100);
+    }
+  }
+
+  /**
+   * Clear all debug logs (session clear).
+   */
+  clearDebugLogs() {
+    this.debugLogs = [];
+  }
+
+  /**
+   * Open the debug log modal.
+   */
+  openDebugModal() {
+    this.debugModalOpen = true;
+  }
+
+  /**
+   * Close the debug log modal.
+   */
+  closeDebugModal() {
+    this.debugModalOpen = false;
+  }
+
+  /**
+   * Toggle the debug log modal.
+   */
+  toggleDebugModal() {
+    this.debugModalOpen = !this.debugModalOpen;
   }
 }
 

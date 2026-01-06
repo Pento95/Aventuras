@@ -1047,6 +1047,35 @@
               <p class="mt-2 text-xs text-red-400">{providerError} Using fallback list.</p>
             {/if}
           </div>
+
+          <!-- Debug Mode Toggle -->
+          <div class="border-b border-surface-700 pb-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-medium text-surface-200">Debug Mode</h3>
+                <p class="text-xs text-surface-500">Log API requests and responses for debugging.</p>
+              </div>
+              <button
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                class:bg-accent-600={settings.uiSettings.debugMode}
+                class:bg-surface-600={!settings.uiSettings.debugMode}
+                onclick={() => settings.setDebugMode(!settings.uiSettings.debugMode)}
+                aria-label="Toggle debug mode"
+              >
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                  class:translate-x-6={settings.uiSettings.debugMode}
+                  class:translate-x-1={!settings.uiSettings.debugMode}
+                ></span>
+              </button>
+            </div>
+            {#if settings.uiSettings.debugMode}
+              <p class="mt-2 text-xs text-amber-400/80">
+                A debug button will appear to view request/response logs. Logs are session-only.
+              </p>
+            {/if}
+          </div>
+
           <!-- Story Generation Section -->
           <div class="border-b border-surface-700 pb-3">
             <div class="flex items-center justify-between">

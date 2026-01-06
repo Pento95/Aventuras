@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ui } from '$lib/stores/ui.svelte';
   import { story } from '$lib/stores/story.svelte';
+  import { settings } from '$lib/stores/settings.svelte';
   import Sidebar from './Sidebar.svelte';
   import Header from './Header.svelte';
   import StoryView from '$lib/components/story/StoryView.svelte';
@@ -9,7 +10,9 @@
   import MemoryView from '$lib/components/memory/MemoryView.svelte';
   import SettingsModal from '$lib/components/settings/SettingsModal.svelte';
   import LorebookDebugPanel from '$lib/components/debug/LorebookDebugPanel.svelte';
+  import DebugLogModal from '$lib/components/debug/DebugLogModal.svelte';
   import { swipe } from '$lib/utils/swipe';
+  import { Bug } from 'lucide-svelte';
   import type { Snippet } from 'svelte';
 
   let { children }: { children?: Snippet } = $props();
@@ -82,6 +85,25 @@
 
   <!-- Lorebook Debug Panel -->
   <LorebookDebugPanel />
+
+  <!-- Debug Log Modal -->
+  <DebugLogModal />
+
+  <!-- Floating Debug Button (when debug mode enabled) -->
+  {#if settings.uiSettings.debugMode}
+    <button
+      class="fixed bottom-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-amber-600 text-white shadow-lg hover:bg-amber-500 transition-colors"
+      onclick={() => ui.toggleDebugModal()}
+      title="View API Debug Logs"
+    >
+      <Bug class="h-5 w-5" />
+      {#if ui.debugLogs.length > 0}
+        <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium">
+          {ui.debugLogs.length > 99 ? '99+' : ui.debugLogs.length}
+        </span>
+      {/if}
+    </button>
+  {/if}
 </div>
 
 <style>

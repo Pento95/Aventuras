@@ -400,6 +400,7 @@ export interface UISettings {
   showWordCount: boolean;
   autoSave: boolean;
   spellcheckEnabled: boolean;
+  debugMode: boolean;
 }
 
 export interface UpdateSettings {
