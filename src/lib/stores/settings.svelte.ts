@@ -697,6 +697,7 @@ export interface EntryRetrievalSettings {
   model: string;
   temperature: number;
   maxTier3Entries: number;  // 0 = unlimited
+  maxWordsPerEntry: number; // 0 = unlimited
   enableLLMSelection: boolean;
 }
 
@@ -706,6 +707,7 @@ export function getDefaultEntryRetrievalSettings(): EntryRetrievalSettings {
     model: 'x-ai/grok-4.1-fast',
     temperature: 0.2,
     maxTier3Entries: 0,
+    maxWordsPerEntry: 0,
     enableLLMSelection: true,
   };
 }
@@ -720,6 +722,7 @@ export function getDefaultEntryRetrievalSettingsForProvider(provider: ProviderPr
     model,
     temperature,
     maxTier3Entries: 0,
+    maxWordsPerEntry: 0,
     enableLLMSelection: true,
   };
 }

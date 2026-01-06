@@ -60,6 +60,8 @@ function log(...args: any[]) {
 export interface EntryRetrievalConfig {
   /** Maximum entries to include from Tier 3 (0 = unlimited) */
   maxTier3Entries: number;
+  /** Maximum words per lorebook entry (0 = unlimited) */
+  maxWordsPerEntry: number;
   /** Enable LLM selection for Tier 3 */
   enableLLMSelection: boolean;
   /** Number of recent story entries to check for keyword matching */
@@ -72,6 +74,7 @@ export interface EntryRetrievalConfig {
 
 export const DEFAULT_ENTRY_RETRIEVAL_CONFIG: EntryRetrievalConfig = {
   maxTier3Entries: 0, // No limit - select all relevant
+  maxWordsPerEntry: 0,
   enableLLMSelection: true,
   recentEntriesCount: 5,
   tier3Model: 'x-ai/grok-4.1-fast',
@@ -84,8 +87,15 @@ export const DEFAULT_ENTRY_RETRIEVAL_CONFIG: EntryRetrievalConfig = {
  */
 export function getEntryRetrievalConfigFromSettings(): EntryRetrievalConfig {
   const entrySettings = settings.systemServicesSettings.entryRetrieval;
+  const maxWordsPerEntryRaw = typeof entrySettings.maxWordsPerEntry === 'number'
+    ? entrySettings.maxWordsPerEntry
+    : Number(entrySettings.maxWordsPerEntry);
+  const maxWordsPerEntry = Number.isFinite(maxWordsPerEntryRaw)
+    ? Math.min(Math.max(0, Math.floor(maxWordsPerEntryRaw)), 500)
+    : 0;
   return {
     maxTier3Entries: entrySettings.maxTier3Entries ?? 0,
+    maxWordsPerEntry,
     enableLLMSelection: entrySettings.enableLLMSelection ?? true,
     recentEntriesCount: 5, // Not configurable currently
     tier3Model: entrySettings.model ?? DEFAULT_ENTRY_RETRIEVAL_CONFIG.tier3Model,
@@ -115,6 +125,8 @@ export class EntryRetrievalService {
   constructor(provider: OpenAIProvider | null, config: Partial<EntryRetrievalConfig> = {}) {
     this.provider = provider;
     this.config = { ...DEFAULT_ENTRY_RETRIEVAL_CONFIG, ...config };
+    const maxWords = Number.isFinite(this.config.maxWordsPerEntry) ? this.config.maxWordsPerEntry : 0;
+    this.config.maxWordsPerEntry = Math.min(Math.max(0, Math.floor(maxWords)), 500);
   }
 
   /**
@@ -535,7 +547,8 @@ export class EntryRetrievalService {
     // Build numbered entry list (simple 1, 2, 3...)
     const entryList = availableEntries
       .map((e, i) => {
-        const desc = e.description ? `: ${e.description}` : '';
+        const description = e.description ? this.truncateEntryText(e.description) : '';
+        const desc = description ? `: ${description}` : '';
         return `${i + 1}. [${e.type.toUpperCase()}] "${e.name}"${desc}`;
       })
       .join('\n');
@@ -689,7 +702,8 @@ Return an empty array [] if none are relevant.`;
     if (byType.character.length > 0) {
       block += '\n\n• Characters:';
       for (const { entry } of byType.character) {
-        block += `\n  - ${entry.name}: ${entry.description}`;
+        const description = this.truncateEntryText(entry.description);
+        block += `\n  - ${entry.name}: ${description}`;
         if (entry.state?.type === 'character') {
           const state = entry.state;
           if (state.currentDisposition) {
@@ -703,7 +717,8 @@ Return an empty array [] if none are relevant.`;
     if (byType.location.length > 0) {
       block += '\n\n• Locations:';
       for (const { entry } of byType.location) {
-        block += `\n  - ${entry.name}: ${entry.description}`;
+        const description = this.truncateEntryText(entry.description);
+        block += `\n  - ${entry.name}: ${description}`;
       }
     }
 
@@ -711,7 +726,8 @@ Return an empty array [] if none are relevant.`;
     if (byType.item.length > 0) {
       block += '\n\n• Items:';
       for (const { entry } of byType.item) {
-        block += `\n  - ${entry.name}: ${entry.description}`;
+        const description = this.truncateEntryText(entry.description);
+        block += `\n  - ${entry.name}: ${description}`;
       }
     }
 
@@ -719,7 +735,8 @@ Return an empty array [] if none are relevant.`;
     if (byType.faction.length > 0) {
       block += '\n\n• Factions:';
       for (const { entry } of byType.faction) {
-        block += `\n  - ${entry.name}: ${entry.description}`;
+        const description = this.truncateEntryText(entry.description);
+        block += `\n  - ${entry.name}: ${description}`;
       }
     }
 
@@ -727,7 +744,8 @@ Return an empty array [] if none are relevant.`;
     if (byType.concept.length > 0) {
       block += '\n\n• Lore:';
       for (const { entry } of byType.concept) {
-        block += `\n  - ${entry.name}: ${entry.description}`;
+        const description = this.truncateEntryText(entry.description);
+        block += `\n  - ${entry.name}: ${description}`;
       }
     }
 
@@ -735,11 +753,22 @@ Return an empty array [] if none are relevant.`;
     if (byType.event.length > 0) {
       block += '\n\n• Events:';
       for (const { entry } of byType.event) {
-        block += `\n  - ${entry.name}: ${entry.description}`;
+        const description = this.truncateEntryText(entry.description);
+        block += `\n  - ${entry.name}: ${description}`;
       }
     }
 
     return block;
+  }
+
+  private truncateEntryText(text: string): string {
+    const maxWords = this.config.maxWordsPerEntry;
+    if (!maxWords || maxWords <= 0) return text;
+    const trimmed = text.trim();
+    if (!trimmed) return text;
+    const words = trimmed.split(/\s+/);
+    if (words.length <= maxWords) return text;
+    return `${words.slice(0, maxWords).join(' ')} [...]`;
   }
 }
 

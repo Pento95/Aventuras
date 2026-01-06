@@ -1794,6 +1794,26 @@
                       <span>50 max</span>
                     </div>
                   </div>
+
+                  <!-- Truncation -->
+                  <div class="mt-3">
+                    <label class="mb-1 block text-xs font-medium text-surface-400">
+                      Truncation (max words per entry): {settings.systemServicesSettings.entryRetrieval.maxWordsPerEntry === 0 ? 'Unlimited' : settings.systemServicesSettings.entryRetrieval.maxWordsPerEntry}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="500"
+                      step="10"
+                      bind:value={settings.systemServicesSettings.entryRetrieval.maxWordsPerEntry}
+                      onchange={() => settings.saveSystemServicesSettings()}
+                      class="w-full h-2"
+                    />
+                    <div class="flex justify-between text-xs text-surface-500">
+                      <span>0 = unlimited</span>
+                      <span>500 max</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             {/if}
