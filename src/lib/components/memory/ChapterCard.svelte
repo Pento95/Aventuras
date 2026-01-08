@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Chapter, StoryEntry } from '$lib/types';
+  import type { Chapter, StoryEntry, TimeTracker } from '$lib/types';
   import { ui } from '$lib/stores/ui.svelte';
   import { story } from '$lib/stores/story.svelte';
   import ChapterEntryList from './ChapterEntryList.svelte';
@@ -12,6 +12,7 @@
     Users,
     MapPin,
     Theater,
+    Clock,
     Save,
     X,
   } from 'lucide-svelte';
@@ -33,6 +34,29 @@
   // Reset edit state when chapter changes
   $effect(() => {
     editedSummary = chapter.summary;
+  });
+
+  // Format time for display (compact version)
+  function formatTime(time: TimeTracker | null): string {
+    if (!time) return '';
+    const parts: string[] = [];
+    if (time.years > 0) parts.push(`Y${time.years}`);
+    if (time.days > 0) parts.push(`D${time.days}`);
+    const hour = time.hours.toString().padStart(2, '0');
+    const minute = time.minutes.toString().padStart(2, '0');
+    parts.push(`${hour}:${minute}`);
+    return parts.join(' ');
+  }
+
+  // Format time range for display
+  const timeRangeDisplay = $derived.by(() => {
+    if (!chapter.startTime && !chapter.endTime) return null;
+    const start = formatTime(chapter.startTime);
+    const end = formatTime(chapter.endTime);
+    if (start && end && start !== end) {
+      return `${start} → ${end}`;
+    }
+    return start || end || null;
   });
 
   function toggleExpand() {
@@ -157,6 +181,12 @@
   <!-- Metadata Row -->
   <div class="px-3 pb-3 flex items-center justify-between gap-2 flex-wrap">
     <div class="flex items-center gap-3 text-xs text-surface-500">
+      {#if timeRangeDisplay}
+        <span class="flex items-center gap-1" title="Time span">
+          <Clock class="h-3.5 w-3.5" />
+          <span>{timeRangeDisplay}</span>
+        </span>
+      {/if}
       {#if chapter.emotionalTone}
         <span class="flex items-center gap-1" title="Emotional tone">
           <Theater class="h-3.5 w-3.5" />
