@@ -23,6 +23,23 @@ function log(...args: any[]) {
   }
 }
 
+/**
+ * Format a TimeTracker into a human-readable string for the narrative prompt.
+ */
+function formatStoryTime(time: TimeTracker | null | undefined): string | null {
+  if (!time) return null;
+  const parts: string[] = [];
+  if (time.years > 0) parts.push(`Year ${time.years}`);
+  if (time.days > 0) parts.push(`Day ${time.days}`);
+  // Always include time of day for narrative context
+  const hour = time.hours;
+  const minute = time.minutes.toString().padStart(2, '0');
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  parts.push(`${hour12}:${minute} ${period}`);
+  return parts.join(', ');
+}
+
 interface WorldState {
   characters: Character[];
   locations: Location[];
@@ -92,7 +109,7 @@ class AIService {
       ? 'third'
       : (pov === 'third' ? 'third' : 'second');
     const tense = story?.settings?.tense ?? (mode === 'creative-writing' ? 'past' : 'present');
-    const systemPrompt = this.buildSystemPrompt(worldState, story?.templateId, undefined, mode, undefined, systemPromptOverride, promptPov, tense);
+    const systemPrompt = this.buildSystemPrompt(worldState, story?.templateId, undefined, mode, undefined, systemPromptOverride, promptPov, tense, story?.timeTracker);
     log('System prompt built, length:', systemPrompt.length, 'mode:', mode, 'pov:', promptPov, 'tense:', tense);
 
     // Build conversation history
@@ -218,7 +235,8 @@ class AIService {
       tieredContextBlock,
       systemPromptOverride,
       promptPov,
-      tense
+      tense,
+      story?.timeTracker
     );
 
     // Inject chapter summaries if chapters exist
@@ -914,7 +932,8 @@ I am the player. You narrate the world around me. Begin when I take my first act
     tieredContextBlock?: string,
     systemPromptOverride?: string,
     pov?: 'first' | 'second' | 'third',
-    tense: 'past' | 'present' = 'present'
+    tense: 'past' | 'present' = 'present',
+    timeTracker?: TimeTracker | null
   ): string {
     // Use custom system prompt if provided (from wizard-generated stories)
     let basePrompt = '';
@@ -1053,6 +1072,13 @@ Example: "You ${tense === 'past' ? 'stepped' : 'step'} forward..." or "You ${ten
         hasContext = true;
         contextBlock += retrievedContext;
       }
+    }
+
+    // Add current story time if available
+    const formattedTime = formatStoryTime(timeTracker);
+    if (formattedTime) {
+      hasContext = true;
+      contextBlock = `\n\n[CURRENT STORY TIME]\n${formattedTime}` + contextBlock;
     }
 
     // Combine prompt with context
