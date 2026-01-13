@@ -106,7 +106,7 @@ class SyncService {
       throw new Error(`Story not found: ${storyId}`);
     }
 
-    const [entries, characters, locations, items, storyBeats, lorebookEntries, embeddedImages, checkpoints, branches] =
+    const [entries, characters, locations, items, storyBeats, lorebookEntries, embeddedImages, checkpoints, branches, chapters] =
       await Promise.all([
         database.getStoryEntries(storyId),
         database.getCharacters(storyId),
@@ -117,10 +117,11 @@ class SyncService {
         database.getEmbeddedImagesForStory(storyId),
         database.getCheckpoints(storyId),
         database.getBranches(storyId),
+        database.getChapters(storyId),
       ]);
 
     const exportData: AventuraExport = {
-      version: '1.6.0',
+      version: '1.7.0',
       exportedAt: Date.now(),
       story: storyData,
       entries,
@@ -133,6 +134,7 @@ class SyncService {
       embeddedImages,
       checkpoints,
       branches,
+      chapters,
     };
 
     return JSON.stringify(exportData);

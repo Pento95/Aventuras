@@ -18,6 +18,7 @@ export interface AventuraExport {
   embeddedImages?: EmbeddedImage[]; // Added in v1.4.0
   checkpoints?: Checkpoint[]; // Added in v1.6.0
   branches?: Branch[]; // Added in v1.6.0
+  chapters?: Chapter[]; // Added in v1.7.0
 }
 
 // Version history for import compatibility
@@ -28,9 +29,10 @@ export interface AventuraExport {
 // v1.4.0 - Added embeddedImages (generated images embedded in story entries)
 // v1.5.0 - Added character portraits
 // v1.6.0 - Added checkpoints and branches
+// v1.7.0 - Added chapters (memory system)
 
 class ExportService {
-  private readonly VERSION = '1.6.0';
+  private readonly VERSION = '1.7.0';
 
   /**
    * Compare semantic versions. Returns:
@@ -71,6 +73,9 @@ class ExportService {
     if (this.compareVersions(importVersion, '1.6.0') < 0) {
       console.warn(`[Import] File from v${importVersion} predates branching data (v1.6.0). Branches and checkpoints will not be restored.`);
     }
+    if (this.compareVersions(importVersion, '1.7.0') < 0) {
+      console.warn(`[Import] File from v${importVersion} predates chapters (v1.7.0). Chapter summaries (memory) will not be restored.`);
+    }
   }
 
   // Export to Aventura format (.avt - JSON)
@@ -84,7 +89,8 @@ class ExportService {
     lorebookEntries: Entry[] = [],
     embeddedImages: EmbeddedImage[] = [],
     checkpoints: Checkpoint[] = [],
-    branches: Branch[] = []
+    branches: Branch[] = [],
+    chapters: Chapter[] = []
   ): Promise<boolean> {
     const exportData: AventuraExport = {
       version: this.VERSION,
@@ -100,6 +106,7 @@ class ExportService {
       embeddedImages,
       checkpoints,
       branches,
+      chapters,
     };
 
     const filePath = await save({
@@ -619,6 +626,34 @@ class ExportService {
         const mappedCurrentBranch = branchIdMap.get(data.story.currentBranchId) ?? null;
         if (mappedCurrentBranch) {
           await database.setStoryCurrentBranch(newStoryId, mappedCurrentBranch);
+        }
+      }
+
+      // Import chapters (added in v1.7.0)
+      if (data.chapters) {
+        for (const chapter of data.chapters) {
+          const newChapterId = crypto.randomUUID();
+          oldToNewId.set(chapter.id, newChapterId);
+
+          await database.addChapter({
+            id: newChapterId,
+            storyId: newStoryId,
+            number: chapter.number,
+            title: chapter.title,
+            startEntryId: oldToNewId.get(chapter.startEntryId) ?? chapter.startEntryId,
+            endEntryId: oldToNewId.get(chapter.endEntryId) ?? chapter.endEntryId,
+            entryCount: chapter.entryCount,
+            summary: chapter.summary,
+            startTime: chapter.startTime,
+            endTime: chapter.endTime,
+            keywords: chapter.keywords,
+            characters: chapter.characters,
+            locations: chapter.locations,
+            plotThreads: chapter.plotThreads,
+            emotionalTone: chapter.emotionalTone,
+            branchId: chapter.branchId ? (branchIdMap.get(chapter.branchId) ?? null) : null,
+            createdAt: chapter.createdAt,
+          });
         }
       }
 

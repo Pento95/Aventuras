@@ -59,6 +59,7 @@
       embeddedImages,
       checkpoints,
       branches,
+      chapters,
     ] = await Promise.all([
       database.getStoryEntries(story.currentStory.id),
       database.getCharacters(story.currentStory.id),
@@ -69,6 +70,7 @@
       database.getEmbeddedImagesForStory(story.currentStory.id),
       database.getCheckpoints(story.currentStory.id),
       database.getBranches(story.currentStory.id),
+      database.getChapters(story.currentStory.id),
     ]);
     await exportService.exportToAventura(
       story.currentStory,
@@ -80,7 +82,8 @@
       lorebookEntries,
       embeddedImages,
       checkpoints,
-      branches
+      branches,
+      chapters
     );
   }
 
