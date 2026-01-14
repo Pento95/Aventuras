@@ -23,7 +23,7 @@ import { emitImageQueued, emitImageReady } from '$lib/services/events';
 import { normalizeImageDataUrl } from '$lib/utils/image';
 import { extractPicTags, type ParsedPicTag } from '$lib/utils/inlineImageParser';
 
-const DEBUG = true;
+const DEBUG = false;
 
 function log(...args: any[]) {
   if (DEBUG) {
