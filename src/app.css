@@ -827,8 +827,9 @@
 
   /* Remove margin from inline generated images */
   .inline-generated-image img {
-    @apply my-0 rounded-none;
+    @apply my-0 rounded-xl;
   }
+
 
   /* Strikethrough */
   del {
@@ -2197,7 +2198,7 @@ body {
   display: block;
   vertical-align: bottom;
   margin: 0;
-  border-radius: 0.65rem;
+  border-radius: 0.75rem;
 }
 
 /* In Visual Prose mode, center inline images */
