@@ -281,6 +281,7 @@ export interface WizardData {
     pov: POV;
     tense: Tense;
     tone: string;
+    visualProseMode?: boolean;
   };
   title: string;
   openingGuidance?: string; // Creative writing mode: user guidance for the opening scene
@@ -1054,11 +1055,11 @@ class ScenarioService {
   /**
    * Convert wizard data to story creation parameters.
    */
-  prepareStoryData(wizardData: WizardData, opening: GeneratedOpening): {
+prepareStoryData(wizardData: WizardData, opening: GeneratedOpening): {
     title: string;
     genre: string;
     mode: StoryMode;
-    settings: { pov: POV; tense: Tense; tone?: string; themes?: string[] };
+    settings: { pov: POV; tense: Tense; tone?: string; themes?: string[]; visualProseMode?: boolean };
     protagonist: Partial<Character>;
     startingLocation: Partial<Location>;
     initialItems: Partial<Item>[];
@@ -1081,6 +1082,7 @@ class ScenarioService {
         tense: writingStyle.tense,
         tone: writingStyle.tone,
         themes: expandedSetting?.themes,
+        visualProseMode: writingStyle.visualProseMode,
       },
       protagonist: {
         name: protagonist?.name || (writingStyle.pov === 'second' ? 'You' : 'The Protagonist'),
@@ -1210,7 +1212,9 @@ End each response at a natural narrative beat that invites the author to direct 
 - Narrative bows: tying scenes with conclusions or realizations
 - Comfort smoothing: sanding down awkward moments into resolution
 - Breaking the narrative voice or referencing being an AI
-</forbidden_patterns>`;
+</forbidden_patterns>
+
+{{visualProseBlock}}`;
     } else {
       return `You are the narrator of an interactive ${genreLabel} adventure with ${userName}. You control all NPCs, environments, and plot progression. You are the narrator -never ${userName}'s character.
 
@@ -1290,7 +1294,9 @@ End each response with ${userName} in a moment of potential action -an NPC waiti
 - Dialogue tag overload: "said" is invisible; use fancy tags sparingly
 - Breaking character or referencing being an AI
 - Repeating information ${userName} already knows
-</forbidden_patterns>`;
+</forbidden_patterns>
+
+{{visualProseBlock}}`;
     }
   }
 

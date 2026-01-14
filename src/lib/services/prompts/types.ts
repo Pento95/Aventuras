@@ -150,6 +150,9 @@ export interface PromptContext {
   settingDescription?: string;
   themes?: string[];
 
+  // Visual Prose Mode
+  visualProseMode?: boolean;
+
   /**
    * Additional custom values for user-defined macros.
    * Key is the macro token, value is the resolved text.

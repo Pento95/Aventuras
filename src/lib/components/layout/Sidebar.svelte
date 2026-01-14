@@ -73,7 +73,7 @@
       <QuestPanel />
     {:else if ui.sidebarTab === 'time'}
       <TimePanel />
-    {:else if ui.sidebarTab === 'branches'}
+{:else if ui.sidebarTab === 'branches'}
       <BranchPanel />
     {/if}
   </div>

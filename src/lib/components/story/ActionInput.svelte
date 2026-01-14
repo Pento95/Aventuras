@@ -469,8 +469,13 @@
       return;
     }
 
-    stopRequested = false;
+stopRequested = false;
     activeAbortController = new AbortController();
+
+    // Check if Visual Prose mode is enabled for this story
+    const visualProseMode = story.currentStory?.settings?.visualProseMode ?? false;
+    // Generate a temp entry ID for Visual Prose CSS scoping during streaming
+    const streamingEntryId = crypto.randomUUID();
 
     ui.setGenerating(true);
     ui.clearGenerationError(); // Clear any previous error
@@ -679,18 +684,18 @@
       const MAX_EMPTY_RESPONSE_RETRIES = 3;
       let retryCount = 0;
 
-      // Start streaming indicator now that retrieval is complete
-      ui.startStreaming();
+// Start streaming indicator now that retrieval is complete
+      ui.startStreaming(visualProseMode, streamingEntryId);
 
       while (retryCount < MAX_EMPTY_RESPONSE_RETRIES) {
         // Reset for each attempt
         fullResponse = '';
         chunkCount = 0;
 
-        if (retryCount > 0) {
+if (retryCount > 0) {
           log(`Retrying generation (attempt ${retryCount + 1}/${MAX_EMPTY_RESPONSE_RETRIES}) due to empty response...`);
           // startStreaming() clears previous content and restarts
-          ui.startStreaming();
+          ui.startStreaming(visualProseMode, streamingEntryId);
         }
 
         // Use streaming response with visible entries only (non-summarized)

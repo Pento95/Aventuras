@@ -486,6 +486,72 @@ I am the author directing the story. Write what I ask for.`,
 };
 
 // ============================================================================
+// VISUAL PROSE MODE MACRO
+// ============================================================================
+
+/**
+ * Visual Prose instructions macro - HTML/CSS creative instructions
+ * Injected when Visual Prose Mode is enabled for a story
+ */
+const visualProseInstructionsMacro: SimpleMacro = {
+  id: 'visual-prose-instructions',
+  name: 'Visual Prose Instructions',
+  token: 'visualProseInstructions',
+  type: 'simple',
+  builtin: true,
+  dynamic: false,
+  description: 'HTML/CSS creative instructions injected when Visual Prose Mode is enabled',
+  defaultValue: `<VisualProse>
+You are also a visual artist with HTML5 and CSS3 at your disposal. Your entire response must be valid HTML.
+
+**OUTPUT FORMAT (CRITICAL):**
+Your response must be FULLY STRUCTURED HTML:
+- Wrap ALL prose paragraphs in \`<p>\` tags
+- Use \`<span>\` with inline styles for colored/styled text (dialogue, emphasis, actions)
+- Use \`<div>\` with \`<style>\` blocks for complex visual elements (menus, letters, signs, etc.)
+- NO plain text outside of HTML tags - everything must be wrapped
+
+Example structure:
+\`\`\`html
+<p>She stepped into the tavern, the smell of smoke and ale washing over her.</p>
+
+<p><span style="color: #8B4513;">"Welcome, stranger,"</span> the bartender said, sliding a mug across the counter.</p>
+
+<style>
+.tavern-sign { background: #2a1810; padding: 15px; border: 3px solid #8B4513; }
+.tavern-sign h2 { color: #d4a574; text-align: center; }
+</style>
+<div class="tavern-sign">
+  <h2>The Rusty Anchor</h2>
+  <p>Est. 1847</p>
+</div>
+
+<p>She studied the sign, then turned back to her drink.</p>
+\`\`\`
+
+**STYLING CAPABILITIES:**
+- **Layouts:** CSS Grid, Flexbox, block/inline positioning
+- **Styling:** Backgrounds, gradients, typography, borders, colors - themed by scene and genre
+- **Interactivity:** :hover, :focus, :active states for subtle effects
+- **Animation:** @keyframes for movement, rotation, fading, opacity changes
+- **Variables:** CSS Custom Properties (--variable) for theming
+
+**FORBIDDEN:**
+- Plain text without HTML tags (NO raw paragraphs - use \`<p>\`)
+- \`position: fixed/absolute\` - breaks the interface
+- \`<script>\` tags - only HTML and CSS
+- Box-shadow animation - use border-color, background-color, or opacity instead
+
+**PRINCIPLES:**
+- Purpose over flash - every visual choice serves the narrative
+- Readability is paramount - never sacrifice text clarity for effects
+- Seamless integration - visuals feel like part of the story
+
+Create atmospheric layouts, styled dialogue, themed visual elements. Match visual style to genre and mood.
+</VisualProse>`,
+};
+
+// ============================================================================
 // COMBINED BUILTIN MACROS
 // ============================================================================
 
@@ -499,6 +565,7 @@ export const BUILTIN_MACROS: Macro[] = [
   settingDescriptionMacro,
   themesMacro,
   storyContextBlockMacro,
+  visualProseInstructionsMacro,
   // Complex macros
   styleInstructionMacro,
   responseInstructionMacro,
@@ -523,6 +590,7 @@ export const CONTEXT_PLACEHOLDERS: ContextPlaceholder[] = [
   { id: 'input-label', name: 'Input Label', token: 'inputLabel', category: 'story', description: '"Player Action" in adventure mode, "Author Direction" in creative writing' },
   { id: 'active-threads', name: 'Active Threads', token: 'activeThreads', category: 'story', description: 'Currently active story threads and plot points' },
   { id: 'lorebook-context', name: 'Lorebook Context', token: 'lorebookContext', category: 'story', description: 'Relevant lorebook entries for the current context' },
+  { id: 'visual-prose-block', name: 'Visual Prose Block', token: 'visualProseBlock', category: 'story', description: 'Visual Prose instructions (empty if disabled, full instructions if enabled)' },
 
   // Entity tracking
   { id: 'entity-counts', name: 'Entity Counts', token: 'entityCounts', category: 'entities', description: 'Count of tracked characters, locations, items, etc.' },
@@ -694,7 +762,9 @@ When [LOREBOOK CONTEXT] is provided, treat it as canonical:
 
 <response_instruction>
 {{responseInstruction}}
-</response_instruction>`,
+</response_instruction>
+
+{{visualProseBlock}}`,
 };
 
 /**
@@ -809,7 +879,9 @@ When [LOREBOOK CONTEXT] is provided, treat it as canonical:
 
 <response_instruction>
 {{responseInstruction}}
-</response_instruction>`,
+</response_instruction>
+
+{{visualProseBlock}}`,
 };
 
 // ============================================================================

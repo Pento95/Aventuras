@@ -139,10 +139,11 @@ import {
   let cardImportedAlternateGreetings = $state<string[]>([]);
   let selectedGreetingIndex = $state<number>(0); // 0 = first_mes, 1+ = alternate greetings
 
-  // Step 6: Writing Style
+// Step 6: Writing Style
   let selectedPOV = $state<POV>('first');
   let selectedTense = $state<Tense>('present');
   let tone = $state('immersive and engaging');
+  let visualProseMode = $state(false);
 
   // Step 7: Generate Opening
   let storyTitle = $state('');
@@ -585,7 +586,7 @@ import {
       scene: generatedOpening.scene.replace(/\{\{user\}\}/gi, protagonistName),
     };
 
-    const wizardData: WizardData = {
+const wizardData: WizardData = {
       mode: selectedMode,
       genre: selectedGenre,
       customGenre: customGenre || undefined,
@@ -597,6 +598,7 @@ import {
         pov: selectedPOV,
         tense: selectedTense,
         tone,
+        visualProseMode,
       },
       title: storyTitle,
       openingGuidance: selectedMode === 'creative-writing' && openingGuidance.trim() ? openingGuidance.trim() : undefined,
@@ -2151,12 +2153,45 @@ function clearImport() {
                 </button>
               {/each}
             </div>
-            <input
+<input
               type="text"
               bind:value={tone}
               placeholder="Or describe your own tone..."
               class="input"
             />
+          </div>
+
+          <!-- Visual Prose Mode Toggle -->
+          <div class="card bg-surface-800/50 p-4">
+            <div class="flex items-start gap-3">
+              <div class="rounded-full bg-surface-700 p-2">
+                <Sparkles class="h-5 w-5 text-accent-400" />
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm font-medium text-surface-200">Visual Prose Mode</div>
+                  <button
+                    type="button"
+                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-surface-800"
+                    class:bg-accent-600={visualProseMode}
+                    class:bg-surface-600={!visualProseMode}
+                    onclick={() => visualProseMode = !visualProseMode}
+                    role="switch"
+                    aria-checked={visualProseMode}
+                    aria-label="Toggle Visual Prose Mode"
+                  >
+                    <span
+                      class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                      class:translate-x-5={visualProseMode}
+                      class:translate-x-0={!visualProseMode}
+                    ></span>
+                  </button>
+                </div>
+                <p class="mt-1 text-xs text-surface-400">
+                  Enable rich HTML/CSS visual output. The AI can create styled layouts, dialogue boxes, and atmospheric effects. Best for immersive, cinematic storytelling.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

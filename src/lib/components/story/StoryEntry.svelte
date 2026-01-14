@@ -4,7 +4,8 @@
   import { ui } from '$lib/stores/ui.svelte';
   import { settings } from '$lib/stores/settings.svelte';
   import { User, BookOpen, Info, Pencil, Trash2, Check, X, RefreshCw, RotateCcw, Loader2, GitBranch, Bookmark, Volume2 } from 'lucide-svelte';
-  import { parseMarkdown } from '$lib/utils/markdown';
+import { parseMarkdown } from '$lib/utils/markdown';
+  import { sanitizeVisualProse } from '$lib/utils/htmlSanitize';
   import { database } from '$lib/services/database';
   import { eventBus, type ImageReadyEvent, type TTSQueuedEvent } from '$lib/services/events';
   import { onMount } from 'svelte';
@@ -25,6 +26,9 @@
       entry.content.toLowerCase().includes('empty response')
     )
   );
+
+// Check if Visual Prose mode is enabled for this story
+  const visualProseMode = $derived(story.currentStory?.settings?.visualProseMode ?? false);
 
   // Check if this is the latest narration entry (for retry button)
   const isLatestNarration = $derived.by(() => {
@@ -246,6 +250,56 @@
     }
 
     return parseMarkdown(processed);
+  }
+
+  // Process Visual Prose content with embedded images
+  function processVisualProseWithImages(content: string, images: EmbeddedImage[], entryId: string): string {
+    if (images.length === 0) return sanitizeVisualProse(content, entryId);
+
+    let processed = content;
+
+    // Sort images by source text length (longest first) to avoid partial matches
+    const sortedImages = [...images]
+      .filter(img => img.status === 'complete' || img.status === 'generating' || img.status === 'pending')
+      .sort((a, b) => b.sourceText.length - a.sourceText.length);
+
+    // Track which portions of text have been marked
+    const markers: { start: number; end: number; imageId: string; status: string }[] = [];
+
+    for (const img of sortedImages) {
+      // Case-insensitive search for the source text
+      const regex = new RegExp(escapeRegex(img.sourceText), 'gi');
+      let match;
+      while ((match = regex.exec(processed)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+
+        // Check if this overlaps with an existing marker
+        const overlaps = markers.some(m =>
+          (start >= m.start && start < m.end) ||
+          (end > m.start && end <= m.end) ||
+          (start <= m.start && end >= m.end)
+        );
+
+        if (!overlaps) {
+          markers.push({ start, end, imageId: img.id, status: img.status });
+        }
+      }
+    }
+
+    // Sort markers by position (reverse order for replacement)
+    markers.sort((a, b) => b.start - a.start);
+
+    // Apply markers from end to start to preserve positions
+    for (const marker of markers) {
+      const originalText = processed.slice(marker.start, marker.end);
+      const statusClass = marker.status === 'complete' ? 'complete' :
+                          marker.status === 'generating' ? 'generating' : 'pending';
+      const replacement = `<span class="embedded-image-link ${statusClass}" data-image-id="${marker.imageId}">${originalText}</span>`;
+      processed = processed.slice(0, marker.start) + replacement + processed.slice(marker.end);
+    }
+
+    return sanitizeVisualProse(processed, entryId);
   }
 
   // Handle click on embedded image link
@@ -701,10 +755,18 @@
           </div>
           <p class="text-xs text-surface-500">Checkpoints save the current story state and allow branching from this point.</p>
         </div>
-      {:else}
+{:else}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="story-text prose-content" onclick={handleContentClick}>
-          {@html entry.type === 'narration' ? processContentWithImages(entry.content, embeddedImages) : parseMarkdown(entry.content)}
+        <div class="story-text prose-content" class:visual-prose-container={visualProseMode && entry.type === 'narration'} onclick={handleContentClick}>
+          {#if entry.type === 'narration'}
+            {#if visualProseMode}
+              {@html processVisualProseWithImages(entry.content, embeddedImages, entry.id)}
+            {:else}
+              {@html processContentWithImages(entry.content, embeddedImages)}
+            {/if}
+          {:else}
+            {@html parseMarkdown(entry.content)}
+          {/if}
         </div>
         {#if isErrorEntry}
           <button

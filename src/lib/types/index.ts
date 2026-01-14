@@ -101,6 +101,7 @@ export interface StorySettings {
   tense?: Tense;
   tone?: string;
   themes?: string[];
+  visualProseMode?: boolean;  // Enable HTML/CSS visual output mode
 }
 
 export interface StoryEntry {

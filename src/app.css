@@ -1997,3 +1997,82 @@ html, body {
 body {
   overscroll-behavior-y: contain;
 }
+
+/* =============================================
+   VISUAL PROSE MODE STYLES
+   Rich HTML/CSS output from AI for enhanced narrative presentation
+   ============================================= */
+
+/* Container for Visual Prose entries - prevents style leakage */
+.visual-prose-container {
+  overflow: hidden;
+  contain: layout style;
+  isolation: isolate;
+}
+
+/* Base styles for Visual Prose entry content */
+.visual-prose-entry {
+  line-height: 1.6;
+}
+
+/* Ensure all Visual Prose elements stay within bounds */
+.visual-prose-entry * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reset prose-content styles for Visual Prose - AI controls spacing */
+.prose-content.visual-prose-container .visual-prose-entry p,
+.visual-prose-container .visual-prose-entry p {
+  margin-top: 0;
+  margin-bottom: 0.75em; /* Tighter paragraph spacing */
+}
+
+.prose-content.visual-prose-container .visual-prose-entry p:last-child,
+.visual-prose-container .visual-prose-entry p:last-child {
+  margin-bottom: 0;
+}
+
+/* Reset div margins - AI should use padding/margin in styles if needed */
+.prose-content.visual-prose-container .visual-prose-entry > div,
+.visual-prose-container .visual-prose-entry > div {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose-content.visual-prose-container .visual-prose-entry > div:first-child,
+.visual-prose-container .visual-prose-entry > div:first-child {
+  margin-top: 0;
+}
+
+.prose-content.visual-prose-container .visual-prose-entry > div:last-child,
+.visual-prose-container .visual-prose-entry > div:last-child {
+  margin-bottom: 0;
+}
+
+/* Reset heading margins */
+:is(.prose-content.visual-prose-container, .visual-prose-container) .visual-prose-entry :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 0;
+  margin-bottom: 0;
+  color: inherit;
+}
+
+/* Streaming indicator for Visual Prose */
+.visual-prose-streaming {
+  position: relative;
+}
+
+.visual-prose-streaming::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background-color: var(--color-accent-400);
+  margin-left: 2px;
+  animation: visual-prose-cursor 1s step-end infinite;
+}
+
+@keyframes visual-prose-cursor {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}

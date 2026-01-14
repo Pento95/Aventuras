@@ -7,6 +7,7 @@ import type { SyncMode } from '$lib/types/sync';
 import { SimpleActivationTracker } from '$lib/services/ai/entryRetrieval';
 import { database } from '$lib/services/database';
 import { SvelteMap } from 'svelte/reactivity';
+import { StreamingHtmlRenderer } from '$lib/utils/htmlStreaming';
 
 // Debug log entry for request/response logging
 export interface DebugLogEntry {
@@ -101,6 +102,8 @@ class UIStore {
   // Streaming state
   streamingContent = $state('');
   isStreaming = $state(false);
+  private htmlRenderer: StreamingHtmlRenderer | null = null;
+  private visualProseEntryId: string | null = null;
 
   // Scroll break state - persists until user sends a new message
   userScrolledUp = $state(false);
@@ -262,18 +265,52 @@ class UIStore {
   }
 
   // Streaming methods
-  startStreaming() {
+  startStreaming(visualProseMode = false, entryId?: string) {
     this.isStreaming = true;
     this.streamingContent = '';
+    if (visualProseMode && entryId) {
+      this.htmlRenderer = new StreamingHtmlRenderer(entryId);
+      this.visualProseEntryId = entryId;
+    } else {
+      this.htmlRenderer = null;
+      this.visualProseEntryId = null;
+    }
   }
 
   appendStreamContent(content: string) {
-    this.streamingContent += content;
+    if (this.htmlRenderer) {
+      this.streamingContent = this.htmlRenderer.append(content);
+    } else {
+      this.streamingContent += content;
+    }
   }
 
-  endStreaming() {
+  endStreaming(): string {
+    let finalContent: string;
+    if (this.htmlRenderer) {
+      finalContent = this.htmlRenderer.getRawContent();
+      this.htmlRenderer = null;
+      this.visualProseEntryId = null;
+    } else {
+      finalContent = this.streamingContent;
+    }
     this.isStreaming = false;
     this.streamingContent = '';
+    return finalContent;
+  }
+
+  /**
+   * Check if currently streaming in Visual Prose mode.
+   */
+  isVisualProseStreaming(): boolean {
+    return this.htmlRenderer !== null;
+  }
+
+  /**
+   * Get the Visual Prose entry ID if currently streaming in Visual Prose mode.
+   */
+  getVisualProseEntryId(): string | null {
+    return this.visualProseEntryId;
   }
 
   // Scroll break methods - user scrolled away during generation

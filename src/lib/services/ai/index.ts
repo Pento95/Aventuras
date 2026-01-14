@@ -108,8 +108,9 @@ class AIService {
     const tense = story?.settings?.tense ?? (mode === 'creative-writing' ? 'past' : 'present');
     const protagonist = worldState.characters.find(c => c.relationship === 'self');
     const protagonistName = protagonist?.name || 'the protagonist';
-    const systemPrompt = this.buildSystemPrompt(worldState, story?.templateId, undefined, mode, undefined, systemPromptOverride, promptPov, tense, story?.timeTracker, story?.genre, story?.description, story?.settings?.tone, story?.settings?.themes);
-    log('System prompt built, length:', systemPrompt.length, 'mode:', mode, 'pov:', promptPov, 'tense:', tense, 'genre:', story?.genre, 'tone:', story?.settings?.tone);
+    const visualProseMode = story?.settings?.visualProseMode ?? false;
+    const systemPrompt = this.buildSystemPrompt(worldState, story?.templateId, undefined, mode, undefined, systemPromptOverride, promptPov, tense, story?.timeTracker, story?.genre, story?.description, story?.settings?.tone, story?.settings?.themes, visualProseMode);
+    log('System prompt built, length:', systemPrompt.length, 'mode:', mode, 'pov:', promptPov, 'tense:', tense, 'genre:', story?.genre, 'tone:', story?.settings?.tone, 'visualProseMode:', visualProseMode);
 
     // Build conversation history
     const messages: Message[] = [
@@ -230,6 +231,7 @@ class AIService {
     const tense = story?.settings?.tense ?? (mode === 'creative-writing' ? 'past' : 'present');
     const protagonist = worldState.characters.find(c => c.relationship === 'self');
     const protagonistName = protagonist?.name || 'the protagonist';
+    const visualProseMode = story?.settings?.visualProseMode ?? false;
     let systemPrompt = this.buildSystemPrompt(
       worldState,
       story?.templateId,
@@ -243,7 +245,8 @@ class AIService {
       story?.genre,
       story?.description,
       story?.settings?.tone,
-      story?.settings?.themes
+      story?.settings?.themes,
+      visualProseMode
     );
 
     // Inject chapter summaries if chapters exist
@@ -1061,7 +1064,8 @@ class AIService {
     genre?: string | null,
     settingDescription?: string | null,
     tone?: string | null,
-    themes?: string[] | null
+    themes?: string[] | null,
+    visualProseMode?: boolean
   ): string {
     const protagonist = worldState.characters.find(c => c.relationship === 'self');
     const protagonistName = protagonist?.name || 'the protagonist';
@@ -1078,6 +1082,7 @@ class AIService {
       settingDescription: settingDescription ?? undefined,
       tone: tone ?? undefined,
       themes: themes ?? undefined,
+      visualProseMode: visualProseMode ?? false,
     };
 
     // Determine the base prompt source
@@ -1223,6 +1228,15 @@ class AIService {
       basePrompt += 'WORLD STATE (for your reference, do not mention directly)';
       basePrompt += contextBlock;
       basePrompt += '\n───────────────────────────────────────';
+    }
+
+    // Replace {{visualProseBlock}} placeholder with visual prose instructions if enabled
+    if (visualProseMode) {
+      const visualProseInstructions = promptService.resolveMacro('visualProseInstructions', promptContext);
+      basePrompt = basePrompt.replace(/\{\{visualProseBlock\}\}/g, visualProseInstructions);
+    } else {
+      // Remove the placeholder when Visual Prose mode is disabled
+      basePrompt = basePrompt.replace(/\{\{visualProseBlock\}\}/g, '');
     }
 
     return basePrompt;

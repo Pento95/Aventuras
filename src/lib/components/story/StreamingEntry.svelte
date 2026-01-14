@@ -5,7 +5,14 @@
 
   // Reactive binding to streaming content
   let content = $derived(ui.streamingContent);
-  let renderedContent = $derived(parseMarkdown(content));
+  
+  // Check if streaming in Visual Prose mode
+  let isVisualProse = $derived(ui.isVisualProseStreaming());
+  
+  // For Visual Prose, content is already wrapped HTML; for regular, parse as markdown
+  let renderedContent = $derived(
+    isVisualProse ? content : parseMarkdown(content)
+  );
 
   // Show thinking state when streaming but no content yet
   let isThinking = $derived(ui.isStreaming && content.length === 0);

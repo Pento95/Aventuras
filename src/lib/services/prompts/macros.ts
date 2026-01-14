@@ -220,6 +220,12 @@ export class MacroEngine {
       }
     }
 
+    // Handle Visual Prose Instructions macro - only include if visualProseMode is enabled
+    if (macro.token === 'visualProseInstructions') {
+      // This macro is not directly used; visualProseBlock placeholder handles conditional inclusion
+      return macro.defaultValue;
+    }
+
     return macro.defaultValue;
   }
 

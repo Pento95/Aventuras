@@ -1683,10 +1683,20 @@ class StoryStore {
   async updateMemoryConfig(updates: Partial<MemoryConfig>): Promise<void> {
     if (!this.currentStory) throw new Error('No story loaded');
 
-    const newConfig = { ...this.memoryConfig, ...updates };
+const newConfig = { ...this.memoryConfig, ...updates };
     await database.updateStory(this.currentStory.id, { memoryConfig: newConfig });
     this.currentStory = { ...this.currentStory, memoryConfig: newConfig };
     log('Memory config updated via updateMemoryConfig:', updates);
+  }
+
+  // Update story settings (partial updates)
+  async updateStorySettings(updates: Partial<StorySettings>): Promise<void> {
+    if (!this.currentStory) throw new Error('No story loaded');
+
+    const newSettings = { ...(this.currentStory.settings ?? {}), ...updates };
+    await database.updateStory(this.currentStory.id, { settings: newSettings });
+    this.currentStory = { ...this.currentStory, settings: newSettings };
+    log('Story settings updated via updateStorySettings:', updates);
   }
 
   /**
@@ -2598,11 +2608,11 @@ class StoryStore {
    * This handles the full initialization from the setup wizard including
    * dynamically generated settings, protagonist, characters, and opening scene.
    */
-  async createStoryFromWizard(data: {
+async createStoryFromWizard(data: {
     title: string;
     genre: string;
     mode: StoryMode;
-    settings: { pov: 'first' | 'second' | 'third'; tense: 'past' | 'present' };
+    settings: { pov: 'first' | 'second' | 'third'; tense: 'past' | 'present'; visualProseMode?: boolean };
     protagonist: Partial<Character>;
     startingLocation: Partial<Location>;
     initialItems: Partial<Item>[];
@@ -2630,6 +2640,7 @@ class StoryStore {
         pov: data.settings.pov,
         tense: data.settings.tense,
         systemPromptOverride: data.systemPrompt,
+        visualProseMode: data.settings.visualProseMode,
       },
       memoryConfig: DEFAULT_MEMORY_CONFIG,
       retryState: null,
