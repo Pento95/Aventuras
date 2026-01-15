@@ -29,8 +29,10 @@
   import { NanoGPTImageProvider } from "$lib/services/ai/nanoGPTImageProvider";
   import { promptService } from "$lib/services/prompts";
   import { normalizeImageDataUrl } from "$lib/utils/image";
-  import type { StoryMode, POV, EntryType, VaultCharacter } from "$lib/types";
+  import type { StoryMode, POV, EntryType, VaultCharacter, VaultLorebook, VaultLorebookEntry } from "$lib/types";
   import VaultCharacterPicker from "$lib/components/vault/VaultCharacterPicker.svelte";
+  import VaultLorebookPicker from "$lib/components/vault/VaultLorebookPicker.svelte";
+  import { lorebookVault } from '$lib/stores/lorebookVault.svelte';
   import {
     X,
     ChevronLeft,
@@ -53,6 +55,7 @@
     RefreshCw,
     Upload,
     FileJson,
+    Archive,
     Check,
     AlertCircle,
     Book,
@@ -60,7 +63,6 @@
     Plus,
     ImageIcon,
     ImageUp,
-    Archive,
   } from "lucide-svelte";
 
   interface Props {
@@ -115,6 +117,7 @@
   // Character Vault integration
   let showProtagonistVaultPicker = $state(false);
   let showSupportingVaultPicker = $state(false);
+  let showLorebookVaultPicker = $state(false);
   let savedToVaultConfirm = $state(false);
 
   // Step 7: Portraits
@@ -1225,6 +1228,52 @@
     }
   }
 
+  async function handleSelectLorebookFromVault(vaultLorebook: VaultLorebook) {
+    const entries = vaultLorebook.entries.map(e => ({
+      ...e,
+    }));
+
+    importedLorebooks.push({
+      id: crypto.randomUUID(),
+      filename: `${vaultLorebook.name} (from Vault)`,
+      result: {
+        success: true,
+        entries: entries,
+        errors: [],
+        warnings: [],
+        metadata: vaultLorebook.metadata || {
+          format: 'aventura',
+          totalEntries: entries.length,
+          importedEntries: entries.length,
+          skippedEntries: 0,
+        },
+      },
+      entries: entries,
+      expanded: true,
+    });
+    showLorebookVaultPicker = false;
+  }
+
+  async function handleSaveLorebookToVault(lb: ImportedLorebookItem) {
+    try {
+      const name = lb.filename.replace(/\.json$/i, '');
+      
+      const vaultEntries: VaultLorebookEntry[] = lb.entries.map(e => {
+        const { originalData, ...rest } = e;
+        return rest;
+      });
+
+      await lorebookVault.saveFromImport(
+        name, 
+        vaultEntries, 
+        lb.result, 
+        lb.filename
+      );
+    } catch (error) {
+      console.error('Failed to save lorebook to vault:', error);
+    }
+  }
+
   function removeLorebook(id: string) {
     importedLorebooks = importedLorebooks.filter((lb) => lb.id !== id);
     if (importedLorebooks.length === 0) {
@@ -1477,37 +1526,62 @@
       {:else if currentStep === 2}
         <!-- Step 2: Import Lorebook (Optional) -->
         <div class="space-y-4">
+          <!-- Vault Picker Modal -->
+          {#if showLorebookVaultPicker}
+            <VaultLorebookPicker
+              onSelect={handleSelectLorebookFromVault}
+              onClose={() => (showLorebookVaultPicker = false)}
+            />
+          {/if}
+
           <p class="text-surface-400">
             Import an existing lorebook to populate your world with characters,
             locations, and lore. This step is optional - you can skip it and add
             content later.
           </p>
 
-          <!-- File Upload Area (always visible unless busy) -->
+          <!-- File Upload & Vault Area (always visible unless busy) -->
           {#if !isImporting && !isClassifying}
-            <div
-              class="card bg-surface-900 border-dashed border-2 border-surface-600 p-8 text-center hover:border-accent-500/50 transition-colors cursor-pointer"
-              onclick={() => importFileInput?.click()}
-              onkeydown={(e) => e.key === "Enter" && importFileInput?.click()}
-              role="button"
-              tabindex="0"
-            >
-              <input
-                type="file"
-                accept=".json,application/json,*/*"
-                class="hidden"
-                bind:this={importFileInput}
-                onchange={handleFileSelect}
-              />
-              <Upload class="h-8 w-8 mx-auto mb-2 text-surface-500" />
-              <p class="text-surface-300 font-medium">
-                {importedLorebooks.length > 0
-                  ? "Add Another Lorebook"
-                  : "Click to upload a lorebook"}
-              </p>
-              <p class="text-xs text-surface-500 mt-1">
-                Supports SillyTavern lorebook format (.json)
-              </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- File Upload -->
+              <div
+                class="card bg-surface-900 border-dashed border-2 border-surface-600 p-6 text-center hover:border-accent-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[140px]"
+                onclick={() => importFileInput?.click()}
+                onkeydown={(e) => e.key === "Enter" && importFileInput?.click()}
+                role="button"
+                tabindex="0"
+              >
+                <input
+                  type="file"
+                  accept=".json,application/json,*/*"
+                  class="hidden"
+                  bind:this={importFileInput}
+                  onchange={handleFileSelect}
+                />
+                <Upload class="h-8 w-8 mb-2 text-surface-500" />
+                <p class="text-surface-300 font-medium">
+                  {importedLorebooks.length > 0
+                    ? "Upload Another"
+                    : "Upload Lorebook"}
+                </p>
+                <p class="text-xs text-surface-500 mt-1">
+                  Supports SillyTavern format (.json)
+                </p>
+              </div>
+
+              <!-- Vault Import -->
+              <button
+                class="card bg-surface-900 border-dashed border-2 border-surface-600 p-6 text-center hover:border-accent-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[140px]"
+                onclick={() => showLorebookVaultPicker = true}
+              >
+                <Archive class="h-8 w-8 mb-2 text-surface-500" />
+                <p class="text-surface-300 font-medium">
+                  Add from Vault
+                </p>
+                <p class="text-xs text-surface-500 mt-1">
+                  Use processed lorebooks
+                </p>
+              </button>
             </div>
           {:else if isImporting}
             <div
@@ -1595,15 +1669,30 @@
                         </span>
                       {/if}
                     </div>
-                    <button
-                      class="text-xs text-surface-400 hover:text-red-400 transition-colors z-10 p-1"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        removeLorebook(lorebook.id);
-                      }}
-                    >
-                      Remove
-                    </button>
+                    <div class="flex items-center gap-2 z-10">
+                      {#if !lorebook.filename.includes('(from Vault)')}
+                        <button
+                          class="flex items-center gap-1 text-xs text-surface-400 hover:text-accent-400 transition-colors p-1"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            handleSaveLorebookToVault(lorebook);
+                          }}
+                          title="Save to Vault for reuse"
+                        >
+                          <Archive class="h-3 w-3" />
+                          <span class="hidden sm:inline">Save</span>
+                        </button>
+                      {/if}
+                      <button
+                        class="text-xs text-surface-400 hover:text-red-400 transition-colors p-1"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          removeLorebook(lorebook.id);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Type breakdown (Always visible) -->

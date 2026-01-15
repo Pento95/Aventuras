@@ -184,8 +184,8 @@
         </button>
         <button
           class="btn btn-secondary flex items-center gap-1.5 sm:gap-2 min-h-[44px] px-3 sm:px-4 text-sm"
-          onclick={() => ui.setActivePanel('character-vault')}
-          title="Character Vault - Manage reusable character templates"
+          onclick={() => ui.setActivePanel('vault')}
+          title="Vault - Manage reusable characters and lorebooks"
         >
           <Archive class="h-4 w-4 sm:h-5 sm:w-5" />
           <span class="hidden xs:inline">Vault</span>

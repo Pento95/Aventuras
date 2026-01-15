@@ -93,7 +93,7 @@ export interface ImportedEntry {
   priority: number;
   disabled: boolean;
   group: string | null;
-  originalData: SillyTavernEntry;
+  originalData?: SillyTavernEntry;
 }
 
 export interface LorebookImportResult {

@@ -22,6 +22,7 @@ import type {
   EmbeddedImageStatus,
   VaultCharacter,
   VaultCharacterType,
+  VaultLorebook,
 } from '$lib/types';
 
 class DatabaseService {
@@ -1753,6 +1754,100 @@ private mapEmbeddedImage(row: any): EmbeddedImage {
       tags: row.tags ? JSON.parse(row.tags) : [],
       favorite: row.favorite === 1,
       source: row.source || 'manual',
+      originalStoryId: row.original_story_id,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  // ===== Lorebook Vault Operations =====
+
+  async getVaultLorebooks(): Promise<VaultLorebook[]> {
+    const db = await this.getDb();
+    const results = await db.select<any[]>(
+      'SELECT * FROM lorebook_vault ORDER BY favorite DESC, updated_at DESC'
+    );
+    return results.map(this.mapVaultLorebook);
+  }
+
+  async getVaultLorebook(id: string): Promise<VaultLorebook | null> {
+    const db = await this.getDb();
+    const results = await db.select<any[]>(
+      'SELECT * FROM lorebook_vault WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? this.mapVaultLorebook(results[0]) : null;
+  }
+
+  async addVaultLorebook(lorebook: VaultLorebook): Promise<void> {
+    const db = await this.getDb();
+    await db.execute(
+      `INSERT INTO lorebook_vault (
+        id, name, description, entries,
+        tags, favorite, source, original_filename, original_story_id,
+        metadata, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        lorebook.id,
+        lorebook.name,
+        lorebook.description,
+        JSON.stringify(lorebook.entries),
+        JSON.stringify(lorebook.tags),
+        lorebook.favorite ? 1 : 0,
+        lorebook.source,
+        lorebook.originalFilename,
+        lorebook.originalStoryId,
+        lorebook.metadata ? JSON.stringify(lorebook.metadata) : null,
+        lorebook.createdAt,
+        lorebook.updatedAt,
+      ]
+    );
+  }
+
+  async updateVaultLorebook(id: string, updates: Partial<VaultLorebook>): Promise<void> {
+    const db = await this.getDb();
+    const setClauses: string[] = ['updated_at = ?'];
+    const values: any[] = [Date.now()];
+
+    if (updates.name !== undefined) { setClauses.push('name = ?'); values.push(updates.name); }
+    if (updates.description !== undefined) { setClauses.push('description = ?'); values.push(updates.description); }
+    if (updates.entries !== undefined) { setClauses.push('entries = ?'); values.push(JSON.stringify(updates.entries)); }
+    if (updates.tags !== undefined) { setClauses.push('tags = ?'); values.push(JSON.stringify(updates.tags)); }
+    if (updates.favorite !== undefined) { setClauses.push('favorite = ?'); values.push(updates.favorite ? 1 : 0); }
+    if (updates.metadata !== undefined) { setClauses.push('metadata = ?'); values.push(updates.metadata ? JSON.stringify(updates.metadata) : null); }
+
+    values.push(id);
+    await db.execute(`UPDATE lorebook_vault SET ${setClauses.join(', ')} WHERE id = ?`, values);
+  }
+
+  async deleteVaultLorebook(id: string): Promise<void> {
+    const db = await this.getDb();
+    await db.execute('DELETE FROM lorebook_vault WHERE id = ?', [id]);
+  }
+
+  async searchVaultLorebooks(query: string): Promise<VaultLorebook[]> {
+    const db = await this.getDb();
+    const searchPattern = `%${query}%`;
+    const results = await db.select<any[]>(
+      `SELECT * FROM lorebook_vault WHERE 
+        name LIKE ? OR description LIKE ? OR tags LIKE ?
+      ORDER BY favorite DESC, updated_at DESC`,
+      [searchPattern, searchPattern, searchPattern]
+    );
+    return results.map(this.mapVaultLorebook);
+  }
+
+  private mapVaultLorebook(row: any): VaultLorebook {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      entries: row.entries ? JSON.parse(row.entries) : [],
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      favorite: row.favorite === 1,
+      source: row.source || 'import',
+      originalFilename: row.original_filename,
       originalStoryId: row.original_story_id,
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       createdAt: row.created_at,

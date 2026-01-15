@@ -106,6 +106,12 @@ pub fn run() {
             sql: include_str!("../migrations/016_character_vault.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 17,
+            description: "lorebook_vault",
+            sql: include_str!("../migrations/017_lorebook_vault.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
