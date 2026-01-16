@@ -1,6 +1,7 @@
 <script lang="ts">
   import { story } from '$lib/stores/story.svelte';
   import { ui } from '$lib/stores/ui.svelte';
+  import { settings } from '$lib/stores/settings.svelte';
   import StoryEntry from './StoryEntry.svelte';
   import StreamingEntry from './StreamingEntry.svelte';
   import ActionInput from './ActionInput.svelte';
@@ -153,7 +154,7 @@
         {/if}
 
         <!-- Show RPG-style action choices after narration (adventure mode only) -->
-        {#if !ui.isStreaming && story.storyMode === 'adventure'}
+        {#if !ui.isStreaming && story.storyMode === 'adventure' && !settings.uiSettings.disableSuggestions}
           <ActionChoices />
         {/if}
       {/if}

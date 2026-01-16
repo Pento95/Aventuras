@@ -1175,6 +1175,7 @@ class SettingsStore {
     autoSave: true,
     spellcheckEnabled: true,
     debugMode: false,
+    disableSuggestions: false,
   });
 
   advancedRequestSettings = $state<AdvancedRequestSettings>(getDefaultAdvancedRequestSettings());
@@ -2085,6 +2086,11 @@ class SettingsStore {
     await database.setSetting('spellcheck_enabled', enabled.toString());
   }
 
+  async setDisableSuggestions(enabled: boolean) {
+    this.uiSettings.disableSuggestions = enabled;
+    await database.setSetting('disable_suggestions', enabled.toString());
+  }
+
   async setDebugMode(enabled: boolean) {
     this.uiSettings.debugMode = enabled;
     await database.setSetting('debug_mode', enabled.toString());
@@ -2364,6 +2370,7 @@ class SettingsStore {
     await database.setSetting('auto_save', this.uiSettings.autoSave.toString());
     await database.setSetting('spellcheck_enabled', this.uiSettings.spellcheckEnabled.toString());
     await database.setSetting('debug_mode', this.uiSettings.debugMode.toString());
+    await database.setSetting('disable_suggestions', this.uiSettings.disableSuggestions.toString());
     await database.setSetting('advanced_manual_mode', this.advancedRequestSettings.manualMode.toString());
     await this.saveWizardSettings();
     await this.saveStoryGenerationSettings();

@@ -662,6 +662,7 @@ export interface UISettings {
   autoSave: boolean;
   spellcheckEnabled: boolean;
   debugMode: boolean;
+  disableSuggestions: boolean;
 }
 
 export interface UpdateSettings {

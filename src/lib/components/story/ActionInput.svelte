@@ -870,14 +870,14 @@ if (retryCount > 0) {
         }
 
         // Phase 6: Generate suggestions for creative writing mode (background, non-blocking)
-        if (isCreativeMode) {
+        if (isCreativeMode && !settings.uiSettings.disableSuggestions) {
           refreshSuggestions().catch(err => {
             log('Suggestions generation failed (non-fatal)', err);
           });
         }
 
         // Phase 7: Generate RPG action choices for adventure mode (background, non-blocking)
-        if (!isCreativeMode) {
+        if (!isCreativeMode && !settings.uiSettings.disableSuggestions) {
           generateActionChoices(fullResponse, worldState).catch(err => {
             log('Action choices generation failed (non-fatal)', err);
           });
@@ -1333,12 +1333,14 @@ if (retryCount > 0) {
 
   {#if isCreativeMode}
     <!-- Creative Writing Mode: Suggestions -->
-    <Suggestions
-      suggestions={ui.suggestions}
-      loading={ui.suggestionsLoading}
-      onSelect={handleSuggestionSelect}
-      onRefresh={refreshSuggestions}
-    />
+    {#if !settings.uiSettings.disableSuggestions}
+      <Suggestions
+        suggestions={ui.suggestions}
+        loading={ui.suggestionsLoading}
+        onSelect={handleSuggestionSelect}
+        onRefresh={refreshSuggestions}
+      />
+    {/if}
 
     <!-- Grammar Check -->
     <GrammarCheck text={inputValue} onApplySuggestion={(newText) => inputValue = newText} />
