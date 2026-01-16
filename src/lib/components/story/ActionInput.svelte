@@ -947,11 +947,14 @@ if (retryCount > 0) {
     // Build action content:
     // - Creative writing mode: use raw input as direction
     // - Raw action choice (from ActionChoices): use as-is (already formatted by AI)
+    // - Disable action prefixes: use raw input
     // - Adventure mode: apply action prefixes/suffixes
     const rawInput = inputValue.trim();
     const wasRawActionChoice = isRawActionChoice;
+    const forceFreeMode = settings.uiSettings.disableActionPrefixes;
+    
     let content: string;
-    if (isCreativeMode || wasRawActionChoice) {
+    if (isCreativeMode || wasRawActionChoice || forceFreeMode) {
       content = rawInput;
     } else {
       content = actionPrefixes[actionType] + rawInput + actionSuffixes[actionType];
@@ -989,7 +992,7 @@ if (retryCount > 0) {
     log('User action added to story', { entryId: userActionEntry.id });
 
     // Emit UserInput event
-    emitUserInput(content, isCreativeMode ? 'direction' : actionType);
+    emitUserInput(content, isCreativeMode ? 'direction' : (forceFreeMode ? 'free' : actionType));
 
     // Clear input
     inputValue = '';
@@ -1351,6 +1354,82 @@ if (retryCount > 0) {
         <textarea
           bind:value={inputValue}
           onkeydown={handleKeydown}
+          disabled={ui.isGenerating}
+          placeholder="Direct the story (e.g. 'I explore the cave' or 'Suddenly, a dragon appears')"
+          class="input min-h-[56px] py-3 resize-none w-full pr-10"
+          rows="1"
+        ></textarea>
+        <!-- Character Count -->
+        <div class="absolute bottom-1.5 right-2 text-[10px] text-surface-500 pointer-events-none">
+          {inputValue.length}
+        </div>
+      </div>
+      
+      {#if ui.isGenerating}
+        <button
+          onclick={handleStopGeneration}
+          class="btn btn-primary bg-red-600 hover:bg-red-700 w-12 sm:w-auto px-0 sm:px-4 flex items-center justify-center"
+          title="Stop generation"
+        >
+          <Square class="h-5 w-5 fill-current" />
+          <span class="hidden sm:inline ml-2">Stop</span>
+        </button>
+      {:else}
+        <button
+          onclick={handleSubmit}
+          disabled={!inputValue.trim()}
+          class="btn btn-primary w-12 sm:w-auto px-0 sm:px-4 flex items-center justify-center"
+          title="Send direction"
+        >
+          <Send class="h-5 w-5" />
+          <span class="hidden sm:inline ml-2">Send</span>
+        </button>
+      {/if}
+    </div>
+  {:else}
+    <!-- Adventure Mode Input -->
+    
+    <!-- Action Type Selector - Hidden if disabled -->
+    {#if !settings.uiSettings.disableActionPrefixes}
+      <div class="flex flex-wrap gap-2 mb-2">
+        <button
+          class="btn btn-sm text-xs {actionType === 'do' ? 'btn-primary' : 'btn-secondary'}"
+          onclick={() => actionType = 'do'}
+        >
+          Do
+        </button>
+        <button
+          class="btn btn-sm text-xs {actionType === 'say' ? 'btn-primary' : 'btn-secondary'}"
+          onclick={() => actionType = 'say'}
+        >
+          Say
+        </button>
+        <button
+          class="btn btn-sm text-xs {actionType === 'think' ? 'btn-primary' : 'btn-secondary'}"
+          onclick={() => actionType = 'think'}
+        >
+          Think
+        </button>
+        <button
+          class="btn btn-sm text-xs {actionType === 'story' ? 'btn-primary' : 'btn-secondary'}"
+          onclick={() => actionType = 'story'}
+        >
+          Story
+        </button>
+        <button
+          class="btn btn-sm text-xs {actionType === 'free' ? 'btn-primary' : 'btn-secondary'}"
+          onclick={() => actionType = 'free'}
+        >
+          Free
+        </button>
+      </div>
+    {/if}
+
+    <div class="flex gap-2">
+      <div class="relative flex-1">
+        <textarea
+          bind:value={inputValue}
+          onkeydown={handleKeydown}
           placeholder="Describe what happens next in the story..."
           class="input min-h-[56px] sm:min-h-[60px] resize-none text-base"
           rows="2"
@@ -1388,53 +1467,55 @@ if (retryCount > 0) {
     </div>
   {:else}
     <!-- Adventure Mode: Action type buttons -->
-    <div class="action-type-buttons flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'do'}
-        class:btn-secondary={actionType !== 'do'}
-        onclick={() => actionType = 'do'}
-      >
-        <Wand2 class="h-4 w-4" />
-        <span class="hidden xs:inline">Do</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'say'}
-        class:btn-secondary={actionType !== 'say'}
-        onclick={() => actionType = 'say'}
-      >
-        <MessageSquare class="h-4 w-4" />
-        <span class="hidden xs:inline">Say</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'think'}
-        class:btn-secondary={actionType !== 'think'}
-        onclick={() => actionType = 'think'}
-      >
-        <Brain class="h-4 w-4" />
-        <span class="hidden xs:inline">Think</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'story'}
-        class:btn-secondary={actionType !== 'story'}
-        onclick={() => actionType = 'story'}
-      >
-        <Sparkles class="h-4 w-4" />
-        <span class="hidden xs:inline">Story</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'free'}
-        class:btn-secondary={actionType !== 'free'}
-        onclick={() => actionType = 'free'}
-      >
-        <PenLine class="h-4 w-4" />
-        <span class="hidden xs:inline">Free</span>
-      </button>
-    </div>
+    {#if !settings.uiSettings.disableActionPrefixes}
+      <div class="action-type-buttons flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+        <button
+          class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
+          class:btn-primary={actionType === 'do'}
+          class:btn-secondary={actionType !== 'do'}
+          onclick={() => actionType = 'do'}
+        >
+          <Wand2 class="h-4 w-4" />
+          <span class="hidden xs:inline">Do</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
+          class:btn-primary={actionType === 'say'}
+          class:btn-secondary={actionType !== 'say'}
+          onclick={() => actionType = 'say'}
+        >
+          <MessageSquare class="h-4 w-4" />
+          <span class="hidden xs:inline">Say</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
+          class:btn-primary={actionType === 'think'}
+          class:btn-secondary={actionType !== 'think'}
+          onclick={() => actionType = 'think'}
+        >
+          <Brain class="h-4 w-4" />
+          <span class="hidden xs:inline">Think</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
+          class:btn-primary={actionType === 'story'}
+          class:btn-secondary={actionType !== 'story'}
+          onclick={() => actionType = 'story'}
+        >
+          <Sparkles class="h-4 w-4" />
+          <span class="hidden xs:inline">Story</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
+          class:btn-primary={actionType === 'free'}
+          class:btn-secondary={actionType !== 'free'}
+          onclick={() => actionType = 'free'}
+        >
+          <PenLine class="h-4 w-4" />
+          <span class="hidden xs:inline">Free</span>
+        </button>
+      </div>
+    {/if}
 
     <!-- Grammar Check -->
     <GrammarCheck text={inputValue} onApplySuggestion={(newText) => inputValue = newText} />

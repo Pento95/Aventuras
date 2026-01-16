@@ -1093,6 +1093,26 @@
             </button>
           </div>
 
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="text-sm font-medium text-surface-300">Disable Action Prefixes</label>
+              <p class="text-xs text-surface-500">Hide Do/Say/Think buttons and use raw input</p>
+            </div>
+            <button
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+              class:bg-accent-600={settings.uiSettings.disableActionPrefixes}
+              class:bg-surface-600={!settings.uiSettings.disableActionPrefixes}
+              onclick={() => settings.setDisableActionPrefixes(!settings.uiSettings.disableActionPrefixes)}
+              aria-label="Toggle disable action prefixes"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                class:translate-x-6={settings.uiSettings.disableActionPrefixes}
+                class:translate-x-1={!settings.uiSettings.disableActionPrefixes}
+              ></span>
+            </button>
+          </div>
+
           <div class="border-t border-surface-700 pt-4 mt-4">
             <div class="flex items-center gap-2 mb-3">
               <Download class="h-5 w-5 text-accent-400" />

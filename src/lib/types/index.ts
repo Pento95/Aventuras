@@ -663,6 +663,7 @@ export interface UISettings {
   spellcheckEnabled: boolean;
   debugMode: boolean;
   disableSuggestions: boolean;
+  disableActionPrefixes: boolean;
 }
 
 export interface UpdateSettings {
