@@ -4,340 +4,171 @@ This file contains guidelines for agentic coding assistants working on the Avent
 
 ## Build/Lint/Test Commands
 
+### Development & Build
 ```bash
-# Development
 npm run dev              # Start dev server (Vite)
+npm run build            # Build for production
+npm run preview          # Preview production build
+npm run tauri dev        # Start Tauri development window
+```
 
-# Type Checking
+### Type Checking
+```bash
 npm run check           # Run svelte-check (type checking)
 npm run check:watch     # Watch mode type checking
-
-# Production Build
-npm run build           # Build for production
-npm run preview         # Preview production build
-
-# Tauri (desktop app)
-npm run tauri          # Tauri CLI commands
-
-# Running specific checks
 npx svelte-check --tsconfig ./tsconfig.json    # Direct type check
 ```
 
-**Note**: No test suite is currently configured. When adding tests, update this file.
+### Testing
+**Current Status**: No test suite is currently configured in `package.json`.
+
+If/when tests are added (e.g., using Vitest), the standard commands would be:
+```bash
+npm test                # Run all tests
+npm test -- -t "test name" # Run a single test (if using Vitest/Jest)
+```
 
 ## Project Architecture
 
 - **Framework**: SvelteKit 2 + Tauri 2 (desktop app)
 - **Language**: TypeScript (strict mode)
 - **Styling**: Tailwind CSS
-- **State Management**: Svelte 5 runes ($state, $derived, $effect)
-- **Database**: SQLite via @tauri-apps/plugin-sql
-- **AI Integration**: OpenAI-compatible APIs (OpenRouter, custom providers)
+- **State Management**: Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`)
+- **Database**: SQLite via `@tauri-apps/plugin-sql`
+- **AI**: OpenAI-compatible APIs (OpenRouter, custom providers)
 
 ## Code Style Guidelines
 
 ### File Organization
-
 ```
 src/
-├── routes/           # SvelteKit pages (use +page.svelte, +layout.svelte)
+├── routes/           # SvelteKit pages (+page.svelte, +layout.svelte)
 ├── lib/
 │   ├── components/   # Svelte components (PascalCase.svelte)
-│   ├── services/     # Business logic classes (PascalCase.ts)
+│   ├── services/     # Business logic classes (PascalCase.ts) or modules (camelCase.ts)
 │   ├── stores/       # Svelte stores (*.svelte.ts for runes)
-│   ├── types/       # TypeScript types (index.ts)
-│   └── utils/       # Utility functions (camelCase.ts)
+│   ├── types/        # TypeScript types (index.ts)
+│   └── utils/        # Utility functions (camelCase.ts)
 ```
 
 ### Naming Conventions
-
 - **Components**: `PascalCase.svelte` (e.g., `StoryView.svelte`)
-- **Services/Classes**: `PascalCase.ts` (e.g., `AIService.ts`)
-- **Functions/Methods**: `camelCase` (e.g., `generateResponse()`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_MEMORY_CONFIG`)
-- **Types/Interfaces**: `PascalCase` (e.g., `interface Story`, `type StoryMode`)
-- **Variables**: `camelCase` (e.g., `currentStory`, `isLoading`)
-- **Event handlers**: `handle<Action>` (e.g., `handleSubmit`, `handleScroll`)
+- **Services**: `PascalCase.ts` (classes) or `camelCase.ts` (modules)
+- **Functions/Vars**: `camelCase` (e.g., `generateResponse`, `isLoading`)
+- **Types**: `PascalCase` (e.g., `interface Story`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_CONFIG`)
+- **Handlers**: `handle<Action>` (e.g., `handleSubmit`)
 
-### Imports and Type Imports
-
+### Imports
+- Use `$lib` alias.
+- Use `type` keyword for type-only imports.
 ```typescript
-// Type imports use 'type' keyword
-import type { Story, StoryEntry } from '$lib/types';
+import type { Story } from '$lib/types';
 import { settings } from '$lib/stores/settings.svelte';
-
-// Non-type imports
-import { marked } from 'marked';
 ```
 
-Use `$lib` alias for src/lib imports. Always use `type` keyword for type-only imports.
-
-### Svelte Component Patterns
+### Svelte Component Patterns (Svelte 5)
+Use Runes (`$state`, `$derived`, `$props`). Avoid `export let`.
 
 ```typescript
 <script lang="ts">
-  // Imports at top
   import { story } from '$lib/stores/story.svelte';
 
-  // Props destructured with TypeScript types
   interface Props {
     entry: StoryEntry;
     onAction?: () => void;
   }
-
   let { entry, onAction }: Props = $props();
 
-  // Local state with Svelte 5 runes
   let isOpen = $state(false);
+  let isActive = $derived(entry.status === 'active');
 
-  // Computed values
-  const isActive = $derived(entry.status === 'active');
-
-  // Effects (cleanup via returned function)
   $effect(() => {
-    // React to changes
-    return () => {
-      // Cleanup
-    };
+    // Side effects here
+    return () => { /* cleanup */ };
   });
 
-  // Event handlers
   function handleClick() {
     isOpen = !isOpen;
   }
 </script>
 
-<!-- HTML with Tailwind classes -->
-<button onclick={handleClick}>
+<button onclick={handleClick} class="btn btn-primary">
   {entry.content}
 </button>
-
-{#if isOpen}
-  <Modal onclose={() => isOpen = false} />
-{/if}
 ```
 
 ### TypeScript Patterns
-
-- **Strict mode enabled**: All code must be type-safe
-- **Interfaces over types**: Use `interface` for object shapes, `type` for unions
-- **Optional chaining**: Use `?.` for safe property access
-- **Nullish coalescing**: Use `??` for fallbacks
+- **Strict Mode**: No `any`.
+- **Async/Await**: Always handle errors with `try/catch` in top-level or service methods.
+- **Null Safety**: Use `?.` and `??`.
 
 ```typescript
-// Async functions with proper error handling
-async function loadStory(storyId: string): Promise<void> {
+async function loadStory(id: string): Promise<void> {
   try {
-    const story = await database.getStory(storyId);
-    if (!story) {
-      throw new Error(`Story not found: ${storyId}`);
-    }
+    const story = await database.getStory(id);
+    if (!story) throw new Error(`Story not found: ${id}`);
     this.currentStory = story;
   } catch (error) {
-    console.error('[StoryStore] Failed to load story:', error);
+    console.error('[StoryStore] Failed to load:', error);
     throw error;
   }
 }
-
-// Type guards for runtime checks
-function isValidEntry(entry: any): entry is StoryEntry {
-  return entry && typeof entry.content === 'string' && typeof entry.type === 'string';
-}
 ```
 
-### Error Handling
-
-- **Logging**: Use consistent prefix pattern for console logs
-
-```typescript
-const DEBUG = true;
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[FeatureName]', ...args);
-  }
-}
-
-// Always validate before operations
-if (!this.currentStory) {
-  throw new Error('No story loaded');
-}
-```
-
-- **Error messages**: Descriptive with context (include IDs, names, etc.)
-
-### State Management
-
-Svelte 5 runes are used for reactive state:
+### State Management (Runes)
+Use `.svelte.ts` files for global state.
 
 ```typescript
-// Class-based store pattern
 class StoryStore {
   currentStory = $state<Story | null>(null);
   entries = $state<StoryEntry[]>([]);
 
-  // Computed properties (getters)
-  get activeCharacters(): Character[] {
+  // Computed
+  get activeCharacters() {
     return this.characters.filter(c => c.status === 'active');
   }
 
-  // Methods update state immutably
-  async addEntry(content: string): Promise<void> {
+  // Action
+  async addEntry(content: string) {
     const entry = await database.addEntry({ content });
-    this.entries = [...this.entries, entry]; // Spread for immutability
+    this.entries = [...this.entries, entry]; // Immutable update
   }
 }
-
 export const story = new StoryStore();
 ```
 
-### Service Classes
-
-Services encapsulate business logic and external API interactions:
-
-```typescript
-class AIService {
-  private getProvider() {
-    const apiSettings = settings.getApiSettingsForProfile(profileId);
-    if (!apiSettings.openaiApiKey) {
-      throw new Error(`No API key configured`);
-    }
-    return new OpenAIProvider(apiSettings);
-  }
-
-  async generateResponse(context: Context): Promise<string> {
-    // Implementation
-  }
-}
-
-export const aiService = new AIService();
-```
-
-### Database Operations
-
-Use the database service for all data persistence:
-
-```typescript
-// Parallel queries for performance
-const [entries, characters, locations] = await Promise.all([
-  database.getStoryEntries(storyId),
-  database.getCharacters(storyId),
-  database.getLocations(storyId),
-]);
-
-// CRUD operations with state updates
-async updateCharacter(id: string, updates: Partial<Character>): Promise<void> {
-  await database.updateCharacter(id, updates);
-  this.characters = this.characters.map(c =>
-    c.id === id ? { ...c, ...updates } : c
-  );
-}
-```
-
-### JSDoc Comments
-
-Add JSDoc for complex functions, not simple getters:
-
-```typescript
-/**
- * Generate a summary and metadata for a chapter.
- * @param entries - The entries to summarize
- * @param previousChapters - Previous chapter summaries for context (optional)
- * @returns ChapterSummary with summary text and metadata
- */
-async summarizeChapter(
-  entries: StoryEntry[],
-  previousChapters?: Chapter[]
-): Promise<ChapterSummary> {
-  // Implementation
-}
-```
-
 ### Tailwind CSS
-
-- Use responsive classes: `sm:`, `md:`, `lg:` prefixes
-- Dark mode with `surface-*` tokens (custom design system)
-- Flexbox/Grid layouts preferred
-- Spacing: `p-3 sm:p-4`, `space-y-3 sm:space-y-4`
-- Mobile-safe areas: `pb-safe` for iOS bottom notch
+- Use utility classes directly.
+- Dark mode: `surface-*` colors.
+- Responsive: `sm:`, `md:`, `lg:`.
+- Layout: `flex` or `grid`.
 
 ```html
-<div class="flex h-full flex-col">
-  <div class="flex-1 overflow-y-auto px-3 sm:px-6 py-3 sm:py-4">
-    {#each items as item (item.id)}
-      <div class="mb-3">{item.name}</div>
-    {/each}
-  </div>
+<div class="flex h-full flex-col bg-surface-900 p-4 sm:p-6">
+  <!-- Content -->
 </div>
 ```
 
-### Event Patterns
-
-- Custom events via callbacks: `onConfirm={() => ...}`
-- DOM events: `onclick`, `onsubmit`, `onscroll`
-- Bindings: `bind:value`, `bind:this={element}`
-
-## AI Integration Patterns
-
-The codebase uses multiple AI services with profile-based configuration:
+### AI Integration
+- Use abstract providers in `src/lib/services/ai`.
+- Handle streaming with async generators.
 
 ```typescript
-// Get provider for specific service
-const provider = this.getProviderForProfile(
-  settings.systemServicesSettings.memory.profileId
-);
-
-// Stream responses with async generators
-async *streamResponse(
-  entries: StoryEntry[],
-  signal?: AbortSignal
-): AsyncIterable<StreamChunk> {
-  for await (const chunk of provider.streamResponse({...})) {
+async *streamResponse(context: Context): AsyncIterable<StreamChunk> {
+  const provider = this.getProvider();
+  for await (const chunk of provider.streamResponse(context)) {
     yield chunk;
   }
 }
 ```
 
-## Common Patterns
-
-### Conditional Logging
-
-```typescript
-const DEBUG = true; // Set to false in production
-
-function log(...args: any[]) {
-  if (DEBUG) console.log('[Module]', ...args);
-}
-```
-
-### Immutability
-
-Always spread arrays/objects for state updates:
-
-```typescript
-// Good
-this.entries = [...this.entries, newEntry];
-this.characters = this.characters.map(c =>
-  c.id === id ? { ...c, updates } : c
-);
-
-// Avoid direct mutations
-this.entries.push(newEntry); // Bad
-```
-
-### UUID Generation
-
-```typescript
-import { crypto } from 'crypto';
-
-const id = crypto.randomUUID();
-```
+### Database
+- Use `src/lib/services/database.ts`.
+- Parameterize all SQL queries.
 
 ## When in Doubt
-
-- Follow existing patterns in similar files
-- Check nearby components/services for conventions
-- Use TypeScript strict mode - fix all type errors
-- Run `npm run check` before committing
-- Keep functions small and focused
-- Use descriptive names over comments
+1. **Search**: Use `grep`/`glob` to find existing patterns.
+2. **Type Check**: Run `npm run check`.
+3. **Consistency**: Mimic surrounding code.
+4. **Safety**: No secrets in code.

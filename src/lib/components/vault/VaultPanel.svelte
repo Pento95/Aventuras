@@ -4,14 +4,13 @@
   import { ui } from '$lib/stores/ui.svelte';
   import type { VaultCharacter, VaultCharacterType, VaultLorebook } from '$lib/types';
   import {
-    Plus, Search, Star, User, Users, ChevronLeft, Upload, Loader2, Archive, Book
+    Plus, Search, Star, User, Users, ChevronLeft, Upload, Loader2, Archive, Book, Globe
   } from 'lucide-svelte';
   import VaultCharacterCard from './VaultCharacterCard.svelte';
   import VaultCharacterForm from './VaultCharacterForm.svelte';
   import VaultLorebookCard from './VaultLorebookCard.svelte';
   import VaultLorebookEditor from './VaultLorebookEditor.svelte';
-  import { readCharacterCardFile, parseCharacterCard } from '$lib/services/characterCardImporter';
-  import { parseLorebook, classifyEntriesWithLLM, type ImportedEntry } from '$lib/services/lorebookImporter';
+  import DiscoveryModal from '$lib/components/discovery/DiscoveryModal.svelte';
   import { fade } from 'svelte/transition';
 
   // Types
@@ -27,14 +26,15 @@
   let showCharForm = $state(false);
   let editingCharacter = $state<VaultCharacter | null>(null);
   let defaultCharFormType = $state<VaultCharacterType>('protagonist');
-  let importingChar = $state(false);
   let importCharError = $state<string | null>(null);
 
   // Lorebook State
-  let importingLorebook = $state(false);
   let importLorebookError = $state<string | null>(null);
-  let importProgress = $state({ current: 0, total: 0 });
   let editingLorebook = $state<VaultLorebook | null>(null);
+
+  // Discovery Modal State
+  let showDiscoveryModal = $state(false);
+  let discoveryMode = $state<'character' | 'lorebook'>('character');
 
   // Derived: Filtered Characters
   const filteredCharacters = $derived.by(() => {
@@ -112,42 +112,13 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    importingChar = true;
-    importCharError = null;
-
+    // Fire and forget (store handles loading state via placeholder)
     try {
-      const jsonString = await readCharacterCardFile(file);
-      const card = parseCharacterCard(jsonString);
-
-      if (!card) throw new Error('Invalid character card format');
-
-      const traits = card.personality
-        ? card.personality.split(/[,;]/).map(t => t.trim()).filter(Boolean).slice(0, 10)
-        : [];
-
-      await characterVault.add({
-        name: card.name,
-        description: card.description || null,
-        characterType: 'supporting',
-        background: null,
-        motivation: null,
-        role: null,
-        relationshipTemplate: null,
-        traits,
-        visualDescriptors: [],
-        portrait: null,
-        tags: ['imported'],
-        favorite: false,
-        source: 'import',
-        originalStoryId: null,
-        metadata: { cardVersion: card.version },
-      });
-
+      await characterVault.importFromFile(file);
     } catch (error) {
       console.error('[CharacterVault] Import failed:', error);
       importCharError = error instanceof Error ? error.message : 'Failed to import character card';
     } finally {
-      importingChar = false;
       input.value = '';
     }
   }
@@ -158,47 +129,13 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    importingLorebook = true;
-    importLorebookError = null;
-    importProgress = { current: 0, total: 0 };
-
+    // Fire and forget (store handles loading state via placeholder)
     try {
-      const content = await file.text();
-      const result = parseLorebook(content);
-
-      if (!result.success || result.entries.length === 0) {
-        throw new Error(result.errors.join('; ') || 'No entries found in lorebook');
-      }
-
-      // Classify entries
-      const entries = await classifyEntriesWithLLM(
-        result.entries,
-        (current, total) => {
-          importProgress = { current, total };
-        },
-        'adventure' // Default mode for classification context
-      );
-
-      // Convert ImportedEntry[] to VaultLorebookEntry[]
-      // We can cast or map. Since structure matches except optional/extra fields:
-      const vaultEntries = entries.map(e => {
-        const { originalData, ...rest } = e;
-        return rest;
-      });
-
-      // Save to vault
-      await lorebookVault.saveFromImport(
-        file.name.replace(/\.json$/i, ''),
-        vaultEntries,
-        { ...result, entries }, // Update result with classified entries
-        file.name
-      );
-
+      await lorebookVault.importFromFile(file);
     } catch (error) {
       console.error('[VaultPanel] Lorebook import failed:', error);
       importLorebookError = error instanceof Error ? error.message : 'Failed to import lorebook';
     } finally {
-      importingLorebook = false;
       input.value = '';
     }
   }
@@ -213,6 +150,11 @@
 
   function openEditLorebook(lorebook: VaultLorebook) {
     editingLorebook = lorebook;
+  }
+
+  function openBrowseOnline(mode: 'character' | 'lorebook') {
+    discoveryMode = mode;
+    showDiscoveryModal = true;
   }
 </script>
 
@@ -238,19 +180,22 @@
       <!-- Right Side Actions (Context Sensitive) -->
       <div class="flex items-center gap-2">
         {#if activeTab === 'characters'}
+          <button
+            class="flex items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 hover:bg-surface-600"
+            onclick={() => openBrowseOnline('character')}
+            title="Browse characters online"
+          >
+            <Globe class="h-4 w-4" />
+            <span class="hidden sm:inline">Browse Online</span>
+          </button>
           <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500">
-            {#if importingChar}
-              <Loader2 class="h-4 w-4 animate-spin" />
-            {:else}
-              <Upload class="h-4 w-4" />
-            {/if}
+            <Upload class="h-4 w-4" />
             <span class="hidden sm:inline">Import Card</span>
             <input
               type="file"
               accept=".json,.png"
               class="hidden"
               onchange={handleImportCard}
-              disabled={importingChar}
             />
           </label>
           <button
@@ -262,19 +207,22 @@
           </button>
         {:else}
           <!-- Lorebook Actions -->
-          <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 {importingLorebook ? 'opacity-50 cursor-not-allowed' : ''}">
-            {#if importingLorebook}
-              <Loader2 class="h-4 w-4 animate-spin" />
-            {:else}
-              <Upload class="h-4 w-4" />
-            {/if}
+          <button
+            class="flex items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 hover:bg-surface-600"
+            onclick={() => openBrowseOnline('lorebook')}
+            title="Browse lorebooks online"
+          >
+            <Globe class="h-4 w-4" />
+            <span class="hidden sm:inline">Browse Online</span>
+          </button>
+          <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500">
+            <Upload class="h-4 w-4" />
             <span class="hidden sm:inline">Import Lorebook</span>
             <input
               type="file"
               accept=".json,application/json"
               class="hidden"
               onchange={handleImportLorebook}
-              disabled={importingLorebook}
             />
           </label>
         {/if}
@@ -318,32 +266,17 @@
       </div>
     {/if}
 
-    {#if activeTab === 'lorebooks'}
-      {#if importLorebookError}
-        <div class="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-sm text-red-400 flex items-center justify-between">
-          <span>{importLorebookError}</span>
-          <button onclick={() => importLorebookError = null} class="text-red-400 hover:text-red-300">
-            <span class="sr-only">Dismiss</span>
-            &times;
-          </button>
-        </div>
-      {/if}
-
-      {#if importingLorebook && importProgress.total > 0}
-        <div class="rounded-lg bg-surface-800 p-3 border border-surface-700">
-          <div class="flex justify-between text-xs text-surface-400 mb-1">
-            <span>Classifying entries...</span>
-            <span>{importProgress.current} / {importProgress.total}</span>
+      {#if activeTab === 'lorebooks'}
+        {#if importLorebookError}
+          <div class="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-sm text-red-400 flex items-center justify-between">
+            <span>{importLorebookError}</span>
+            <button onclick={() => importLorebookError = null} class="text-red-400 hover:text-red-300">
+              <span class="sr-only">Dismiss</span>
+              &times;
+            </button>
           </div>
-          <div class="w-full bg-surface-700 rounded-full h-1.5">
-            <div
-              class="bg-accent-500 h-1.5 rounded-full transition-all duration-300"
-              style="width: {(importProgress.current / importProgress.total) * 100}%"
-            ></div>
-          </div>
-        </div>
+        {/if}
       {/if}
-    {/if}
 
     <div class="flex flex-col sm:flex-row gap-3">
       <div class="relative flex-1">
@@ -499,3 +432,10 @@
     onClose={() => editingLorebook = null}
   />
 {/if}
+
+<!-- Discovery Modal -->
+<DiscoveryModal
+  isOpen={showDiscoveryModal}
+  mode={discoveryMode}
+  onClose={() => showDiscoveryModal = false}
+/>

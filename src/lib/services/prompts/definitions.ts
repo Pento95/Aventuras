@@ -1585,6 +1585,94 @@ IMPORTANT:
 Clean the above content. Identify all NPCs, replace {{char}} with the actual name, keep {{user}} as-is, and remove meta-content. Output valid JSON only.`,
 };
 
+/**
+ * Vault Character Import prompt template
+ * Cleans SillyTavern character cards and extracts structured character data for the vault
+ */
+const vaultCharacterImportPromptTemplate: PromptTemplate = {
+  id: 'vault-character-import',
+  name: 'Vault Character Import',
+  category: 'service',
+  description: 'Cleans SillyTavern character cards and extracts structured character data for the vault',
+  content: `You are extracting and cleaning character data from a SillyTavern character card for storage in a character vault.
+
+## Your Task
+1. IDENTIFY who "{{char}}" refers to based on the content (the actual character name)
+2. EXTRACT clean, prose-format character information
+3. REMOVE all roleplay instructions, meta-content, and formatting artifacts
+4. Convert any structured formats (PList, W++, etc.) to natural prose
+
+## REMOVE THESE PATTERNS (delete entirely):
+
+### Roleplay Instructions:
+- "You are {{char}}", "You will portray...", "Play as..."
+- "Do not speak for {{user}}", "Never speak for {{user}}"
+- "Stay in character", "Never break character"
+- Instructions telling an AI how to behave
+
+### Meta-Content:
+- HTML comments: <!-- ... -->
+- OOC markers: "(OOC:", "[Author's note:", "[A/N:", etc.
+- System prompts, jailbreaks, NSFW toggles
+- Format instructions about writing style
+- Section headers like "=== Narration ===" or "=== Scenario ==="
+
+### User References:
+- Replace "{{user}}" with "the protagonist" or remove sentences that only make sense in a roleplay context
+
+## CONVERT TO NATURAL PROSE:
+- [Character: trait1, trait2; clothes: x] → Natural sentences
+- W++ format → Natural sentences
+- Keep ALL information, just convert the format
+
+## OUTPUT FORMAT
+Respond with valid JSON only (no markdown code blocks):
+{
+  "name": "The character's actual name (what {{char}} refers to)",
+  "description": "1-2 paragraphs describing who this character is - their role, personality, and key characteristics. Written as clean prose.",
+  "background": "1-2 paragraphs of backstory, history, and context. Null if not provided in the card.",
+  "motivation": "What drives this character - their goals, desires, or purpose. 1-2 sentences. Null if not clear.",
+  "role": "A short role descriptor like 'Mentor', 'Rival', 'Guardian', 'Companion', etc. Null if unclear.",
+  "traits": ["array", "of", "3-8", "personality", "traits"],
+  "visualDescriptors": ["array", "of", "physical", "appearance", "details", "for", "image", "generation"]
+}
+
+## GUIDELINES FOR EACH FIELD
+
+### description
+- Who is this character? What makes them interesting?
+- Combine personality and role information
+- Clean, engaging prose without roleplay formatting
+
+### background  
+- Their history, where they come from, important past events
+- Set to null if the card doesn't provide meaningful backstory
+
+### motivation
+- What do they want? What drives their actions?
+- Set to null if not discernible from the card
+
+### role
+- A simple archetype or function: "Mentor", "Love Interest", "Antagonist", "Guide", "Companion", "Ruler", etc.
+- Set to null if the character doesn't fit a clear role
+
+### traits
+- Personality traits as single words or short phrases
+- Examples: "cunning", "loyal", "short-tempered", "mysterious", "protective"
+- Extract from personality descriptions, not physical traits
+
+### visualDescriptors
+- Physical appearance details useful for image generation
+- Examples: "long silver hair", "green eyes", "tall and slender", "wears dark robes", "has a scar on left cheek"
+- Extract from character descriptions, separate from personality`,
+  userContent: `Extract clean character data from this character card.
+
+## CARD CONTENT
+{{cardContent}}
+
+Extract the character information into the JSON format. Remove all meta-instructions and roleplay formatting. Output valid JSON only.`,
+};
+
 // ============================================================================
 // WIZARD PROMPT TEMPLATES
 // ============================================================================
@@ -2175,6 +2263,7 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
   loreManagementPromptTemplate,
   agenticRetrievalPromptTemplate,
   characterCardImportPromptTemplate,
+  vaultCharacterImportPromptTemplate,
   imagePromptAnalysisTemplate,
   imagePromptAnalysisReferenceTemplate,
   imagePortraitGenerationTemplate,

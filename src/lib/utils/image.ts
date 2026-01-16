@@ -2,7 +2,7 @@ export function normalizeImageDataUrl(imageData: string | null | undefined): str
   if (!imageData) {
     return null;
   }
-  if (imageData.startsWith('data:image/')) {
+  if (imageData.startsWith('data:image/') || imageData.startsWith('http://') || imageData.startsWith('https://')) {
     return imageData;
   }
   // Backward compatibility: stored as raw base64 without a data URL prefix.

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { VaultCharacter } from '$lib/types';
-  import { Star, Pencil, Trash2, User, Users } from 'lucide-svelte';
+  import { Star, Pencil, Trash2, User, Users, Loader2 } from 'lucide-svelte';
   import { normalizeImageDataUrl } from '$lib/utils/image';
 
   interface Props {
@@ -15,8 +15,10 @@
   let { character, onEdit, onDelete, onToggleFavorite, selectable = false, onSelect }: Props = $props();
 
   let confirmingDelete = $state(false);
+  let isImporting = $derived(character.metadata?.importing === true);
 
   function handleCardClick() {
+    if (isImporting) return;
     if (selectable && onSelect) {
       onSelect();
     }
@@ -42,12 +44,19 @@
 </script>
 
 <div
-  class="rounded-lg border border-surface-700 bg-surface-800 p-4 {selectable ? 'cursor-pointer hover:ring-2 hover:ring-accent-500 transition-all' : ''}"
+  class="relative rounded-lg border border-surface-700 bg-surface-800 p-4 {selectable && !isImporting ? 'cursor-pointer hover:ring-2 hover:ring-accent-500 transition-all' : ''}"
   onclick={handleCardClick}
-  role={selectable ? "button" : undefined}
-  tabindex={selectable ? 0 : undefined}
-  onkeydown={selectable ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick(); } : undefined}
+  role={selectable && !isImporting ? "button" : undefined}
+  tabindex={selectable && !isImporting ? 0 : undefined}
+  onkeydown={selectable && !isImporting ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick(); } : undefined}
 >
+  {#if isImporting}
+    <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg bg-surface-900/80 backdrop-blur-sm">
+      <Loader2 class="h-8 w-8 animate-spin text-primary-400" />
+      <span class="text-sm font-medium text-primary-200">Importing...</span>
+    </div>
+  {/if}
+
   <div class="flex items-start gap-3">
     <!-- Portrait -->
     {#if character.portrait}

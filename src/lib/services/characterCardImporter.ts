@@ -184,6 +184,8 @@ export interface SillyTavernCardV2 {
   scenario?: string;
   first_mes?: string;
   mes_example?: string;
+  creator_notes?: string;
+  tags?: string[];
 }
 
 /**
@@ -197,6 +199,8 @@ export interface ParsedCard {
   firstMessage: string;
   alternateGreetings: string[];
   exampleMessages: string;
+  creator_notes?: string;
+  tags?: string[];
   version: 'v1' | 'v2' | 'v3';
 }
 
@@ -263,6 +267,8 @@ export function parseCharacterCard(jsonString: string): ParsedCard | null {
         firstMessage: data.data.first_mes || data.first_mes || '',
         alternateGreetings: data.data.alternate_greetings || [],
         exampleMessages: data.data.mes_example || data.mes_example || '',
+        creator_notes: data.data.creator_notes || data.creator_notes,
+        tags: data.data.tags || data.tags,
         version,
       };
     }
@@ -526,5 +532,125 @@ export async function convertCardToScenario(
       alternateGreetings: preprocessedAlternateGreetings,
       errors: [`LLM conversion failed: ${errorMsg}. Basic extraction was used as fallback.`],
     };
+  }
+}
+
+/**
+ * Sanitized character result from vault-character-import prompt.
+ * Maps to VaultCharacter fields.
+ */
+export interface SanitizedCharacter {
+  name: string;
+  description: string;
+  background: string | null;
+  motivation: string | null;
+  role: string | null;
+  traits: string[];
+  visualDescriptors: string[];
+}
+
+/**
+ * Sanitize a character card using LLM to extract clean character data.
+ * Used for importing characters into the Vault.
+ */
+export async function sanitizeCharacterCard(
+  jsonString: string,
+  profileId?: string | null
+): Promise<SanitizedCharacter | null> {
+  const card = parseCharacterCard(jsonString);
+  if (!card) {
+    log('Failed to parse card for sanitization');
+    return null;
+  }
+
+  log('Sanitizing card:', card.name);
+
+  // Get settings
+  const cardImportSettings = settings.systemServicesSettings.characterCardImport;
+  const resolvedProfileId = profileId ?? cardImportSettings.profileId ?? settings.apiSettings.mainNarrativeProfileId;
+  const apiSettings = settings.getApiSettingsForProfile(resolvedProfileId);
+
+  if (!apiSettings.openaiApiKey) {
+    log('No API key for sanitization');
+    return null;
+  }
+
+  const provider = new OpenAIProvider(apiSettings);
+  const cardContext = buildCardContext(card);
+
+  if (!cardContext.trim()) {
+    log('Empty card context');
+    return null;
+  }
+
+  const context: PromptContext = {
+    mode: 'adventure',
+    pov: 'second',
+    tense: 'present',
+    protagonistName: '{{user}}',
+  };
+
+  // Use the vault-character-import prompt for clean extraction
+  const userPrompt = promptService.renderUserPrompt('vault-character-import', context, {
+    cardContent: cardContext,
+  });
+
+  const systemPrompt = promptService.renderPrompt('vault-character-import', context);
+
+  try {
+    log('Sending to LLM for sanitization...');
+    const response = await provider.generateResponse({
+      model: cardImportSettings.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: cardImportSettings.temperature,
+      maxTokens: cardImportSettings.maxTokens,
+      extraBody: buildExtraBody({
+        manualMode: settings.advancedRequestSettings.manualMode,
+        manualBody: cardImportSettings.manualBody,
+        reasoningEffort: cardImportSettings.reasoningEffort,
+        providerOnly: cardImportSettings.providerOnly,
+      }),
+    });
+
+    log('LLM response received');
+    let jsonStr = response.content.trim();
+
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/^```(?:json|JSON)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+    }
+
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0];
+    }
+
+    interface VaultImportResult {
+      name: string;
+      description: string;
+      background: string | null;
+      motivation: string | null;
+      role: string | null;
+      traits: string[];
+      visualDescriptors: string[];
+    }
+
+    const result = JSON.parse(jsonStr) as VaultImportResult;
+
+    // Validate and normalize the result
+    return {
+      name: result.name || card.name,
+      description: result.description || '',
+      background: result.background || null,
+      motivation: result.motivation || null,
+      role: result.role || null,
+      traits: Array.isArray(result.traits) ? result.traits.slice(0, 10) : [],
+      visualDescriptors: Array.isArray(result.visualDescriptors) ? result.visualDescriptors : [],
+    };
+  } catch (error) {
+    log('Sanitization failed:', error);
+    return null;
   }
 }

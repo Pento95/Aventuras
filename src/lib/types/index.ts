@@ -192,6 +192,7 @@ export interface VaultLorebookMetadata {
   format: 'aventura' | 'sillytavern' | 'unknown';
   totalEntries: number;
   entryBreakdown: Record<EntryType, number>;
+  [key: string]: unknown;
 }
 
 /**

@@ -1,0 +1,25 @@
+import { fetch } from '@tauri-apps/plugin-http';
+
+export async function corsFetch(url: string, options?: RequestInit): Promise<Response> {
+  // Tauri's fetch implementation automatically bypasses CORS
+  // We wrap it just in case we need to add global headers or error handling later
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        ...options?.headers
+      }
+    });
+    return response;
+  } catch (error) {
+    console.error('[Discovery] Fetch error:', error);
+    throw error;
+  }
+}
+
+export function buildProxyUrl(url: string): string {
+  // For now, we rely on Tauri's native capability. 
+  // If we were on web, we would use a proxy service here.
+  return url;
+}
