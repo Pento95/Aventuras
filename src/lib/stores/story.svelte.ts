@@ -53,7 +53,7 @@ class StoryStore {
 
   // Performance caches - avoid O(n) recalculations on every access
   private _cachedWordCount: number = 0;
-  private _wordCountDirty: boolean = true;
+  private _wordCountDirty = $state(true);
   private _cachedLastChapterEndIndex: number = 0;
   private _lastChapterEndIndexDirty: boolean = true;
   private _lastChaptersLength: number = 0;
