@@ -26,7 +26,8 @@
     }
 
     // Sort favorites first, then updated
-    return books.sort((a, b) => {
+    // Use spread to create a copy before sorting to avoid mutating the $state array
+    return [...books].sort((a, b) => {
       if (a.favorite && !b.favorite) return -1;
       if (!a.favorite && b.favorite) return 1;
       return b.updatedAt - a.updatedAt;

@@ -31,7 +31,8 @@
     }
 
     // Sort favorites first
-    return chars.sort((a, b) => {
+    // Use spread to create a copy before sorting to avoid mutating the $state array
+    return [...chars].sort((a, b) => {
       if (a.favorite && !b.favorite) return -1;
       if (!a.favorite && b.favorite) return 1;
       return 0;

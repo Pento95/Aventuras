@@ -1266,14 +1266,14 @@
         }
       }
 
-      // Add to array
-      importedLorebooks.push({
+      // Add to array - use reassignment instead of .push() to avoid state_unsafe_mutation
+      importedLorebooks = [...importedLorebooks, {
         id: crypto.randomUUID(),
         filename: file.name,
         result,
         entries: classifiedEntries,
         expanded: true,
-      });
+      }];
 
       isImporting = false;
     } catch (err) {
@@ -1293,7 +1293,8 @@
       ...e,
     }));
 
-    importedLorebooks.push({
+    // Use reassignment instead of .push() to avoid state_unsafe_mutation error
+    importedLorebooks = [...importedLorebooks, {
       id: crypto.randomUUID(),
       filename: `${vaultLorebook.name} (from Vault)`,
       result: {
@@ -1310,7 +1311,7 @@
       },
       entries: entries,
       expanded: true,
-    });
+    }];
     showLorebookVaultPicker = false;
   }
 
@@ -1342,10 +1343,10 @@
   }
 
   function toggleLorebookExpanded(id: string) {
-    const lb = importedLorebooks.find((lb) => lb.id === id);
-    if (lb) {
-      lb.expanded = !lb.expanded;
-    }
+    // Use immutable update pattern to avoid state_unsafe_mutation
+    importedLorebooks = importedLorebooks.map((lb) =>
+      lb.id === id ? { ...lb, expanded: !lb.expanded } : lb
+    );
   }
 
   function clearAllLorebooks() {
