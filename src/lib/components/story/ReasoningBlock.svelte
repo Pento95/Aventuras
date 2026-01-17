@@ -8,11 +8,13 @@
   let { 
     content, 
     isStreaming = false,
+    isReasoningPhase = false,
     entryId,
     showToggleOnly = false,
   }: { 
     content: string; 
     isStreaming?: boolean;
+    isReasoningPhase?: boolean;
     entryId?: string;
     showToggleOnly?: boolean;
   } = $props();
@@ -36,8 +38,8 @@
     }
   }
 
-  // Toggle button is always visible when there's content
-  let isToggleEnabled = $derived(settings.uiSettings.showReasoning || isStreaming);
+  // Toggle is only enabled when showReasoning is on (regardless of streaming state)
+  let isToggleEnabled = $derived(settings.uiSettings.showReasoning);
   
   // Content panel visibility respects the setting
   let isContentVisible = $derived(settings.uiSettings.showReasoning);
@@ -55,7 +57,7 @@
     onclick={toggleOpen}
     title={isToggleEnabled ? (isOpen ? "Hide thinking" : "Show thinking") : "Reasoning display is disabled in settings"}
   >
-    <Brain class="h-3.5 w-3.5" />
+    <Brain class="h-3.5 w-3.5 {isReasoningPhase ? 'animate-pulse' : ''}" />
     {#if isStreaming}
       <span class="streaming-indicator"></span>
     {/if}
@@ -102,8 +104,8 @@
   }
 
   .reasoning-toggle.is-disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
   }
 
   .streaming-indicator {

@@ -40,11 +40,13 @@
   <div class="rounded-lg border-l-4 border-l-accent-500 bg-accent-500/5 px-4 pb-4 pt-3 animate-fade-in">
     <!-- Header row -->
     <div class="flex items-center gap-2 mb-2">
-      <BookOpen class="h-4 w-4 shrink-0 translate-y-px animate-pulse text-accent-400" />
+      <BookOpen 
+        class="h-4 w-4 shrink-0 translate-y-px text-accent-400 {isContentPhase || !isReasoningEnabled ? 'animate-pulse' : ''}"
+      />
       
       <!-- Reasoning toggle (inline icon) - only show if reasoning is enabled -->
       {#if isReasoningEnabled && (reasoning || isThinking)}
-        <ReasoningBlock content={reasoning} isStreaming={true} showToggleOnly={true} />
+        <ReasoningBlock content={reasoning} isStreaming={true} {isReasoningPhase} showToggleOnly={true} />
       {/if}
       
       <!-- Live token counts with phase-based highlighting -->
@@ -80,7 +82,7 @@
     <div class="min-w-0">
       <!-- Reasoning content panel -->
       {#if reasoning || isThinking}
-        <ReasoningBlock content={reasoning} isStreaming={true} showToggleOnly={false} />
+        <ReasoningBlock content={reasoning} isStreaming={true} {isReasoningPhase} showToggleOnly={false} />
       {/if}
 
       <!-- Story Content -->
