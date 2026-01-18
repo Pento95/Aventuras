@@ -829,9 +829,7 @@ class AIService {
     const timelineFill = new TimelineFillService(
       provider,
       settings.getServicePresetId('timelineFill'),
-      timelineFillSettings.maxQueries,
-      timelineFillSettings.systemPrompt,
-      timelineFillSettings.queryAnswerPrompt
+      timelineFillSettings.maxQueries
     );
 
     return await timelineFill.fillTimeline(
@@ -865,8 +863,6 @@ class AIService {
       provider,
       settings.getServicePresetId('chapterQuery'),
       timelineFillSettings.maxQueries,
-      timelineFillSettings.systemPrompt,
-      timelineFillSettings.queryAnswerPrompt,
       {
         model: chapterQuerySettings.model,
         temperature: chapterQuerySettings.temperature,
@@ -905,8 +901,6 @@ class AIService {
       provider,
       settings.getServicePresetId('chapterQuery'),
       timelineFillSettings.maxQueries,
-      timelineFillSettings.systemPrompt,
-      timelineFillSettings.queryAnswerPrompt,
       {
         model: chapterQuerySettings.model,
         temperature: chapterQuerySettings.temperature,

@@ -67,21 +67,10 @@ export interface TimelineChapterInfo {
   locations: string[];
 }
 
-// ===== Default Prompts =====
-
-export const DEFAULT_TIMELINE_FILL_PROMPT = `<role>
-You are an expert narrative analyzer, who is able to efficiently determine what crucial information is missing from the current narrative.
-</role>
-
-<task>
-You will be provided with the entirety of the current chapter, as well as summaries of previous chapters. Your task is to succinctly ascertain what information is needed from previous chapters for the most recent scene and query accordingly, as to ensure that all information needed for accurate portrayal of the current scene is gathered.
-</task>
-
-<constraints>
-Query based ONLY on the information visible in the chapter summaries or things that may be implied to have happened in them. Do not reference current events in your queries, as the assistant that answers queries is only provided the history of that chapter, and would have no knowledge of events outside of the chapters queried. However, do not ask about information directly answered in the summaries. Instead, try to ask questions that 'fill in the gaps'. The maximum range of chapters (startChapter - endChapter) for a single query is 3, but you may make as many queries as you wish.
-</constraints>`;
-
-export const DEFAULT_QUERY_ANSWER_PROMPT = `You answer specific questions about story chapters. Be concise and factual. Only include information that directly answers the question. If the chapter doesn't contain relevant information, say "Not mentioned in this chapter."`;
+// NOTE: The default system prompts for Timeline Fill are now in the centralized
+// prompt system at src/lib/services/prompts/definitions.ts (template ids: 'timeline-fill', 'timeline-fill-answer')
+// The systemPrompt/queryAnswerPrompt fields in TimelineFillSettings are kept for backwards compatibility
+// with user-customized settings, but the actual prompts are rendered via promptService.
 
 // ===== Service Class =====
 
@@ -90,22 +79,16 @@ export class TimelineFillService {
   private settingsOverride?: Partial<GenerationPreset>;
   private presetId: string;
   private maxQueries: number;
-  private systemPrompt: string;
-  private queryAnswerPrompt: string;
 
   constructor(
     provider: OpenAIProvider,
     presetId: string = 'memory',
     maxQueries: number = 5,
-    systemPrompt: string = DEFAULT_TIMELINE_FILL_PROMPT,
-    queryAnswerPrompt: string = DEFAULT_QUERY_ANSWER_PROMPT,
     settingsOverride?: Partial<GenerationPreset>
   ) {
     this.provider = provider;
     this.presetId = presetId;
     this.maxQueries = maxQueries;
-    this.systemPrompt = systemPrompt;
-    this.queryAnswerPrompt = queryAnswerPrompt;
     this.settingsOverride = settingsOverride;
   }
 
@@ -621,7 +604,7 @@ export function getDefaultTimelineFillSettings(): TimelineFillSettings {
     model: 'deepseek/deepseek-v3.2',
     temperature: 0.3,
     maxQueries: 5,
-    systemPrompt: DEFAULT_TIMELINE_FILL_PROMPT,
-    queryAnswerPrompt: DEFAULT_QUERY_ANSWER_PROMPT,
+    systemPrompt: '',
+    queryAnswerPrompt: '',
   };
 }

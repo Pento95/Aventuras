@@ -710,6 +710,7 @@ export const CONTEXT_PLACEHOLDERS: ContextPlaceholder[] = [
   { id: 'max-images', name: 'Max Images', token: 'maxImages', category: 'other', description: 'Maximum number of images to generate (0 = unlimited)' },
   { id: 'image-style-prompt', name: 'Image Style Prompt', token: 'imageStylePrompt', category: 'other', description: 'Style guidelines for image generation (anime, photorealistic, etc.)' },
   { id: 'character-descriptors', name: 'Character Descriptors', token: 'characterDescriptors', category: 'other', description: 'Visual appearance descriptors for characters in the scene' },
+  { id: 'characters-with-portraits', name: 'Characters With Portraits', token: 'charactersWithPortraits', category: 'other', description: 'List of character names that have portrait images available for reference' },
   { id: 'visual-descriptors', name: 'Visual Descriptors', token: 'visualDescriptors', category: 'other', description: 'Comma-separated visual appearance details for a single character (hair, eyes, clothing, etc.)' },
   { id: 'chat-history', name: 'Chat History', token: 'chatHistory', category: 'story', description: 'Full untruncated chat history for comprehensive context' },
   { id: 'lorebook-context', name: 'Lorebook Context', token: 'lorebookContext', category: 'story', description: 'Activated lorebook entries for world and character context' },
