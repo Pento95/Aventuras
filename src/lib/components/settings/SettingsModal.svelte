@@ -775,25 +775,52 @@
 
   // Handle touch/swipe
   let touchStartX = 0;
-  let touchEndX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let isSwiping = false;
   const SWIPE_THRESHOLD = 50;
+  const SWIPE_TIMEOUT = 400; // Max time in ms for a valid swipe
+
+  // Elements that should not trigger swipe gestures
+  const INTERACTIVE_SELECTORS = 'input[type="range"], input[type="text"], input[type="number"], textarea, select, button, a';
 
   function handleTouchStart(e: TouchEvent) {
-    touchStartX = e.changedTouches[0].screenX;
+    // Check if touch started on an interactive element
+    const target = e.target as HTMLElement;
+    if (target.closest(INTERACTIVE_SELECTORS)) {
+      isSwiping = false;
+      return;
+    }
+
+    const touch = e.changedTouches[0];
+    touchStartX = touch.screenX;
+    touchStartY = touch.screenY;
+    touchStartTime = Date.now();
+    isSwiping = true;
   }
 
   function handleTouchEnd(e: TouchEvent) {
-    touchEndX = e.changedTouches[0].screenX;
-    handleSwipe();
-  }
+    if (!isSwiping) return;
+    isSwiping = false;
 
-  function handleSwipe() {
-    if (touchEndX < touchStartX - SWIPE_THRESHOLD) {
+    // Check if swipe took too long
+    if (Date.now() - touchStartTime > SWIPE_TIMEOUT) return;
+
+    const touch = e.changedTouches[0];
+    const deltaX = touch.screenX - touchStartX;
+    const deltaY = touch.screenY - touchStartY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    // Only trigger swipe if horizontal movement is dominant (> 1.5x vertical)
+    // This prevents diagonal scrolling from triggering tab switches
+    if (absX < SWIPE_THRESHOLD || absX < absY * 1.5) return;
+
+    if (deltaX < -SWIPE_THRESHOLD) {
       // Swipe Left -> Next Tab
       const idx = tabs.findIndex((t) => t.id === activeTab);
       if (idx < tabs.length - 1) setActiveTab(tabs[idx + 1].id);
-    }
-    if (touchEndX > touchStartX + SWIPE_THRESHOLD) {
+    } else if (deltaX > SWIPE_THRESHOLD) {
       // Swipe Right -> Previous Tab
       const idx = tabs.findIndex((t) => t.id === activeTab);
       if (idx > 0) setActiveTab(tabs[idx - 1].id);
