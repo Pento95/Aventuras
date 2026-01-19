@@ -491,6 +491,23 @@
           />
         </div>
 
+        {#if settings.advancedRequestSettings.manualMode}
+          <div class="pt-2 border-t border-surface-700">
+            <label class="mb-1 block text-xs font-medium text-surface-400">
+              Manual Request Body (JSON)
+            </label>
+            <textarea
+              bind:value={tempPreset.manualBody}
+              class="input text-xs min-h-[100px] resize-y font-mono w-full"
+              rows="4"
+              placeholder={'{"temperature": 0.7, "top_p": 0.9}'}
+            ></textarea>
+            <p class="text-xs text-surface-500 mt-1">
+              Overrides request parameters; messages and tools are managed by Aventura.
+            </p>
+          </div>
+        {/if}
+
         <div class="flex justify-end gap-2 pt-2">
           <button class="btn btn-ghost text-xs" onclick={cancelEditingPreset}
             >Cancel</button
