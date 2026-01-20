@@ -91,10 +91,14 @@ export function getDefaultClassifierSettingsForProvider(provider: ProviderPreset
   const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
   // For custom provider, use provided model or fall back to placeholder
   let model: string;
+  let reasoningEffort: ReasoningEffort = 'medium';
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
+    reasoningEffort = 'high';
   } else {
-    model = provider === 'nanogpt' ? 'minimax/minimax-m2.1' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   return {
     presetId: 'classification',
@@ -103,7 +107,7 @@ export function getDefaultClassifierSettingsForProvider(provider: ProviderPreset
     temperature: 0.3,
     maxTokens: 8192,
     systemPrompt: '',
-    reasoningEffort: 'medium',
+    reasoningEffort,
     providerOnly: [],
     manualBody: '',
     chatHistoryTruncation: 0,  // No truncation - full chat history for comprehensive visual descriptors
@@ -148,8 +152,10 @@ export function getDefaultLorebookClassifierSettingsForProvider(provider: Provid
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
   } else {
-    model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   return {
     presetId: 'classification',
@@ -195,8 +201,10 @@ export function getDefaultMemorySettingsForProvider(provider: ProviderPreset, cu
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
   } else {
-    model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   return {
     presetId: 'memory',
@@ -239,7 +247,16 @@ export function getDefaultSuggestionsSettings(): SuggestionsSettings {
 export function getDefaultSuggestionsSettingsForProvider(provider: ProviderPreset, customModel?: string | null): SuggestionsSettings {
   const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
   // For custom provider, use provided model or fall back to placeholder
-  const model = provider === 'custom' ? (customModel || 'gpt-4o-mini') : 'deepseek/deepseek-v3.2';
+  let model: string;
+  let reasoningEffort: ReasoningEffort = 'off';
+  if (provider === 'custom') {
+    model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
+    reasoningEffort = 'high';
+  } else {
+    model = 'deepseek/deepseek-v3.2';
+  }
   return {
     presetId: 'suggestions',
     profileId: provider === 'custom' ? null : profileId,
@@ -247,7 +264,7 @@ export function getDefaultSuggestionsSettingsForProvider(provider: ProviderPrese
     temperature: 0.7,
     maxTokens: 8192,
     systemPrompt: '',
-    reasoningEffort: 'off',
+    reasoningEffort,
     providerOnly: [],
     manualBody: '',
   };
@@ -281,14 +298,23 @@ export function getDefaultActionChoicesSettings(): ActionChoicesSettings {
 export function getDefaultActionChoicesSettingsForProvider(provider: ProviderPreset, customModel?: string | null): ActionChoicesSettings {
   const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
   // For custom provider, use provided model or fall back to placeholder
-  const model = provider === 'custom' ? (customModel || 'gpt-4o-mini') : 'deepseek/deepseek-v3.2';
+  let model: string;
+  let reasoningEffort: ReasoningEffort = 'off';
+  if (provider === 'custom') {
+    model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
+    reasoningEffort = 'high';
+  } else {
+    model = 'deepseek/deepseek-v3.2';
+  }
   return {
     presetId: 'suggestions',
     profileId: provider === 'custom' ? null : profileId,
     model,
     temperature: 0.8,
     maxTokens: 8192,
-    reasoningEffort: 'off',
+    reasoningEffort,
     providerOnly: [],
     manualBody: '',
   };
@@ -331,8 +357,10 @@ export function getDefaultStyleReviewerSettingsForProvider(provider: ProviderPre
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
   } else {
-    model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   return {
     presetId: 'suggestions',
@@ -399,8 +427,10 @@ export function getDefaultLoreManagementSettingsForProvider(provider: ProviderPr
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'zai-org/glm-4.7-original:thinking';
   } else {
-    model = provider === 'nanogpt' ? 'zai-org/glm-4.7' : 'minimax/minimax-m2.1';
+    model = 'minimax/minimax-m2.1';
   }
   return {
     presetId: 'agentic',
@@ -444,8 +474,10 @@ export function getDefaultInteractiveLorebookSettingsForProvider(provider: Provi
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'zai-org/glm-4.7-original:thinking';
   } else {
-    model = provider === 'nanogpt' ? 'zai-org/glm-4.7' : 'z-ai/glm-4.7';
+    model = 'z-ai/glm-4.7';
   }
   return {
     presetId: 'agentic',
@@ -511,8 +543,10 @@ export function getDefaultAgenticRetrievalSettingsForProvider(provider: Provider
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'zai-org/glm-4.7-original:thinking';
   } else {
-    model = provider === 'nanogpt' ? 'zai-org/glm-4.7' : 'minimax/minimax-m2.1';
+    model = 'minimax/minimax-m2.1';
   }
   return {
     presetId: 'agentic',
@@ -568,8 +602,10 @@ export function getDefaultTimelineFillSettingsForProvider(provider: ProviderPres
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
   } else {
-    model = provider === 'nanogpt' ? 'minimax/minimax-m2.1' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   const temperature = 0.3;
   return {
@@ -617,8 +653,10 @@ export function getDefaultChapterQuerySettingsForProvider(provider: ProviderPres
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
   } else {
-    model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   return {
     presetId: 'memory',
@@ -666,8 +704,10 @@ export function getDefaultEntryRetrievalSettingsForProvider(provider: ProviderPr
   let model: string;
   if (provider === 'custom') {
     model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
   } else {
-    model = provider === 'nanogpt' ? 'minimax/minimax-m2.1' : 'x-ai/grok-4.1-fast';
+    model = 'x-ai/grok-4.1-fast';
   }
   const temperature = provider === 'nanogpt' ? 0.3 : 0.2;
   return {
@@ -855,14 +895,23 @@ export function getDefaultCharacterCardImportSettings(): CharacterCardImportSett
 
 export function getDefaultCharacterCardImportSettingsForProvider(provider: ProviderPreset, customModel?: string | null): CharacterCardImportSettings {
   // For custom provider, use provided model or fall back to placeholder
-  const model = provider === 'custom' ? (customModel || 'gpt-4o-mini') : 'deepseek/deepseek-v3.2';
+  let model: string;
+  let reasoningEffort: ReasoningEffort = 'off';
+  if (provider === 'custom') {
+    model = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    model = 'xiaomi/mimo-v2-flash-thinking-original';
+    reasoningEffort = 'high';
+  } else {
+    model = 'deepseek/deepseek-v3.2';
+  }
   return {
     presetId: 'classification',
     profileId: null,
     model,
     temperature: 0.3,
     maxTokens: 16384,
-    reasoningEffort: 'off',
+    reasoningEffort,
     providerOnly: [],
     manualBody: '',
   };
@@ -1186,10 +1235,10 @@ export function getDefaultGenerationPresetsForProvider(provider: ProviderPreset,
         name: 'Classification',
         description: 'World state, lorebook parsing, entity extraction',
         profileId: null,
-        model: 'minimax/minimax-m2.1',
+        model: 'xiaomi/mimo-v2-flash-thinking-original',
         temperature: 0.3,
         maxTokens: 8192,
-        reasoningEffort: 'off',
+        reasoningEffort: 'high',
         providerOnly: [],
         manualBody: ''
       },
@@ -1198,7 +1247,7 @@ export function getDefaultGenerationPresetsForProvider(provider: ProviderPreset,
         name: 'Memory & Context',
         description: 'Chapter analysis, timeline, context retrieval',
         profileId: null,
-        model: 'minimax/minimax-m2.1',
+        model: 'xiaomi/mimo-v2-flash-thinking-original',
         temperature: 0.3,
         maxTokens: 8192,
         reasoningEffort: 'high',
@@ -1210,10 +1259,10 @@ export function getDefaultGenerationPresetsForProvider(provider: ProviderPreset,
         name: 'Suggestions',
         description: 'Plot suggestions, action choices, style review',
         profileId: null,
-        model: 'deepseek/deepseek-v3.2',
+        model: 'xiaomi/mimo-v2-flash-thinking-original',
         temperature: 0.7,
         maxTokens: 8192,
-        reasoningEffort: 'off',
+        reasoningEffort: 'high',
         providerOnly: [],
         manualBody: ''
       },
@@ -1222,7 +1271,7 @@ export function getDefaultGenerationPresetsForProvider(provider: ProviderPreset,
         name: 'Agentic',
         description: 'Autonomous lore management and retrieval',
         profileId: null,
-        model: 'zai-org/glm-4.7',
+        model: 'zai-org/glm-4.7-original:thinking',
         temperature: 0.3,
         maxTokens: 8192,
         reasoningEffort: 'high',
@@ -1234,10 +1283,10 @@ export function getDefaultGenerationPresetsForProvider(provider: ProviderPreset,
         name: 'Story Wizard',
         description: 'Story setup, character and setting generation',
         profileId: null,
-        model: 'deepseek/deepseek-v3.2',
+        model: 'zai-org/glm-4.7-original:thinking',
         temperature: 0.7,
         maxTokens: 8192,
-        reasoningEffort: 'off',
+        reasoningEffort: 'high',
         providerOnly: [],
         manualBody: ''
       }
@@ -2727,7 +2776,8 @@ class SettingsStore {
     const mainNarrativeProfileId = preserveApiSettings ? this.apiSettings.mainNarrativeProfileId : defaultProfileId;
 
     // Provider-specific default model (NanoGPT uses zai-org/ prefix)
-    const defaultNarrativeModel = effectiveProvider === 'nanogpt' ? 'zai-org/glm-4.7' : 'z-ai/glm-4.7';
+    const defaultNarrativeModel = effectiveProvider === 'nanogpt' ? 'zai-org/glm-4.7-original:thinking' : 'z-ai/glm-4.7';
+    const defaultReasoningEffort: ReasoningEffort = effectiveProvider === 'nanogpt' ? 'high' : 'off';
 
     // Reset API settings (except URL/key/profiles if preserving)
     this.apiSettings = {
@@ -2739,7 +2789,7 @@ class SettingsStore {
       defaultModel: defaultNarrativeModel,
       temperature: 0.8,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: defaultReasoningEffort,
       providerOnly: [],
       manualBody: '',
       enableThinking: false,
@@ -2845,7 +2895,7 @@ class SettingsStore {
 
     // Models for each provider (NanoGPT uses zai-org/ prefix, OpenRouter uses z-ai/)
     const defaultModels = effectiveProvider === 'nanogpt'
-      ? ['deepseek/deepseek-v3.2', 'zai-org/glm-4.7', 'zai-org/glm-4.7:thinking', 'xiaomi/mimo-v2-flash-thinking', 'minimax/minimax-m2.1']
+      ? ['zai-org/glm-4.7-original:thinking', 'xiaomi/mimo-v2-flash-thinking-original', 'deepseek/deepseek-v3.2', 'zai-org/glm-4.7', 'minimax/minimax-m2.1']
       : ['deepseek/deepseek-v3.2', 'x-ai/grok-4.1-fast', 'x-ai/grok-4-fast', 'z-ai/glm-4.7', 'minimax/minimax-m2.1'];
 
     const defaultProfile: APIProfile = {
@@ -2873,11 +2923,12 @@ class SettingsStore {
     this.apiSettings.openaiApiKey = apiKey;
 
     // Set provider-specific default model (NanoGPT uses zai-org/ prefix)
-    const defaultNarrativeModel = effectiveProvider === 'nanogpt' ? 'zai-org/glm-4.7' : 'z-ai/glm-4.7';
+    const defaultNarrativeModel = effectiveProvider === 'nanogpt' ? 'zai-org/glm-4.7-original:thinking' : 'z-ai/glm-4.7';
+    const defaultReasoningEffort: ReasoningEffort = effectiveProvider === 'nanogpt' ? 'high' : 'off';
     this.apiSettings.defaultModel = defaultNarrativeModel;
     this.apiSettings.temperature = 0.8;
     this.apiSettings.maxTokens = 8192;
-    this.apiSettings.reasoningEffort = 'off';
+    this.apiSettings.reasoningEffort = defaultReasoningEffort;
     this.apiSettings.providerOnly = [];
     this.apiSettings.manualBody = '';
     this.apiSettings.enableThinking = false;

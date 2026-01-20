@@ -148,18 +148,23 @@ export function getDefaultAdvancedSettings(): AdvancedWizardSettings {
 
 export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, customModel?: string | null): AdvancedWizardSettings {
   const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
-  
+
   // For custom provider, use provided model or fall back to placeholder
   let generalModel: string;
   let openingModel: string;
-  
+  let generalReasoningEffort: ReasoningEffort = 'off';
+
   if (provider === 'custom') {
     generalModel = customModel || 'gpt-4o-mini';
     openingModel = customModel || 'gpt-4o-mini';
+  } else if (provider === 'nanogpt') {
+    // NanoGPT uses zai-org/ prefix and :thinking suffix with high reasoning
+    generalModel = 'zai-org/glm-4.7-original:thinking';
+    openingModel = 'zai-org/glm-4.7-original:thinking';
+    generalReasoningEffort = 'high';
   } else {
     generalModel = 'deepseek/deepseek-v3.2';
-    // NanoGPT uses zai-org/ prefix and :thinking suffix for opening generation
-    openingModel = provider === 'nanogpt' ? 'zai-org/glm-4.7:thinking' : 'z-ai/glm-4.7';
+    openingModel = 'z-ai/glm-4.7';
   }
 
   return {
@@ -171,7 +176,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
@@ -183,7 +188,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
@@ -195,7 +200,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
@@ -207,7 +212,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
@@ -219,7 +224,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
@@ -231,7 +236,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
@@ -255,7 +260,7 @@ export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset, 
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
-      reasoningEffort: 'off',
+      reasoningEffort: generalReasoningEffort,
       providerOnly: [],
       manualBody: '',
     },
