@@ -208,6 +208,7 @@ export interface GeneratedCharacter {
   description: string;
   relationship: string;
   traits: string[];
+  vaultId?: string;
 }
 
 export interface GeneratedOpening {

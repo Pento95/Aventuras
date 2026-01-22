@@ -9,6 +9,7 @@
     actionLabel?: string;
     onAction?: () => void;
     class?: string;
+    children?: import("svelte").Snippet;
   }
 
   let {
@@ -17,11 +18,14 @@
     description,
     actionLabel,
     onAction,
-    class: className = ""
+    class: className = "",
+    children,
   }: Props = $props();
 </script>
 
-<div class="flex flex-col items-center justify-center flex-1 text-center px-4 py-12 {className}">
+<div
+  class="flex flex-col items-center justify-center flex-1 text-center {className}"
+>
   <div class="rounded-full bg-muted p-6 mb-4">
     <Icon class="h-12 w-12 text-muted-foreground" />
   </div>
@@ -29,7 +33,9 @@
   <p class="text-muted-foreground max-w-sm mb-6">
     {description}
   </p>
-  {#if actionLabel && onAction}
+  {#if children}
+    {@render children()}
+  {:else if actionLabel && onAction}
     <Button variant="default" onclick={onAction}>
       {actionLabel}
     </Button>

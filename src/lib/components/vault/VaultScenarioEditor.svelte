@@ -8,6 +8,12 @@
   } from 'lucide-svelte';
   import { fade, slide } from 'svelte/transition';
   import TagInput from '$lib/components/tags/TagInput.svelte';
+  import VaultListItem from './shared/VaultListItem.svelte';
+  import { normalizeImageDataUrl } from "$lib/utils/image";
+  import * as Avatar from "$lib/components/ui/avatar";
+
+  import * as ResponsiveModal from '$lib/components/ui/responsive-modal';
+  import { Button } from '$lib/components/ui/button';
 
   interface Props {
     scenario: VaultScenario;
@@ -124,9 +130,9 @@
     const newIndex = npcs.length;
     npcs.push({
       name: char.name,
-      role: char.role || 'Supporting Character',
+      role: 'Supporting Character',
       description: char.description || '',
-      relationship: char.relationshipTemplate || 'Neutral',
+      relationship: 'Neutral',
       traits: [...char.traits]
     });
     npcs = npcs;
@@ -151,57 +157,20 @@
   }
 </script>
 
-<div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-  role="dialog"
-  aria-modal="true"
->
-  <div class="flex h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-surface-900 shadow-2xl overflow-hidden ring-1 ring-surface-700">
+<ResponsiveModal.Root open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+  <ResponsiveModal.Content class="sm:max-w-4xl w-full sm:h-[90vh] flex flex-col overflow-hidden p-0">
     
     <!-- Header -->
-    <div class="flex items-center justify-between border-b border-surface-700 bg-surface-800 px-6 py-4">
+    <ResponsiveModal.Header class="bg-surface-800">
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-700">
           <MapPin class="h-5 w-5 text-green-400" />
         </div>
-        <div>
-          <h2 class="text-lg font-semibold text-surface-100">Edit Scenario</h2>
-          <p class="text-xs text-surface-400">{name}</p>
-        </div>
+        <ResponsiveModal.Title class="text-lg font-semibold text-surface-100">
+          Edit Scenario
+        </ResponsiveModal.Title>
       </div>
-
-      <div class="flex items-center gap-3">
-        {#if error}
-          <div class="flex items-center gap-2 text-red-400 text-sm mr-4 bg-red-500/10 px-3 py-1.5 rounded-full">
-            <AlertCircle class="h-4 w-4" />
-            {error}
-          </div>
-        {/if}
-
-        <button
-          class="flex items-center gap-2 rounded-lg bg-accent-600 px-4 py-2 text-sm font-medium text-white hover:bg-accent-500 disabled:opacity-50 transition-colors"
-          onclick={handleSave}
-          disabled={saving}
-        >
-          {#if saving}
-            <div class="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
-          {:else}
-            <Save class="h-4 w-4" />
-          {/if}
-          Save Changes
-        </button>
-        
-        <div class="h-6 w-px bg-surface-700 mx-1"></div>
-
-        <button
-          class="rounded-lg p-2 text-surface-400 hover:bg-surface-700 hover:text-surface-200 transition-colors"
-          onclick={onClose}
-          title="Close"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-    </div>
+    </ResponsiveModal.Header>
 
     <!-- Tabs -->
     <div class="flex border-b border-surface-700 bg-surface-800/50 px-6">
@@ -229,7 +198,7 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-6 bg-surface-900">
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-surface-900">
       <div class="max-w-3xl mx-auto">
         
         <!-- General Tab -->
@@ -463,9 +432,46 @@
 
       </div>
     </div>
-  </div>
 
-  <!-- Character Selector Modal -->
+    <!-- Actions -->
+    <ResponsiveModal.Footer class="bg-surface-800">
+      <div class="flex w-full items-center justify-between gap-4">
+        {#if error}
+          <div class="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 px-3 py-1.5 rounded-full">
+            <AlertCircle class="h-4 w-4" />
+            {error}
+          </div>
+        {:else}
+          <div class="hidden sm:block"></div>
+        {/if}
+
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <Button
+            variant="ghost"
+            onclick={onClose}
+            disabled={saving}
+            class="flex-1 sm:flex-initial"
+          >
+            Cancel
+          </Button>
+          <Button
+            onclick={handleSave}
+            disabled={saving}
+            class="flex-1 sm:flex-initial"
+          >
+            {#if saving}
+              <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+            {:else}
+              <Save class="mr-2 h-4 w-4" />
+            {/if}
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    </ResponsiveModal.Footer>
+  </ResponsiveModal.Content>
+
+  <!-- Character Selector Modal (Nested) -->
   {#if showCharacterSelector}
     <div 
       class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -512,38 +518,34 @@
               <p>No matching characters found.</p>
             </div>
           {:else}
-            {#each filteredCharacters as char}
-              <button
-                class="w-full flex items-center gap-3 rounded-lg p-2 text-left hover:bg-surface-800 transition-colors group"
+            {#each filteredCharacters as char (char.id)}
+              <VaultListItem
+                title={char.name}
+                subtitle={char.traits.slice(0, 3).join(', ')}
                 onclick={() => addNpcFromCharacter(char)}
+                class="hover:bg-surface-800 border-transparent bg-transparent"
               >
-                <!-- Avatar -->
-                <div class="h-10 w-10 flex-shrink-0 rounded-lg bg-surface-800 border border-surface-700 overflow-hidden">
-                  {#if char.portrait}
-                    <img src={char.portrait} alt="" class="h-full w-full object-cover" />
-                  {:else}
-                    <div class="flex h-full w-full items-center justify-center bg-surface-700">
-                      <User class="h-5 w-5 text-surface-400" />
-                    </div>
-                  {/if}
-                </div>
+                {#snippet icon()}
+                  <Avatar.Root class="h-10 w-10 border shadow-sm">
+                    <Avatar.Image
+                      src={normalizeImageDataUrl(char.portrait) ?? ""}
+                      alt={char.name}
+                      class="object-cover"
+                    />
+                    <Avatar.Fallback class="bg-muted text-muted-foreground">
+                      <User class="h-5 w-5" />
+                    </Avatar.Fallback>
+                  </Avatar.Root>
+                {/snippet}
                 
-                <!-- Info -->
-                <div class="flex-1 min-w-0">
-                  <div class="font-medium text-surface-200 group-hover:text-accent-400 transition-colors">
-                    {char.name}
-                  </div>
-                  <div class="text-xs text-surface-400 truncate">
-                    {char.role || 'Supporting'} • {char.traits.slice(0, 3).join(', ')}
-                  </div>
-                </div>
-                
-                <Plus class="h-4 w-4 text-surface-500 group-hover:text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
+                {#snippet end()}
+                  <Plus class="h-4 w-4 text-surface-500 group-hover:text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                {/snippet}
+              </VaultListItem>
             {/each}
           {/if}
         </div>
       </div>
     </div>
   {/if}
-</div>
+</ResponsiveModal.Root>

@@ -155,7 +155,6 @@ export interface Character {
 
 // ===== Character Vault Types =====
 
-export type VaultCharacterType = 'protagonist' | 'supporting';
 export type VaultCharacterSource = 'manual' | 'import' | 'story';
 
 /**
@@ -166,17 +165,6 @@ export interface VaultCharacter {
   id: string;
   name: string;
   description: string | null;
-
-  // Type determines which fields are relevant
-  characterType: VaultCharacterType;
-
-  // Protagonist-specific fields
-  background: string | null;   // Backstory for protagonist wizard step
-  motivation: string | null;   // Goals/drives for protagonist wizard step
-
-  // Supporting-specific fields
-  role: string | null;         // e.g., "Mentor", "Rival", "Love Interest"
-  relationshipTemplate: string | null;  // Default relationship when added
 
   // Common fields (same as Character)
   traits: string[];

@@ -9,6 +9,7 @@
   import { fade, slide } from 'svelte/transition';
   import InteractiveLorebookChat from './InteractiveLorebookChat.svelte';
   import TagInput from '$lib/components/tags/TagInput.svelte';
+  import * as ResponsiveModal from '$lib/components/ui/responsive-modal';
 
   interface Props {
     lorebook: VaultLorebook;
@@ -160,15 +161,11 @@
   }
 </script>
 
-<div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-4"
-  role="dialog"
-  aria-modal="true"
->
-  <div class="flex h-full sm:h-[90vh] w-full sm:max-w-6xl flex-col sm:rounded-lg bg-surface-900 shadow-xl overflow-hidden sm:ring-1 sm:ring-surface-700">
+<ResponsiveModal.Root open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+  <ResponsiveModal.Content class="sm:max-w-6xl w-full sm:h-[90vh] flex flex-col overflow-hidden sm:rounded-lg p-0 bg-surface-900 shadow-xl border border-surface-700">
     
     <!-- Header -->
-    <div class="flex items-center justify-between border-b border-surface-700 bg-surface-800 px-3 sm:px-6 py-3 sm:py-4 gap-2 pt-safe">
+    <div class="flex items-center justify-between border-b border-surface-700 bg-surface-800 px-3 sm:px-6 py-3 sm:py-4 gap-2">
       <div class="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
         <div class="flex flex-col min-w-0 flex-1">
           <input
@@ -245,7 +242,7 @@
       
       {#if activeTab === 'settings'}
         <!-- Global Settings Panel -->
-        <div class="w-full p-4 sm:p-8 overflow-y-auto pb-safe" in:fade={{ duration: 150 }}>
+        <div class="w-full p-4 sm:p-8 overflow-y-auto" in:fade={{ duration: 150 }}>
           <div class="max-w-2xl mx-auto space-y-4 sm:space-y-6">
             <h3 class="text-lg sm:text-xl font-medium text-surface-100 mb-4 sm:mb-6">Lorebook Settings</h3>
             
@@ -313,7 +310,7 @@
           </div>
 
           <!-- List -->
-          <div class="flex-1 overflow-y-auto p-2 sm:p-2 space-y-1 pb-safe">
+          <div class="flex-1 overflow-y-auto p-2 sm:p-2 space-y-1">
             {#if filteredEntries.length === 0}
               <div class="p-4 text-center text-sm text-surface-500">
                 {#if searchQuery}
@@ -390,7 +387,7 @@
             </div>
 
             <!-- Entry Editor Form -->
-            <div class="flex-1 overflow-y-auto p-4 sm:p-6 pb-safe">
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6">
               <div class="max-w-3xl mx-auto space-y-4 sm:space-y-6">
                 
                 <!-- Basic Info Grid -->
@@ -522,5 +519,5 @@
       {/if}
     </div>
 
-  </div>
-</div>
+  </ResponsiveModal.Content>
+</ResponsiveModal.Root>

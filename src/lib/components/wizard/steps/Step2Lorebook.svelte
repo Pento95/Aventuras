@@ -8,7 +8,7 @@
     AlertCircle,
     X,
   } from "lucide-svelte";
-  import VaultLorebookBrowser from "$lib/components/vault/VaultLorebookBrowser.svelte";
+  import UniversalVaultBrowser from "$lib/components/vault/UniversalVaultBrowser.svelte";
   import type { VaultLorebook } from "$lib/types";
   import type { ImportedLorebookItem, EntryType } from "../wizardTypes";
   import { getTypeCounts, getTypeColor } from "../wizardTypes";
@@ -36,8 +36,8 @@
   // Get list of vault lorebook IDs that have been imported
   const importedVaultLorebookIds = $derived(
     importedLorebooks
-      .filter((lb) => lb.filename.includes("(from Vault)"))
-      .map((lb) => lb.id),
+      .map((lb) => lb.vaultId)
+      .filter((id): id is string => !!id),
   );
 
   // Combined summary for display
@@ -68,10 +68,11 @@
     </p>
     <!-- Inline Vault Browser (Moved up to be close to description) -->
     <div class="pt-0">
-      <VaultLorebookBrowser
+      <UniversalVaultBrowser
+        type="lorebook"
         onSelect={onSelectFromVault}
         {onNavigateToVault}
-        importedLorebookIds={importedVaultLorebookIds}
+        disabledIds={importedVaultLorebookIds}
       />
     </div>
   </div>

@@ -5,6 +5,7 @@
   import { settings } from "$lib/stores/settings.svelte";
   import { exportService } from "$lib/services/export";
   import { database } from "$lib/services/database";
+  import { Button } from "$lib/components/ui/button";
   import {
     eventBus,
     type ImageAnalysisStartedEvent,
@@ -191,16 +192,17 @@
 
     <!-- Back to Library Button (right side) -->
     {#if story.currentStory}
-      <button
-        class="btn-ghost flex items-center justify-center rounded-lg p-2 text-surface-400 hover:bg-surface-700 hover:text-surface-100 min-h-[44px] min-w-[44px]"
+      <Button
+        icon={Library}
+        label="Library"
+        variant="ghost"
+        class="text-surface-400 hover:text-surface-100 min-h-[44px] min-w-[44px] hover:bg-surface-700"
         onclick={() => {
           story.closeStory();
           ui.setActivePanel("library");
         }}
         title="Return to Library"
-      >
-        <Library class="h-5 w-5" />
-      </button>
+      />
     {/if}
 
     <!-- Image generation status indicators -->
@@ -227,15 +229,15 @@
 
     {#if story.currentStory}
       <div class="relative">
-        <button
-          class="btn-ghost flex items-center gap-1 rounded-lg p-2 sm:px-2 sm:py-1.5 text-sm min-h-[44px] min-w-[44px] justify-center"
+        <Button
+          icon={Download}
+          label="Export"
+          endIcon={ChevronDown}
+          variant="ghost"
+          class="min-h-[44px] min-w-[44px] hover:bg-surface-700 hover:text-foreground"
           onclick={() => (showExportMenu = !showExportMenu)}
           title="Export story"
-        >
-          <Download class="h-4 w-4" />
-          <span class="hidden sm:inline">Export</span>
-          <ChevronDown class="h-3 w-3 hidden sm:inline" />
-        </button>
+        />
 
         {#if showExportMenu}
           <div
@@ -278,7 +280,7 @@
 
     {#if story.currentStory && story.lorebookEntries.length > 0}
       <button
-        class="btn-ghost rounded-lg p-2 relative min-h-[44px] min-w-[44px] flex items-center justify-center hidden sm:flex"
+        class="btn-ghost rounded-lg p-2 relative min-h-[44px] min-w-[44px] flex items-center justify-center hidden sm:flex hover:bg-surface-700"
         onclick={() => ui.toggleLorebookDebug()}
         title="View active lorebook entries"
       >
@@ -298,7 +300,7 @@
         href="https://discord.gg/DqVzhSPC46"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-ghost rounded-lg p-2 min-h-[44px] min-w-[44px] flex items-center justify-center sm:hidden"
+        class="btn-ghost rounded-lg p-2 min-h-[44px] min-w-[44px] flex items-center justify-center sm:hidden hover:bg-surface-700"
         title="Join our Discord community"
       >
         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -309,17 +311,17 @@
       </a>
     {/if}
 
-    <button
-      class="btn-ghost rounded-lg p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+    <Button
+      icon={Settings}
+      label="Settings"
+      variant="ghost"
+      class="min-h-[44px] min-w-[44px] hover:bg-surface-700"
       onclick={() => ui.openSettings()}
-      title="Settings"
-    >
-      <Settings class="h-5 w-5" />
-    </button>
+    />
 
     {#if story.currentStory}
       <button
-        class="btn-ghost rounded-lg p-3 min-h-[48px] min-w-[48px] flex items-center justify-center"
+        class="btn-ghost rounded-lg p-3 min-h-[48px] min-w-[48px] flex items-center justify-center hover:bg-surface-700"
         onclick={() => ui.toggleSidebar()}
         title={ui.sidebarOpen ? "Hide sidebar" : "Show sidebar"}
       >

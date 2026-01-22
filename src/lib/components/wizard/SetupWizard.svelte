@@ -115,6 +115,7 @@
   let supportingCharacterTraits = $state("");
   let isElaboratingSupportingCharacter = $state(false);
   let supportingCharacterGuidance = $state("");
+  let supportingCharacterVaultId = $state<string | null>(null);
 
   // Character Vault integration
   let showProtagonistVaultPicker = $state(false);
@@ -567,6 +568,7 @@
     supportingCharacterVisualDescriptors[vaultCharacter.name] =
       vaultCharacter.visualDescriptors.join(", ");
     supportingCharacterPortraits[vaultCharacter.name] = vaultCharacter.portrait;
+    supportingCharacterVaultId = vaultCharacter.id;
 
     showSupportingVaultPicker = false;
     showSupportingCharacterForm = true;
@@ -754,6 +756,7 @@
     supportingCharacterRelationship = "";
     supportingCharacterTraits = "";
     showSupportingCharacterForm = true;
+    supportingCharacterVaultId = null;
   }
 
   function editSupportingCharacter(index: number) {
@@ -776,6 +779,7 @@
     supportingCharacterRelationship = "";
     supportingCharacterTraits = "";
     supportingCharacterGuidance = "";
+    supportingCharacterVaultId = null;
   }
 
   function useSupportingCharacterAsIs() {
@@ -792,6 +796,7 @@
             .map((t) => t.trim())
             .filter(Boolean)
         : [],
+      vaultId: supportingCharacterVaultId ?? undefined,
     };
 
     if (editingSupportingCharacterIndex !== null) {
@@ -1710,6 +1715,7 @@
       ...importedLorebooks,
       {
         id: crypto.randomUUID(),
+        vaultId: vaultLorebook.id,
         filename: `${vaultLorebook.name} (from Vault)`,
         result: {
           success: true,

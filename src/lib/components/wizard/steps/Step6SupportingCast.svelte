@@ -13,7 +13,7 @@
     ChevronDown,
     Send,
   } from "lucide-svelte";
-  import VaultCharacterBrowser from "$lib/components/vault/VaultCharacterBrowser.svelte";
+  import UniversalVaultBrowser from "$lib/components/vault/UniversalVaultBrowser.svelte";
   import { characterVault } from "$lib/stores/characterVault.svelte";
   import type { VaultCharacter } from "$lib/types";
   import type {
@@ -96,9 +96,13 @@
   let loadedVaultCharacterId = $state<string | null>(null);
 
   const hasVaultCharacters = $derived(
-    characterVault.isLoaded &&
-      characterVault.characters.filter((c) => c.characterType === "supporting")
-        .length > 0,
+    characterVault.isLoaded && characterVault.characters.length > 0,
+  );
+
+  const addedVaultCharacterIds = $derived(
+    supportingCharacters
+      .map((c) => c.vaultId)
+      .filter((id): id is string => !!id),
   );
 
   function handleSelectFromVault(character: VaultCharacter) {
@@ -322,10 +326,11 @@
       </p>
     {/if}
     <div class="-mt-3">
-      <VaultCharacterBrowser
-        filterType="supporting"
+      <UniversalVaultBrowser
+        type="character"
         onSelect={handleSelectFromVault}
-        selectedCharacterId={loadedVaultCharacterId}
+        selectedId={loadedVaultCharacterId}
+        disabledIds={addedVaultCharacterIds}
         {onNavigateToVault}
       />
     </div>

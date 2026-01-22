@@ -16,7 +16,7 @@
     ChevronDown,
     Send,
   } from "lucide-svelte";
-  import VaultScenarioBrowser from "$lib/components/vault/VaultScenarioBrowser.svelte";
+  import UniversalVaultBrowser from "$lib/components/vault/UniversalVaultBrowser.svelte";
   import { scenarioVault } from "$lib/stores/scenarioVault.svelte";
   import type { VaultScenario } from "$lib/types";
   import type { ExpandedSetting, GeneratedCharacter } from "../wizardTypes";
@@ -330,9 +330,10 @@
       </p>
     {/if}
     <div class="-mt-3">
-      <VaultScenarioBrowser
+      <UniversalVaultBrowser
+        type="scenario"
         onSelect={handleSelectFromVault}
-        selectedScenarioId={loadedVaultScenarioId}
+        selectedId={loadedVaultScenarioId}
         {onNavigateToVault}
       />
     </div>

@@ -1,36 +1,30 @@
 <script lang="ts">
-  import type { VaultCharacter, VaultCharacterType } from '$lib/types';
-  import { characterVault } from '$lib/stores/characterVault.svelte';
-  import { X, User, Users, ImageUp, Loader2 } from 'lucide-svelte';
-  import { normalizeImageDataUrl } from '$lib/utils/image';
-  import TagInput from '$lib/components/tags/TagInput.svelte';
-  import { cn } from '$lib/utils/cn';
+  import type { VaultCharacter } from "$lib/types";
+  import { characterVault } from "$lib/stores/characterVault.svelte";
+  import { X, User, Users, ImageUp, Loader2 } from "lucide-svelte";
+  import { normalizeImageDataUrl } from "$lib/utils/image";
+  import TagInput from "$lib/components/tags/TagInput.svelte";
+  import { cn } from "$lib/utils/cn";
 
-  import * as Dialog from '$lib/components/ui/dialog';
-  import { Input } from '$lib/components/ui/input';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import { Button } from '$lib/components/ui/button';
-  import { Label } from '$lib/components/ui/label';
+  import * as ResponsiveModal from "$lib/components/ui/responsive-modal";
+  import { Input } from "$lib/components/ui/input";
+  import { Textarea } from "$lib/components/ui/textarea";
+  import { Button } from "$lib/components/ui/button";
+  import { Label } from "$lib/components/ui/label";
 
   interface Props {
     character?: VaultCharacter | null;
-    defaultType?: VaultCharacterType;
     onClose: () => void;
     onSaved?: (character: VaultCharacter) => void;
   }
 
-  let { character = null, defaultType = 'protagonist', onClose, onSaved }: Props = $props();
+  let { character = null, onClose, onSaved }: Props = $props();
 
   // Form state
-  let characterType = $state<VaultCharacterType>(character?.characterType ?? defaultType);
-  let name = $state(character?.name ?? '');
-  let description = $state(character?.description ?? '');
-  let background = $state(character?.background ?? '');
-  let motivation = $state(character?.motivation ?? '');
-  let role = $state(character?.role ?? '');
-  let relationshipTemplate = $state(character?.relationshipTemplate ?? '');
-  let traits = $state(character?.traits.join(', ') ?? '');
-  let visualDescriptors = $state(character?.visualDescriptors.join(', ') ?? '');
+  let name = $state(character?.name ?? "");
+  let description = $state(character?.description ?? "");
+  let traits = $state(character?.traits.join(", ") ?? "");
+  let visualDescriptors = $state(character?.visualDescriptors.join(", ") ?? "");
   let tags = $state<string[]>(character?.tags ?? []);
   let portrait = $state<string | null>(character?.portrait ?? null);
 
@@ -42,7 +36,7 @@
 
   async function handleSubmit() {
     if (!name.trim()) {
-      error = 'Name is required';
+      error = "Name is required";
       return;
     }
 
@@ -50,19 +44,20 @@
     error = null;
 
     try {
-      const traitsArray = traits.split(',').map(t => t.trim()).filter(Boolean);
-      const visualDescriptorsArray = visualDescriptors.split(',').map(d => d.trim()).filter(Boolean);
-      
+      const traitsArray = traits
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const visualDescriptorsArray = visualDescriptors
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean);
+
       if (isEditing && character) {
         // Update existing
         await characterVault.update(character.id, {
           name: name.trim(),
           description: description.trim() || null,
-          characterType,
-          background: background.trim() || null,
-          motivation: motivation.trim() || null,
-          role: role.trim() || null,
-          relationshipTemplate: relationshipTemplate.trim() || null,
           traits: traitsArray,
           visualDescriptors: visualDescriptorsArray,
           tags,
@@ -74,17 +69,12 @@
         const newCharacter = await characterVault.add({
           name: name.trim(),
           description: description.trim() || null,
-          characterType,
-          background: background.trim() || null,
-          motivation: motivation.trim() || null,
-          role: role.trim() || null,
-          relationshipTemplate: relationshipTemplate.trim() || null,
           traits: traitsArray,
           visualDescriptors: visualDescriptorsArray,
           tags,
           portrait,
           favorite: false,
-          source: 'manual',
+          source: "manual",
           originalStoryId: null,
           metadata: null,
         });
@@ -92,7 +82,7 @@
       }
       onClose();
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to save character';
+      error = e instanceof Error ? e.message : "Failed to save character";
     } finally {
       saving = false;
     }
@@ -103,8 +93,8 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      error = 'Please select an image file';
+    if (!file.type.startsWith("image/")) {
+      error = "Please select an image file";
       return;
     }
 
@@ -115,11 +105,11 @@
       uploadingPortrait = false;
     };
     reader.onerror = () => {
-      error = 'Failed to read image file';
+      error = "Failed to read image file";
       uploadingPortrait = false;
     };
     reader.readAsDataURL(file);
-    input.value = '';
+    input.value = "";
   }
 
   function removePortrait() {
@@ -127,169 +117,122 @@
   }
 </script>
 
-<Dialog.Root open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
-  <Dialog.Content class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-    <Dialog.Header>
-      <Dialog.Title>{isEditing ? 'Edit Character' : 'New Character'}</Dialog.Title>
-    </Dialog.Header>
+<ResponsiveModal.Root
+  open={true}
+  onOpenChange={(open) => {
+    if (!open) onClose();
+  }}
+>
+  <ResponsiveModal.Content
+    class="md:max-w-[600px] flex flex-col md:h-auto md:max-h-[90vh]"
+  >
+    <ResponsiveModal.Header>
+      <ResponsiveModal.Title class="text-center sm:text-left w-full"
+        >{isEditing ? "Edit Character" : "New Character"}</ResponsiveModal.Title
+      >
+    </ResponsiveModal.Header>
 
-    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4 py-2">
-      {#if error}
-        <div class="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      {/if}
-
-      <!-- Character Type -->
-      <div class="space-y-2">
-        <Label>Character Type</Label>
-        <div class="flex gap-2">
-          <Button
-            type="button"
-            variant={characterType === 'protagonist' ? "default" : "outline"}
-            class="flex-1"
-            onclick={() => characterType = 'protagonist'}
+    <div class="flex-1 overflow-y-auto px-4">
+      <form
+        id="character-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+        class="space-y-4 py-2"
+      >
+        {#if error}
+          <div
+            class="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive"
           >
-            <User class="mr-2 h-4 w-4" />
-            Protagonist
-          </Button>
-          <Button
-            type="button"
-            variant={characterType === 'supporting' ? "default" : "outline"}
-            class="flex-1"
-            onclick={() => characterType = 'supporting'}
-          >
-            <Users class="mr-2 h-4 w-4" />
-            Supporting
-          </Button>
-        </div>
-      </div>
+            {error}
+          </div>
+        {/if}
 
-      <!-- Name -->
-      <div class="space-y-2">
-        <Label for="name">Name *</Label>
-        <Input
-          id="name"
-          type="text"
-          bind:value={name}
-          placeholder="Character name"
-        />
-      </div>
-
-      <!-- Description -->
-      <div class="space-y-2">
-        <Label for="description">Description</Label>
-        <Textarea
-          id="description"
-          bind:value={description}
-          placeholder="Brief description of the character"
-          rows={3}
-          class="resize-none"
-        />
-      </div>
-
-      <!-- Protagonist-specific fields -->
-      {#if characterType === 'protagonist'}
+        <!-- Name -->
         <div class="space-y-2">
-          <Label for="background">Background</Label>
+          <Label for="name">Name *</Label>
+          <Input
+            id="name"
+            type="text"
+            bind:value={name}
+            placeholder="Character name"
+          />
+        </div>
+
+        <!-- Description -->
+        <div class="space-y-2">
+          <Label for="description">Description</Label>
           <Textarea
-            id="background"
-            bind:value={background}
-            placeholder="Character's backstory and history"
-            rows={2}
+            id="description"
+            bind:value={description}
+            placeholder="Brief description of the character"
+            rows={3}
             class="resize-none"
           />
         </div>
 
+        <!-- Traits -->
         <div class="space-y-2">
-          <Label for="motivation">Motivation</Label>
+          <Label for="traits">Traits</Label>
           <Input
-            id="motivation"
+            id="traits"
             type="text"
-            bind:value={motivation}
-            placeholder="What drives this character?"
+            bind:value={traits}
+            placeholder="Brave, Curious, Stubborn (comma-separated)"
           />
-        </div>
-      {/if}
-
-      <!-- Supporting-specific fields -->
-      {#if characterType === 'supporting'}
-        <div class="space-y-2">
-          <Label for="role">Role</Label>
-          <Input
-            id="role"
-            type="text"
-            bind:value={role}
-            placeholder="e.g., Mentor, Rival, Love Interest"
-          />
+          <p class="text-[0.8rem] text-muted-foreground">
+            Comma-separated personality traits
+          </p>
         </div>
 
+        <!-- Visual Descriptors -->
         <div class="space-y-2">
-          <Label for="relationship">Relationship Template</Label>
+          <Label for="visualDescriptors">Visual Descriptors</Label>
           <Input
-            id="relationship"
+            id="visualDescriptors"
             type="text"
-            bind:value={relationshipTemplate}
-            placeholder="Default relationship to protagonist"
+            bind:value={visualDescriptors}
+            placeholder="Tall, dark hair, blue eyes (comma-separated)"
           />
+          <p class="text-[0.8rem] text-muted-foreground">
+            Used for portrait generation
+          </p>
         </div>
-      {/if}
 
-      <!-- Traits -->
-      <div class="space-y-2">
-        <Label for="traits">Traits</Label>
-        <Input
-          id="traits"
-          type="text"
-          bind:value={traits}
-          placeholder="Brave, Curious, Stubborn (comma-separated)"
-        />
-        <p class="text-[0.8rem] text-muted-foreground">Comma-separated personality traits</p>
-      </div>
-
-      <!-- Visual Descriptors -->
-      <div class="space-y-2">
-        <Label for="visualDescriptors">Visual Descriptors</Label>
-        <Input
-          id="visualDescriptors"
-          type="text"
-          bind:value={visualDescriptors}
-          placeholder="Tall, dark hair, blue eyes (comma-separated)"
-        />
-        <p class="text-[0.8rem] text-muted-foreground">Used for portrait generation</p>
-      </div>
-
-      <!-- Portrait -->
-      <div class="space-y-2">
-        <Label>Portrait</Label>
-        <div class="flex items-start gap-4">
-          {#if portrait}
-            <div class="relative group">
-              <img
-                src={normalizeImageDataUrl(portrait) ?? ''}
-                alt="Portrait preview"
-                class="h-20 w-20 rounded-md object-cover ring-1 ring-border"
-              />
-              <button
-                type="button"
-                class="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground hover:bg-destructive/90 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                onclick={removePortrait}
+        <!-- Portrait -->
+        <div class="space-y-2">
+          <Label>Portrait</Label>
+          <div class="flex items-start gap-4">
+            {#if portrait}
+              <div class="relative group">
+                <img
+                  src={normalizeImageDataUrl(portrait) ?? ""}
+                  alt="Portrait preview"
+                  class="h-20 w-20 rounded-md object-cover ring-1 ring-border"
+                />
+                <button
+                  type="button"
+                  class="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground hover:bg-destructive/90 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  onclick={removePortrait}
+                >
+                  <X class="h-3 w-3" />
+                </button>
+              </div>
+            {:else}
+              <div
+                class="flex h-20 w-20 items-center justify-center rounded-md bg-muted ring-1 ring-border"
               >
-                <X class="h-3 w-3" />
-              </button>
-            </div>
-          {:else}
-            <div class="flex h-20 w-20 items-center justify-center rounded-md bg-muted ring-1 ring-border">
-              {#if characterType === 'protagonist'}
                 <User class="h-8 w-8 text-muted-foreground" />
-              {:else}
-                <Users class="h-8 w-8 text-muted-foreground" />
-              {/if}
-            </div>
-          {/if}
+              </div>
+            {/if}
 
-          <div class="flex-1">
-             <Button variant="outline" class="w-full relative cursor-pointer" disabled={uploadingPortrait}>
+            <div class="flex-1">
+              <Button
+                variant="outline"
+                class="w-full relative cursor-pointer"
+                disabled={uploadingPortrait}
+              >
                 {#if uploadingPortrait}
                   <Loader2 class="mr-2 h-4 w-4 animate-spin" />
                 {:else}
@@ -303,43 +246,40 @@
                   onchange={handlePortraitUpload}
                   disabled={uploadingPortrait}
                 />
-             </Button>
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Tags -->
-      <div class="space-y-2">
-        <Label for="tags">Tags</Label>
-        <TagInput
-          value={tags}
-          type="character"
-          onChange={(newTags) => tags = newTags}
-          placeholder="Add tags..."
-        />
-        <p class="text-[0.8rem] text-muted-foreground">For organizing your vault</p>
-      </div>
+        <!-- Tags -->
+        <div class="space-y-2">
+          <Label for="tags">Tags</Label>
+          <TagInput
+            value={tags}
+            type="character"
+            onChange={(newTags) => (tags = newTags)}
+            placeholder="Add tags..."
+          />
+          <p class="text-[0.8rem] text-muted-foreground">
+            For organizing your vault
+          </p>
+        </div>
+      </form>
+    </div>
 
-      <!-- Actions -->
-      <Dialog.Footer class="gap-2 sm:gap-0">
-        <Button
-          type="button"
-          variant="ghost"
-          onclick={onClose}
-          disabled={saving}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={saving || !name.trim()}
-        >
-          {#if saving}
-            <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-          {/if}
-          {isEditing ? 'Save Changes' : 'Create Character'}
-        </Button>
-      </Dialog.Footer>
-    </form>
-  </Dialog.Content>
-</Dialog.Root>
+    <!-- Actions -->
+    <ResponsiveModal.Footer class="gap-2 sm:gap-0">
+      <Button
+        type="submit"
+        form="character-form"
+        disabled={saving || !name.trim()}
+        class="w-full"
+      >
+        {#if saving}
+          <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+        {/if}
+        {isEditing ? "Save Changes" : "Create Character"}
+      </Button>
+    </ResponsiveModal.Footer>
+  </ResponsiveModal.Content>
+</ResponsiveModal.Root>

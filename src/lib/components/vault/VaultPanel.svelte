@@ -5,7 +5,6 @@
   import { ui } from "$lib/stores/ui.svelte";
   import type {
     VaultCharacter,
-    VaultCharacterType,
     VaultLorebook,
     VaultScenario,
   } from "$lib/types";
@@ -23,11 +22,9 @@
     MapPin,
     Tags,
   } from "lucide-svelte";
-  import VaultCharacterCard from "./VaultCharacterCard.svelte";
+  import UniversalVaultCard from "./UniversalVaultCard.svelte";
   import VaultCharacterForm from "./VaultCharacterForm.svelte";
-  import VaultLorebookCard from "./VaultLorebookCard.svelte";
   import VaultLorebookEditor from "./VaultLorebookEditor.svelte";
-  import VaultScenarioCard from "./VaultScenarioCard.svelte";
   import VaultScenarioEditor from "./VaultScenarioEditor.svelte";
   import DiscoveryModal from "$lib/components/discovery/DiscoveryModal.svelte";
   import TagFilter from "./TagFilter.svelte";
@@ -35,8 +32,11 @@
   import { tagStore } from "$lib/stores/tags.svelte";
   import { fade } from "svelte/transition";
 
+  // Shared Components
+  import EmptyState from "$lib/components/ui/empty-state/empty-state.svelte";
+
   // Shadcn Components
-  import { Button, buttonVariants } from "$lib/components/ui/button";
+  import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import {
     Tabs,
@@ -51,6 +51,9 @@
 
   // Types
   type VaultTab = "characters" | "lorebooks" | "scenarios";
+  type VaultType = "character" | "lorebook" | "scenario";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type AnyVaultItem = VaultCharacter | VaultLorebook | VaultScenario;
 
   // State
   let activeTab = $state<VaultTab>(ui.vaultTab);
@@ -60,130 +63,127 @@
   let filterLogic = $state<"AND" | "OR">("OR");
   let showTagManager = $state(false);
 
-  // Character State
-  let charFilterType = $state<VaultCharacterType | "all">("all");
+  // Modal States
   let showCharForm = $state(false);
   let editingCharacter = $state<VaultCharacter | null>(null);
-  let defaultCharFormType = $state<VaultCharacterType>("protagonist");
-  let importCharError = $state<string | null>(null);
-
-  // Lorebook State
-  let importLorebookError = $state<string | null>(null);
   let editingLorebook = $state<VaultLorebook | null>(null);
-
-  // Scenario State
-  let importScenarioError = $state<string | null>(null);
   let editingScenario = $state<VaultScenario | null>(null);
 
-  // Discovery Modal State
   let showDiscoveryModal = $state(false);
-  let discoveryMode = $state<"character" | "lorebook" | "scenario">(
-    "character",
-  );
+  let discoveryMode = $state<VaultType>("character");
 
-  // Derived: Filtered Characters
-  const filteredCharacters = $derived.by(() => {
-    let chars = characterVault.characters;
+  // Error States
+  let errors = $state<Record<VaultTab, string | null>>({
+    characters: null,
+    lorebooks: null,
+    scenarios: null,
+  });
 
-    if (charFilterType !== "all") {
-      chars = chars.filter((c) => c.characterType === charFilterType);
-    }
+  // Configuration
+  interface VaultSectionConfig {
+    id: VaultTab;
+    label: string;
+    icon: typeof Users;
+    type: VaultType;
+    store: typeof characterVault | typeof lorebookVault | typeof scenarioVault;
+    singularLabel: string;
+    emptyIcon: typeof Users;
+    emptyTitle: string;
+    emptyDesc: string;
+    createLabel?: string;
+    createAction?: () => void;
+    importLabel: string;
+    importAction: (e: Event) => Promise<void>;
+  }
+
+  const sections: VaultSectionConfig[] = [
+    {
+      id: "characters",
+      label: "Characters",
+      icon: Users,
+      type: "character",
+      store: characterVault,
+      singularLabel: "Character",
+      emptyIcon: Users,
+      emptyTitle: "No characters in vault yet",
+      emptyDesc: "Create your first character to get started.",
+      createLabel: "New Character",
+      createAction: openCreateCharForm,
+      importLabel: "Import Card",
+      importAction: handleImportCard,
+    },
+    {
+      id: "lorebooks",
+      label: "Lorebooks",
+      icon: Book,
+      type: "lorebook",
+      store: lorebookVault,
+      singularLabel: "Lorebook",
+      emptyIcon: Book,
+      emptyTitle: "No lorebooks in vault yet",
+      emptyDesc: "Create a new lorebook or import one from a file.",
+      createLabel: "New Lorebook",
+      createAction: handleCreateLorebook,
+      importLabel: "Import Lorebook",
+      importAction: handleImportLorebook,
+    },
+    {
+      id: "scenarios",
+      label: "Scenarios",
+      icon: MapPin,
+      type: "scenario",
+      store: scenarioVault,
+      singularLabel: "Scenario",
+      emptyIcon: MapPin,
+      emptyTitle: "No scenarios in vault yet",
+      emptyDesc: "Import character cards to extract scenario settings.",
+      // No create action for scenarios currently
+      importLabel: "Import Card",
+      importAction: handleImportScenario,
+    },
+  ];
+
+  // Helper function to filter items
+  function getFilteredItems<
+    T extends {
+      tags: string[];
+      favorite: boolean;
+      name: string;
+      description: string | null;
+      traits?: string[];
+    },
+  >(items: T[]): T[] {
+    let result = items;
 
     if (showFavoritesOnly) {
-      chars = chars.filter((c) => c.favorite);
+      result = result.filter((item) => item.favorite);
     }
 
     if (selectedTags.length > 0) {
       if (filterLogic === "AND") {
-        chars = chars.filter((c) =>
-          selectedTags.every((tag) => c.tags.includes(tag)),
+        result = result.filter((item) =>
+          selectedTags.every((tag) => item.tags.includes(tag)),
         );
       } else {
-        chars = chars.filter((c) =>
-          selectedTags.some((tag) => c.tags.includes(tag)),
+        result = result.filter((item) =>
+          selectedTags.some((tag) => item.tags.includes(tag)),
         );
       }
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      chars = chars.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query) ||
-          c.description?.toLowerCase().includes(query) ||
-          c.tags.some((t) => t.toLowerCase().includes(query)) ||
-          c.traits.some((t) => t.toLowerCase().includes(query)),
+      result = result.filter(
+        (item) =>
+          item.name.toLowerCase().includes(query) ||
+          item.description?.toLowerCase().includes(query) ||
+          item.tags.some((t) => t.toLowerCase().includes(query)) ||
+          item.traits?.some((t) => t.toLowerCase().includes(query)),
       );
     }
 
-    return chars;
-  });
-
-  // Derived: Filtered Lorebooks
-  const filteredLorebooks = $derived.by(() => {
-    let books = lorebookVault.lorebooks;
-
-    if (showFavoritesOnly) {
-      books = books.filter((b) => b.favorite);
-    }
-
-    if (selectedTags.length > 0) {
-      if (filterLogic === "AND") {
-        books = books.filter((b) =>
-          selectedTags.every((tag) => b.tags.includes(tag)),
-        );
-      } else {
-        books = books.filter((b) =>
-          selectedTags.some((tag) => b.tags.includes(tag)),
-        );
-      }
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      books = books.filter(
-        (b) =>
-          b.name.toLowerCase().includes(query) ||
-          b.description?.toLowerCase().includes(query) ||
-          b.tags.some((t) => t.toLowerCase().includes(query)),
-      );
-    }
-
-    return books;
-  });
-
-  // Derived: Filtered Scenarios
-  const filteredScenarios = $derived.by(() => {
-    let items = scenarioVault.scenarios;
-
-    if (showFavoritesOnly) {
-      items = items.filter((s) => s.favorite);
-    }
-
-    if (selectedTags.length > 0) {
-      if (filterLogic === "AND") {
-        items = items.filter((s) =>
-          selectedTags.every((tag) => s.tags.includes(tag)),
-        );
-      } else {
-        items = items.filter((s) =>
-          selectedTags.some((tag) => s.tags.includes(tag)),
-        );
-      }
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      items = items.filter(
-        (s) =>
-          s.name.toLowerCase().includes(query) ||
-          s.description?.toLowerCase().includes(query) ||
-          s.tags.some((t) => t.toLowerCase().includes(query)),
-      );
-    }
-
-    return items;
-  });
+    return result;
+  }
 
   // Load on mount
   $effect(() => {
@@ -196,19 +196,17 @@
   // Sync with UI store
   $effect(() => {
     activeTab = ui.vaultTab;
-    selectedTags = []; // Reset tags when tab changes externally
+    selectedTags = [];
   });
 
-  // Update UI store when tab changes
   $effect(() => {
     ui.setVaultTab(activeTab);
-    selectedTags = []; // Reset tags when tab changes internally
+    selectedTags = [];
   });
 
-  // Character Handlers
-  function openCreateCharForm(type: VaultCharacterType = "protagonist") {
+  // Handlers
+  function openCreateCharForm() {
     editingCharacter = null;
-    defaultCharFormType = type;
     showCharForm = true;
   }
 
@@ -217,25 +215,16 @@
     showCharForm = true;
   }
 
-  async function handleDeleteChar(id: string) {
-    await characterVault.delete(id);
-  }
-
-  async function handleToggleFavoriteChar(id: string) {
-    await characterVault.toggleFavorite(id);
-  }
-
   async function handleImportCard(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
-    // Fire and forget (store handles loading state via placeholder)
     try {
       await characterVault.importFromFile(file);
     } catch (error) {
       console.error("[CharacterVault] Import failed:", error);
-      importCharError =
+      errors.characters =
         error instanceof Error
           ? error.message
           : "Failed to import character card";
@@ -244,38 +233,23 @@
     }
   }
 
-  // Lorebook Handlers
   async function handleImportLorebook(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
-    // Fire and forget (store handles loading state via placeholder)
     try {
       await lorebookVault.importFromFile(file);
     } catch (error) {
       console.error("[VaultPanel] Lorebook import failed:", error);
-      importLorebookError =
+      errors.lorebooks =
         error instanceof Error ? error.message : "Failed to import lorebook";
     } finally {
       input.value = "";
     }
   }
 
-  async function handleDeleteLorebook(id: string) {
-    await lorebookVault.delete(id);
-  }
-
-  async function handleToggleFavoriteLorebook(id: string) {
-    await lorebookVault.toggleFavorite(id);
-  }
-
-  function openEditLorebook(lorebook: VaultLorebook) {
-    editingLorebook = lorebook;
-  }
-
   async function handleCreateLorebook() {
-    // Create a new empty lorebook and open it for editing
     const newLorebook = await lorebookVault.add({
       name: "",
       description: null,
@@ -301,7 +275,6 @@
     editingLorebook = newLorebook;
   }
 
-  // Scenario Handlers
   async function handleImportScenario(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -311,28 +284,31 @@
       await scenarioVault.importFromFile(file);
     } catch (error) {
       console.error("[VaultPanel] Scenario import failed:", error);
-      importScenarioError =
+      errors.scenarios =
         error instanceof Error ? error.message : "Failed to import scenario";
     } finally {
       input.value = "";
     }
   }
 
-  async function handleDeleteScenario(id: string) {
-    await scenarioVault.delete(id);
-  }
-
-  async function handleToggleFavoriteScenario(id: string) {
-    await scenarioVault.toggleFavorite(id);
-  }
-
-  function openEditScenario(scenario: VaultScenario) {
-    editingScenario = scenario;
-  }
-
-  function openBrowseOnline(mode: "character" | "lorebook" | "scenario") {
+  function openBrowseOnline(mode: VaultType) {
     discoveryMode = mode;
     showDiscoveryModal = true;
+  }
+
+  // Generic Edit/Delete handlers
+  function handleEdit(item: AnyVaultItem, type: VaultType) {
+    if (type === "character") openEditCharForm(item as VaultCharacter);
+    else if (type === "lorebook") editingLorebook = item as VaultLorebook;
+    else if (type === "scenario") editingScenario = item as VaultScenario;
+  }
+
+  async function handleDelete(id: string, store: any) {
+    await store.delete(id);
+  }
+
+  async function handleToggleFavorite(id: string, store: any) {
+    await store.toggleFavorite(id);
   }
 </script>
 
@@ -364,166 +340,70 @@
       <!-- Right Side Actions -->
       <div class="flex items-center gap-2">
         <Button
+          icon={Tags}
+          label="Tags"
           variant="outline"
           size="sm"
-          class="h-9 hidden sm:flex"
+          class="h-9"
           onclick={() => (showTagManager = true)}
-        >
-          <Tags class="h-4 w-4" />
-          Tags
-        </Button>
-        <!-- Mobile only icon button -->
-        <Button
-          variant="outline"
-          size="icon"
-          class="h-9 w-9 sm:hidden"
-          onclick={() => (showTagManager = true)}
-        >
-          <Tags class="h-4 w-4" />
-        </Button>
+        />
 
-        {#if activeTab === "characters"}
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-9 hidden sm:flex"
-            onclick={() => openBrowseOnline("character")}
-          >
-            <Globe class="h-4 w-4" />
-            Browse Online
-          </Button>
-
-          <div class="relative">
+        {#each sections as section}
+          {#if activeTab === section.id}
             <Button
+              icon={Globe}
+              label="Browse Online"
               variant="outline"
               size="sm"
-              class="h-9 cursor-pointer hidden sm:flex"
-            >
-              <Upload class="h-4 w-4" />
-              Import Card
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              class="h-9 w-9 cursor-pointer sm:hidden"
-            >
-              <Upload class="h-4 w-4" />
-            </Button>
-            <input
-              type="file"
-              accept=".json,.png"
-              class="absolute inset-0 cursor-pointer opacity-0"
-              onchange={handleImportCard}
+              class="h-9"
+              onclick={() => openBrowseOnline(section.type)}
             />
-          </div>
 
-          <Button size="sm" class="h-9" onclick={() => openCreateCharForm()}>
-            <Plus class="h-4 w-4" />
-            <span class="hidden sm:inline">New Character</span>
-            <span class="sm:hidden">New</span>
-          </Button>
-        {:else if activeTab === "lorebooks"}
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-9 hidden sm:flex"
-            onclick={() => openBrowseOnline("lorebook")}
-          >
-            <Globe class="h-4 w-4" />
-            Browse Online
-          </Button>
+            <div class="relative">
+              <Button
+                icon={Upload}
+                label={section.importLabel}
+                variant="outline"
+                size="sm"
+                class="h-9 cursor-pointer"
+              />
+              <input
+                type="file"
+                accept={section.id === "lorebooks"
+                  ? ".json,application/json"
+                  : ".json,.png"}
+                class="absolute inset-0 cursor-pointer opacity-0"
+                onchange={section.importAction}
+              />
+            </div>
 
-          <div class="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              class="h-9 cursor-pointer hidden sm:flex"
-            >
-              <Upload class="h-4 w-4" />
-              Import Lorebook
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              class="h-9 w-9 cursor-pointer sm:hidden"
-            >
-              <Upload class="h-4 w-4" />
-            </Button>
-            <input
-              type="file"
-              accept=".json,application/json"
-              class="absolute inset-0 cursor-pointer opacity-0"
-              onchange={handleImportLorebook}
-            />
-          </div>
-
-          <Button size="sm" class="h-9" onclick={handleCreateLorebook}>
-            <Plus class="h-4 w-4" />
-            <span class="hidden sm:inline">New Lorebook</span>
-            <span class="sm:hidden">New</span>
-          </Button>
-        {:else if activeTab === "scenarios"}
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-9 hidden sm:flex"
-            onclick={() => openBrowseOnline("scenario")}
-          >
-            <Globe class="h-4 w-4" />
-            Browse Online
-          </Button>
-
-          <div class="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              class="h-9 cursor-pointer hidden sm:flex"
-            >
-              <Upload class="h-4 w-4" />
-              Import Card
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              class="h-9 w-9 cursor-pointer sm:hidden"
-            >
-              <Upload class="h-4 w-4" />
-            </Button>
-            <input
-              type="file"
-              accept=".json,.png"
-              class="absolute inset-0 cursor-pointer opacity-0"
-              onchange={handleImportScenario}
-            />
-          </div>
-        {/if}
+            {#if section.createAction}
+              <Button
+                icon={Plus}
+                label={section.createLabel!}
+                size="sm"
+                class="h-9"
+                onclick={section.createAction}
+              />
+            {/if}
+          {/if}
+        {/each}
       </div>
     </div>
 
     <!-- Tab Bar -->
     <div class="px-4 pb-2">
       <TabsList class="grid w-full grid-cols-3 max-w-md bg-muted/50">
-        <TabsTrigger value="characters" class="flex items-center gap-2">
-          <Users class="h-4 w-4" />
-          <span class="hidden sm:inline">Characters</span>
-          <Badge variant="secondary" class="ml-1 px-1 py-0 h-5 text-[10px]"
-            >{characterVault.characters.length}</Badge
-          >
-        </TabsTrigger>
-        <TabsTrigger value="lorebooks" class="flex items-center gap-2">
-          <Book class="h-4 w-4" />
-          <span class="hidden sm:inline">Lorebooks</span>
-          <Badge variant="secondary" class="ml-1 px-1 py-0 h-5 text-[10px]"
-            >{lorebookVault.lorebooks.length}</Badge
-          >
-        </TabsTrigger>
-        <TabsTrigger value="scenarios" class="flex items-center gap-2">
-          <MapPin class="h-4 w-4" />
-          <span class="hidden sm:inline">Scenarios</span>
-          <Badge variant="secondary" class="ml-1 px-1 py-0 h-5 text-[10px]"
-            >{scenarioVault.scenarios.length}</Badge
-          >
-        </TabsTrigger>
+        {#each sections as section}
+          <TabsTrigger value={section.id} class="flex items-center gap-2">
+            <section.icon class="h-4 w-4" />
+            <span class="hidden sm:inline">{section.label}</span>
+            <Badge variant="secondary" class="ml-1 px-1 py-0 h-5 text-[10px]">
+              {// @ts-ignore - dynamic access
+              section.store[section.id].length}
+            </Badge>
+          </TabsTrigger>
+        {/each}
       </TabsList>
     </div>
   </div>
@@ -533,58 +413,26 @@
     class="flex flex-col gap-3 bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
     <!-- Errors -->
-    {#if activeTab === "characters" && importCharError}
-      <div
-        class="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
-      >
-        <span>{importCharError}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6 text-destructive hover:bg-destructive/20 hover:text-destructive"
-          onclick={() => (importCharError = null)}
+    {#each sections as section}
+      {#if activeTab === section.id && errors[section.id]}
+        <div
+          class="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
         >
-          <span class="sr-only">Dismiss</span>
-          &times;
-        </Button>
-      </div>
-    {/if}
+          <span>{errors[section.id]}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-6 w-6 text-destructive hover:bg-destructive/20 hover:text-destructive"
+            onclick={() => (errors[section.id] = null)}
+          >
+            <span class="sr-only">Dismiss</span>
+            &times;
+          </Button>
+        </div>
+      {/if}
+    {/each}
 
-    {#if activeTab === "lorebooks" && importLorebookError}
-      <div
-        class="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
-      >
-        <span>{importLorebookError}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6 text-destructive hover:bg-destructive/20 hover:text-destructive"
-          onclick={() => (importLorebookError = null)}
-        >
-          <span class="sr-only">Dismiss</span>
-          &times;
-        </Button>
-      </div>
-    {/if}
-
-    {#if activeTab === "scenarios" && importScenarioError}
-      <div
-        class="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
-      >
-        <span>{importScenarioError}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6 text-destructive hover:bg-destructive/20 hover:text-destructive"
-          onclick={() => (importScenarioError = null)}
-        >
-          <span class="sr-only">Dismiss</span>
-          &times;
-        </Button>
-      </div>
-    {/if}
-
-    <div class="flex flex-col gap-3 sm:flex-row">
+    <div class="flex items-center gap-2">
       <div class="relative flex-1">
         <SearchIcon
           class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"
@@ -592,57 +440,16 @@
         <Input
           type="text"
           bind:value={searchQuery}
-          placeholder={activeTab === "characters"
-            ? "Search characters..."
-            : activeTab === "lorebooks"
-              ? "Search lorebooks..."
-              : "Search scenarios..."}
+          placeholder={`Search ${activeTab}...`}
           class="pl-9 bg-muted/40"
         />
       </div>
 
-      <div
-        class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar"
-      >
-        {#if activeTab === "characters"}
-          <div class="flex items-center rounded-lg border bg-muted p-1">
-            <Button
-              variant={charFilterType === "all" ? "secondary" : "ghost"}
-              size="sm"
-              class="h-7 px-3 text-xs"
-              onclick={() => (charFilterType = "all")}
-            >
-              All
-            </Button>
-            <Button
-              variant={charFilterType === "protagonist" ? "secondary" : "ghost"}
-              size="sm"
-              class="h-7 px-3 text-xs gap-1.5"
-              onclick={() => (charFilterType = "protagonist")}
-            >
-              <User class="h-3 w-3" />
-              Protagonists
-            </Button>
-            <Button
-              variant={charFilterType === "supporting" ? "secondary" : "ghost"}
-              size="sm"
-              class="h-7 px-3 text-xs gap-1.5"
-              onclick={() => (charFilterType = "supporting")}
-            >
-              <Users class="h-3 w-3" />
-              Supporting
-            </Button>
-          </div>
-        {/if}
-
+      <div class="flex items-center gap-2 shrink-0">
         <TagFilter
           {selectedTags}
           logic={filterLogic}
-          type={activeTab === "characters"
-            ? "character"
-            : activeTab === "lorebooks"
-              ? "lorebook"
-              : "scenario"}
+          type={sections.find((s) => s.id === activeTab)?.type || "character"}
           onUpdate={(tags, logic) => {
             selectedTags = tags;
             filterLogic = logic;
@@ -650,212 +457,112 @@
         />
 
         <Button
-          variant={showFavoritesOnly ? "outline" : "outline"}
+          icon={Star}
+          label="Favorites"
+          variant="outline"
           size="sm"
           class={cn(
-            "gap-1.5 transition-all",
+            "transition-all",
             showFavoritesOnly &&
               "border-yellow-500/50 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700",
           )}
+          iconClass={cn(
+            "h-3 w-3",
+            showFavoritesOnly && "fill-yellow-500 text-yellow-500",
+          )}
           onclick={() => (showFavoritesOnly = !showFavoritesOnly)}
-        >
-          <Star
-            class={cn(
-              "h-3 w-3",
-              showFavoritesOnly && "fill-yellow-500 text-yellow-500",
-            )}
-          />
-          <span class="hidden sm:inline">Favorites</span>
-        </Button>
+        />
       </div>
     </div>
   </div>
 
   <!-- Content -->
-  <TabsContent
-    value="characters"
-    class="flex-1 overflow-hidden m-0 p-0 outline-none data-[state=inactive]:hidden"
-  >
-    <ScrollArea class="h-full">
-      <div class="px-4 py-1">
-        {#if !characterVault.isLoaded}
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {#each Array(6) as _}
-              <div class="space-y-3">
-                <Skeleton class="h-[200px] w-full rounded-xl" />
-                <div class="space-y-2">
-                  <Skeleton class="h-4 w-[250px]" />
-                  <Skeleton class="h-4 w-[200px]" />
+  {#each sections as section}
+    <TabsContent
+      value={section.id}
+      class="flex-1 overflow-hidden m-0 p-0 outline-none data-[state=inactive]:hidden"
+    >
+      <ScrollArea class="h-full">
+        <div class="flex min-h-full flex-col px-4 pb-36 sm:pb-16">
+          {#if !section.store.isLoaded}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {#each Array(6) as _}
+                <div class="space-y-3">
+                  <Skeleton class="h-[200px] w-full rounded-xl" />
+                  <div class="space-y-2">
+                    <Skeleton class="h-4 w-[250px]" />
+                    <Skeleton class="h-4 w-[200px]" />
+                  </div>
                 </div>
-              </div>
-            {/each}
-          </div>
-        {:else if filteredCharacters.length === 0}
-          <div
-            class="flex h-[50vh] flex-col items-center justify-center text-center"
-            in:fade
-          >
-            <div class="rounded-full bg-muted p-4">
-              <Users class="h-10 w-10 text-muted-foreground" />
+              {/each}
             </div>
-            <p class="mt-4 text-lg font-medium text-foreground">
-              {#if searchQuery || showFavoritesOnly || charFilterType !== "all"}
-                No characters match your filters
-              {:else}
-                No characters in vault yet
-              {/if}
-            </p>
-            {#if !searchQuery && !showFavoritesOnly && charFilterType === "all"}
-              <div class="mt-6 flex gap-3">
-                <Button onclick={() => openCreateCharForm("protagonist")}>
-                  <User class="h-4 w-4" />
-                  Create Protagonist
-                </Button>
-                <Button
-                  variant="outline"
-                  onclick={() => openCreateCharForm("supporting")}
+          {:else}
+            {@const filteredItems = getFilteredItems(
+              // @ts-ignore - dynamic access
+              section.store[section.id],
+            )}
+
+            {#if filteredItems.length === 0}
+              <div
+                in:fade
+                class="flex flex-1 flex-col items-center justify-center"
+              >
+                <EmptyState
+                  icon={section.emptyIcon}
+                  title={searchQuery || showFavoritesOnly
+                    ? `No ${section.label.toLowerCase()} match your filters`
+                    : section.emptyTitle}
+                  description={searchQuery || showFavoritesOnly
+                    ? "Try adjusting your search terms or filters."
+                    : section.emptyDesc}
                 >
-                  <Users class="h-4 w-4" />
-                  Create Supporting
-                </Button>
+                  {#if !searchQuery && !showFavoritesOnly}
+                    <div class="flex flex-col items-center gap-3 sm:flex-row">
+                      {#if section.createAction}
+                        <Button onclick={section.createAction}>
+                          <Plus class="h-4 w-4" />
+                          {section.createLabel}
+                        </Button>
+                      {/if}
+                      <Button
+                        variant="outline"
+                        onclick={() => openBrowseOnline(section.type)}
+                      >
+                        <Globe class="h-4 w-4" />
+                        Browse Online
+                      </Button>
+                    </div>
+                  {/if}
+                </EmptyState>
+              </div>
+            {:else}
+              <div
+                class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                in:fade
+              >
+                {#each filteredItems as item (item.id)}
+                  <UniversalVaultCard
+                    {item}
+                    type={section.type}
+                    onEdit={() => handleEdit(item, section.type)}
+                    onDelete={() => handleDelete(item.id, section.store)}
+                    onToggleFavorite={() =>
+                      handleToggleFavorite(item.id, section.store)}
+                  />
+                {/each}
               </div>
             {/if}
-          </div>
-        {:else}
-          <div
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            in:fade
-          >
-            {#each filteredCharacters as character (character.id)}
-              <VaultCharacterCard
-                {character}
-                onEdit={() => openEditCharForm(character)}
-                onDelete={() => handleDeleteChar(character.id)}
-                onToggleFavorite={() => handleToggleFavoriteChar(character.id)}
-              />
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </ScrollArea>
-  </TabsContent>
-
-  <TabsContent
-    value="lorebooks"
-    class="flex-1 overflow-hidden m-0 p-0 outline-none data-[state=inactive]:hidden"
-  >
-    <ScrollArea class="h-full">
-      <div class="p-4 sm:p-6">
-        {#if !lorebookVault.isLoaded}
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {#each Array(6) as _}
-              <Skeleton class="h-[150px] w-full rounded-xl" />
-            {/each}
-          </div>
-        {:else if filteredLorebooks.length === 0}
-          <div
-            class="flex h-[50vh] flex-col items-center justify-center text-center"
-            in:fade
-          >
-            <div class="rounded-full bg-muted p-4">
-              <Book class="h-10 w-10 text-muted-foreground" />
-            </div>
-            <p class="mt-4 text-lg font-medium text-foreground">
-              {#if searchQuery || showFavoritesOnly}
-                No lorebooks match your filters
-              {:else}
-                No lorebooks in vault yet
-              {/if}
-            </p>
-            <p class="mt-2 text-muted-foreground">
-              Create a new lorebook or import one from a file
-            </p>
-            {#if !searchQuery && !showFavoritesOnly}
-              <div class="mt-6">
-                <Button onclick={handleCreateLorebook}>
-                  <Plus class="h-4 w-4" />
-                  Create Lorebook
-                </Button>
-              </div>
-            {/if}
-          </div>
-        {:else}
-          <div
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            in:fade
-          >
-            {#each filteredLorebooks as lorebook (lorebook.id)}
-              <VaultLorebookCard
-                {lorebook}
-                onDelete={() => handleDeleteLorebook(lorebook.id)}
-                onToggleFavorite={() =>
-                  handleToggleFavoriteLorebook(lorebook.id)}
-                onEdit={() => openEditLorebook(lorebook)}
-              />
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </ScrollArea>
-  </TabsContent>
-
-  <TabsContent
-    value="scenarios"
-    class="flex-1 overflow-hidden m-0 p-0 outline-none data-[state=inactive]:hidden"
-  >
-    <ScrollArea class="h-full">
-      <div class="p-4 sm:p-6">
-        {#if !scenarioVault.isLoaded}
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {#each Array(6) as _}
-              <Skeleton class="h-[150px] w-full rounded-xl" />
-            {/each}
-          </div>
-        {:else if filteredScenarios.length === 0}
-          <div
-            class="flex h-[50vh] flex-col items-center justify-center text-center"
-            in:fade
-          >
-            <div class="rounded-full bg-muted p-4">
-              <MapPin class="h-10 w-10 text-muted-foreground" />
-            </div>
-            <p class="mt-4 text-lg font-medium text-foreground">
-              {#if searchQuery || showFavoritesOnly}
-                No scenarios match your filters
-              {:else}
-                No scenarios in vault yet
-              {/if}
-            </p>
-            <p class="mt-2 text-muted-foreground">
-              Import character cards to extract scenario settings
-            </p>
-          </div>
-        {:else}
-          <div
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            in:fade
-          >
-            {#each filteredScenarios as scenario (scenario.id)}
-              <VaultScenarioCard
-                {scenario}
-                onDelete={() => handleDeleteScenario(scenario.id)}
-                onToggleFavorite={() =>
-                  handleToggleFavoriteScenario(scenario.id)}
-                onEdit={() => openEditScenario(scenario)}
-              />
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </ScrollArea>
-  </TabsContent>
+          {/if}
+        </div>
+      </ScrollArea>
+    </TabsContent>
+  {/each}
 </Tabs>
 
 <!-- Character Form Modal -->
 {#if showCharForm}
   <VaultCharacterForm
     character={editingCharacter}
-    defaultType={defaultCharFormType}
     onClose={() => {
       showCharForm = false;
       editingCharacter = null;
