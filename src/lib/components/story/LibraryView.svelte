@@ -3,12 +3,23 @@
   import { ui } from "$lib/stores/ui.svelte";
   import { exportService } from "$lib/services/export";
   import { ask } from "@tauri-apps/plugin-dialog";
-  import { BookOpen, Upload, RefreshCw, Archive, Plus } from "lucide-svelte";
+  import {
+    BookOpen,
+    Trash2,
+    Clock,
+    Upload,
+    RefreshCw,
+    Archive,
+    Plus,
+  } from "lucide-svelte";
   import SetupWizard from "../wizard/SetupWizard.svelte";
 
   import { Button } from "$lib/components/ui/button";
   import EmptyState from "$lib/components/ui/empty-state/empty-state.svelte";
   import StoryCard from "$lib/components/story/StoryCard.svelte";
+  import * as Card from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Input } from "$lib/components/ui/input";
 
   // File input for import (HTML-based for mobile compatibility)
   let importFileInput: HTMLInputElement;
@@ -42,6 +53,33 @@
     );
     if (confirmed) {
       await story.deleteStory(storyId);
+    }
+  }
+
+  function formatDate(timestamp: number): string {
+    return new Date(timestamp).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function getGenreColor(genre: string | null): string {
+    switch (genre) {
+      case "Fantasy":
+        return "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/20";
+      case "Sci-Fi":
+        return "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-500/20";
+      case "Mystery":
+        return "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/20";
+      case "Horror":
+        return "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/20";
+      case "Slice of Life":
+        return "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/20";
+      case "Historical":
+        return "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/20";
+      default:
+        return "bg-secondary text-secondary-foreground border-border";
     }
   }
 

@@ -1,0 +1,74 @@
+/* =============================================
+   LIGHT THEME (Solarized)
+   Classic Solarized color scheme
+   ============================================= */
+[data-theme="light-solarized"] {
+  /* Solarized base colors */
+  --color-surface-50: #fdf6e3;
+  --color-surface-100: #f5eedb;
+  --color-surface-200: #eee8d5;
+  --color-surface-300: #e0d6c1;
+  --color-surface-400: #9a9181;
+  --color-surface-500: #6b6459;
+  --color-surface-600: #544f46;
+  --color-surface-700: #3d3933;
+  --color-surface-800: #2a2721;
+  --color-surface-850: #1e1c18;
+  --color-surface-900: #141310;
+  --color-surface-950: #0a0908;
+
+  /* Solarized accent colors (cyan) */
+  --color-accent-50: #e8f5f4;
+  --color-accent-100: #d1ebe9;
+  --color-accent-200: #a3d7d3;
+  --color-accent-300: #75c3bd;
+  --color-accent-400: #2aa198;
+  --color-accent-500: #24897f;
+  --color-accent-600: #1e7268;
+  --color-accent-700: #185b52;
+  --color-accent-800: #12443d;
+  --color-accent-900: #0c2d28;
+  --color-accent-950: #061614;
+
+  /* Semantic colors */
+  --bg-primary: var(--color-surface-50);
+  --bg-secondary: var(--color-surface-100);
+  --bg-tertiary: var(--color-surface-200);
+  --text-primary: var(--color-surface-900);
+  --text-secondary: var(--color-surface-700);
+  --text-muted: var(--color-surface-500);
+  --text-accent: var(--color-accent-500);
+  --border-primary: var(--color-surface-300);
+  --border-secondary: var(--color-surface-400);
+  --scrollbar-track: var(--color-surface-200);
+  --scrollbar-thumb: var(--color-surface-400);
+  --scrollbar-thumb-hover: var(--color-surface-500);
+
+  /* Shadcn Variables (Light - Solarized) */
+  --radius: 0.5rem;
+  --background: hsl(44 26% 94%);
+  --foreground: hsl(204 11% 23%);
+  --card: hsl(43 27% 91%);
+  --card-foreground: hsl(204 11% 23%);
+  --popover: hsl(43 27% 91%);
+  --popover-foreground: hsl(204 11% 23%);
+  --primary: hsl(175 59% 40%);
+  --primary-foreground: hsl(44 26% 94%);
+  --secondary: hsl(42 16% 87%);
+  --secondary-foreground: hsl(204 11% 23%);
+  --muted: hsl(42 16% 87%);
+  --muted-foreground: hsl(38 7% 40%);
+  --accent: hsl(42 16% 87%);
+  --accent-foreground: hsl(175 59% 40%);
+  --destructive: hsl(1 71% 52%);
+  --destructive-foreground: hsl(44 26% 94%);
+  --border: hsl(38 15% 82%);
+  --input: hsl(38 15% 82%);
+  --ring: hsl(175 59% 40%);
+
+  /* Special effects */
+  --crt-scanline: transparent;
+  --crt-glow: none;
+  --crt-flicker: none;
+  --font-story: 'Georgia', 'Cambria', serif;
+}

@@ -96,7 +96,7 @@
 	// Mobile: h-5 w-5 (default)
 	let defaultIconClass = $derived(iconClass ?? "h-4 w-4");
 	let mobileIconClass = $derived(iconClass ?? "h-5 w-5");
-	
+
 	// For Single Render optimization
 	let responsiveIconClass = $derived(iconClass ? iconClass : "h-5 w-5 sm:h-4 sm:w-4");
 </script>
