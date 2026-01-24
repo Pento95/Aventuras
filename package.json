@@ -22,7 +22,6 @@
     "@tauri-apps/plugin-sql": "^2",
     "@tauri-apps/plugin-updater": "^2.9.0",
     "clsx": "^2.1.1",
-    "clsx": "^2.1.1",
     "gpt-tokenizer": "^3.4.0",
     "harper.js": "^1.2.0",
     "html5-qrcode": "^2.3.8",
@@ -30,11 +29,8 @@
     "lucide-svelte": "^0.468.0",
     "marked": "^17.0.1",
     "tailwind-merge": "^3.4.0"
-    "marked": "^17.0.1",
-    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@lucide/svelte": "^0.482.0",
     "@lucide/svelte": "^0.482.0",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.9.0",
@@ -43,7 +39,6 @@
     "@tauri-apps/cli": "^2",
     "@types/marked": "^5.0.2",
     "autoprefixer": "^10.4.20",
-    "bits-ui": "^1.8.0",
     "bits-ui": "^1.8.0",
     "postcss": "^8.4.49",
     "svelte": "^5.0.0",
