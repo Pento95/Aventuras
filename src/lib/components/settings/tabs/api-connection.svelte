@@ -555,147 +555,205 @@
           </div>
 
           <Collapsible.Content>
-            <div class="space-y-4 border-t bg-muted/10 mt-2 p-4">
-              <Input
-                label="Profile Name"
-                bind:value={formName}
-                placeholder="Profile name"
-              />
+            {#if editingProfileId === profile.id}
+              <div class="space-y-4 border-t bg-muted/10 mt-2 p-4">
+                <Input
+                  label="Profile Name"
+                  bind:value={formName}
+                  placeholder="Profile name"
+                />
 
-              <div class="flex flex-col">
-                <Label class="mb-2">Base URL</Label>
-                <div class="flex flex-wrap gap-2 mb-2">
-                  {#each urlPresets as preset}
-                    <Badge
-                      variant={formBaseUrl === preset.url
-                        ? "default"
-                        : "outline"}
-                      class="cursor-pointer"
-                      onclick={() => {
-                        formBaseUrl = preset.url;
-                        formFetchedModels = [];
-                        fetchError = null;
-                      }}
-                    >
-                      {preset.name}
-                    </Badge>
-                  {/each}
+                <div class="flex flex-col">
+                  <Label class="mb-2">Base URL</Label>
+                  <div class="flex flex-wrap gap-2 mb-2">
+                    {#each urlPresets as preset}
+                      <Badge
+                        variant={formBaseUrl === preset.url
+                          ? "default"
+                          : "outline"}
+                        class="cursor-pointer"
+                        onclick={() => {
+                          formBaseUrl = preset.url;
+                          formFetchedModels = [];
+                          fetchError = null;
+                        }}
+                      >
+                        {preset.name}
+                      </Badge>
+                    {/each}
+                  </div>
+                  <Input
+                    bind:value={formBaseUrl}
+                    placeholder="https://api.example.com/v1"
+                    class="font-mono text-xs"
+                  />
                 </div>
-                <Input
-                  bind:value={formBaseUrl}
-                  placeholder="https://api.example.com/v1"
-                  class="font-mono text-xs"
-                />
-              </div>
 
-              <div class="space-y-2">
-                <Input
-                  label="API Key"
-                  type="password"
-                  placeholder="sk-..."
-                  bind:value={formApiKey}
-                  class="font-mono text-xs"
-                />
-              </div>
+                <div class="space-y-2">
+                  <Input
+                    label="API Key"
+                    type="password"
+                    placeholder="sk-..."
+                    bind:value={formApiKey}
+                    class="font-mono text-xs"
+                  />
+                </div>
 
-              <div class="">
-                <div class="flex items-center justify-between">
-                  <Label class="flex items-center gap-2">
-                    <Box class="h-4 w-4" />
-                    Models
-                  </Label>
+                <div class="">
+                  <div class="flex items-center justify-between">
+                    <Label class="flex items-center gap-2">
+                      <Box class="h-4 w-4" />
+                      Models
+                    </Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onclick={handleFetchModels}
+                      disabled={isFetchingModels || !formBaseUrl}
+                    >
+                      {#if isFetchingModels}
+                        <RefreshCw class=" h-3 w-3 animate-spin" />
+                        Fetching...
+                      {:else}
+                        <RefreshCw class=" h-3 w-3" />
+                        {isMobileDevice() ? "Fetch" : "Fetch Models"}
+                      {/if}
+                    </Button>
+                  </div>
+
+                  {#if fetchError}
+                    <Alert variant="destructive">
+                      <AlertCircle class="h-4 w-4" />
+                      <AlertDescription class="text-xs"
+                        >{fetchError}</AlertDescription
+                      >
+                    </Alert>
+                  {/if}
+
+                  {#if formFetchedModels.length > 0}
+                    <div class="space-y-1 mb-2">
+                      <p class="text-xs font-medium text-muted-foreground">
+                        Fetched Models ({formFetchedModels.length})
+                      </p>
+                      <ScrollArea class="h-32 w-full rounded-md border">
+                        <div class="flex flex-wrap gap-1 p-2">
+                          {#each formFetchedModels as model}
+                            <Badge variant="secondary" class="gap-1 pr-1">
+                              <span class="max-w-37.5 truncate">{model}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                class="h-4 w-4 p-0 hover:text-destructive"
+                                onclick={() => handleRemoveFetchedModel(model)}
+                              >
+                                <X class="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          {/each}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  {/if}
+
+                  <div class="space-y-1">
+                    <p class="text-xs font-medium text-muted-foreground">
+                      Custom Models
+                    </p>
+                    <div class="flex gap-2">
+                      <Input
+                        placeholder="model-name or provider/model"
+                        bind:value={formNewModelInput}
+                        class="flex-1 pr-20"
+                        onkeydown={(e) =>
+                          e.key === "Enter" && handleAddCustomModel()}
+                      />
+                      <Button
+                        size="icon"
+                        onclick={handleAddCustomModel}
+                        disabled={!formNewModelInput.trim()}
+                      >
+                        <Plus class="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {#if formCustomModels.length > 0}
+                      <ScrollArea class="h-24 w-full rounded-md border">
+                        <div class="flex flex-wrap gap-1 p-2">
+                          {#each formCustomModels as model}
+                            <Badge variant="outline" class="gap-1 pr-1">
+                              <span class="max-w-[150px] truncate">{model}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                class="h-4 w-4 p-0 hover:text-destructive"
+                                onclick={() => handleRemoveCustomModel(model)}
+                              >
+                                <X class="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          {/each}
+                        </div>
+                      </ScrollArea>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {:else}
+              <!-- Read-only View -->
+              <div class="space-y-4 border-t bg-muted/10 mt-2 p-4">
+                <div class="grid gap-1">
+                  <Label class="text-muted-foreground text-xs">Profile Name</Label
+                  >
+                  <div class="font-medium">{profile.name}</div>
+                </div>
+
+                <div class="grid gap-1">
+                  <Label class="text-muted-foreground text-xs">Base URL</Label>
+                  <div class="font-mono text-sm bg-muted p-2 rounded truncate">
+                    {profile.baseUrl}
+                  </div>
+                </div>
+
+                <div class="grid gap-1">
+                  <Label class="text-muted-foreground text-xs">API Key</Label>
+                  <div class="font-mono text-sm bg-muted p-2 rounded truncate">
+                    {#if profile.apiKey}
+                      {profile.apiKey.slice(0, 3)}...{profile.apiKey.slice(-4)}
+                    {:else}
+                      <span class="text-muted-foreground italic"
+                        >No API key set</span
+                      >
+                    {/if}
+                  </div>
+                </div>
+
+                <div class="grid gap-2">
+                  <Label class="text-muted-foreground text-xs">Models</Label>
+                  <div class="flex flex-wrap gap-1">
+                    {#each [...profile.fetchedModels, ...profile.customModels] as model}
+                      <Badge variant="secondary" class="font-mono text-xs">
+                        {model}
+                      </Badge>
+                    {/each}
+                    {#if profile.fetchedModels.length === 0 && profile.customModels.length === 0}
+                      <span class="text-sm text-muted-foreground italic"
+                        >No models configured</span
+                      >
+                    {/if}
+                  </div>
+                </div>
+
+                <div class="pt-2 flex justify-end">
                   <Button
                     variant="outline"
                     size="sm"
-                    onclick={handleFetchModels}
-                    disabled={isFetchingModels || !formBaseUrl}
+                    onclick={() => startEdit(profile)}
                   >
-                    {#if isFetchingModels}
-                      <RefreshCw class=" h-3 w-3 animate-spin" />
-                      Fetching...
-                    {:else}
-                      <RefreshCw class=" h-3 w-3" />
-                      {isMobileDevice() ? "HHelelo" : "Fetch Models"}
-                    {/if}
+                    <Edit2 class="h-3 w-3 mr-2" />
+                    Edit Profile
                   </Button>
                 </div>
-
-                {#if fetchError}
-                  <Alert variant="destructive">
-                    <AlertCircle class="h-4 w-4" />
-                    <AlertDescription class="text-xs"
-                      >{fetchError}</AlertDescription
-                    >
-                  </Alert>
-                {/if}
-
-                {#if formFetchedModels.length > 0}
-                  <div class="space-y-1 mb-2">
-                    <p class="text-xs font-medium text-muted-foreground">
-                      Fetched Models ({formFetchedModels.length})
-                    </p>
-                    <ScrollArea class="h-32 w-full rounded-md border">
-                      <div class="flex flex-wrap gap-1 p-2">
-                        {#each formFetchedModels as model}
-                          <Badge variant="secondary" class="gap-1 pr-1">
-                            <span class="max-w-37.5 truncate">{model}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="h-4 w-4 p-0 hover:text-destructive"
-                              onclick={() => handleRemoveFetchedModel(model)}
-                            >
-                              <X class="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        {/each}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                {/if}
-
-                <div class="space-y-1">
-                  <p class="text-xs font-medium text-muted-foreground">
-                    Custom Models
-                  </p>
-                  <div class="flex gap-2">
-                    <Input
-                      placeholder="model-name or provider/model"
-                      bind:value={formNewModelInput}
-                      class="flex-1 pr-20"
-                      onkeydown={(e) =>
-                        e.key === "Enter" && handleAddCustomModel()}
-                    />
-                    <Button
-                      size="icon"
-                      onclick={handleAddCustomModel}
-                      disabled={!formNewModelInput.trim()}
-                    >
-                      <Plus class="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {#if formCustomModels.length > 0}
-                    <ScrollArea class="h-24 w-full rounded-md border">
-                      <div class="flex flex-wrap gap-1 p-2">
-                        {#each formCustomModels as model}
-                          <Badge variant="outline" class="gap-1 pr-1">
-                            <span class="max-w-[150px] truncate">{model}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="h-4 w-4 p-0 hover:text-destructive"
-                              onclick={() => handleRemoveCustomModel(model)}
-                            >
-                              <X class="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        {/each}
-                      </div>
-                    </ScrollArea>
-                  {/if}
-                </div>
               </div>
-            </div>
+            {/if}
           </Collapsible.Content>
         </Collapsible.Root>
       </div>

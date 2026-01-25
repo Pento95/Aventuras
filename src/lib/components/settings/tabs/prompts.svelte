@@ -2,24 +2,28 @@
   import { settings } from "$lib/stores/settings.svelte";
   import {
     promptService,
-    type PromptTemplate,
     type MacroOverride,
     type Macro,
-    type SimpleMacro,
-    type ComplexMacro,
+    type MacroVariant,
   } from "$lib/services/prompts";
   import { promptExportService } from "$lib/services/promptExport";
   import PromptEditor from "$lib/components/prompts/PromptEditor.svelte";
   import MacroChip from "$lib/components/prompts/MacroChip.svelte";
-  import MacroEditor from "$lib/components/prompts/MacroEditor.svelte";
-  import ComplexMacroEditor from "$lib/components/prompts/ComplexMacroEditor.svelte";
+  import MacroInspector from "$lib/components/prompts/MacroInspector.svelte";
   import {
     RotateCcw,
     Download,
     Upload,
     Loader2,
+    ListFilter,
+    X,
+    Check,
   } from "lucide-svelte";
   import { Button } from "$lib/components/ui/button";
+  import * as Tabs from "$lib/components/ui/tabs";
+  import * as Accordion from "$lib/components/ui/accordion";
+  import * as Card from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
 
   interface Props {
     openImportModal: () => void;
@@ -28,13 +32,14 @@
   let { openImportModal }: Props = $props();
 
   // Prompts tab state
-  let selectedTemplateId = $state<string | null>(null);
-  let editingMacro = $state<Macro | null>(null);
-  let showMacroEditor = $state(false);
-  let showComplexMacroEditor = $state(false);
   let promptsCategory = $state<"story" | "service" | "wizard">("story");
-
   let isExporting = $state(false);
+
+  // Macro Library State
+  let libraryEditingMacro = $state<Macro | null>(null);
+
+  let confirmingCategoryReset = $state(false);
+  let confirmingMacroReset = $state(false);
 
   // Get all templates grouped by category
   const allTemplates = $derived(promptService.getAllTemplates());
@@ -54,13 +59,6 @@
     if (promptsCategory === "story") return storyTemplates;
     if (promptsCategory === "service") return serviceTemplates;
     return wizardTemplates;
-  }
-
-  // Get category label
-  function getCategoryLabel() {
-    if (promptsCategory === "story") return "Story Templates";
-    if (promptsCategory === "service") return "Service Templates";
-    return "Wizard Templates";
   }
 
   // Get current template content (with overrides)
@@ -154,260 +152,283 @@
       (o) => o.macroId === macroId,
     );
   }
+
+  // Handle Library Macro Save
+  function handleLibraryMacroSave(value: string | MacroVariant[]) {
+    if (!libraryEditingMacro) return;
+
+    if (libraryEditingMacro.type === "simple" && typeof value === "string") {
+      handleMacroOverride({
+        macroId: libraryEditingMacro.id,
+        value,
+      });
+    } else if (libraryEditingMacro.type === "complex" && Array.isArray(value)) {
+      handleMacroOverride({
+        macroId: libraryEditingMacro.id,
+        variantOverrides: value,
+      });
+    }
+    libraryEditingMacro = null;
+  }
 </script>
 
-<div class="space-y-6">
-  <!-- Category Toggle -->
-  <div
-    class="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto"
-  >
-    <Button
-      variant={promptsCategory === "story" ? "default" : "ghost"}
-      size="sm"
-      onclick={() => (promptsCategory = "story")}
-    >
-      Story
-    </Button>
-    <Button
-      variant={promptsCategory === "service" ? "default" : "ghost"}
-      size="sm"
-      onclick={() => (promptsCategory = "service")}
-    >
-      Services
-    </Button>
-    <Button
-      variant={promptsCategory === "wizard" ? "default" : "ghost"}
-      size="sm"
-      onclick={() => (promptsCategory = "wizard")}
-    >
-      Wizard
-    </Button>
+<div class="space-y-4">
+  <!-- Header Actions -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <h3 class="text-lg font-medium">Prompt Templates</h3>
+    </div>
+    <div class="flex items-center gap-2">
+      {#if confirmingCategoryReset}
+        <div
+          class="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200"
+        >
+          <span
+            class="text-xs font-medium text-muted-foreground hidden sm:inline"
+          >
+            Reset all in category?
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 w-8 p-0 hover:bg-transparent text-muted-foreground hover:text-foreground"
+            onclick={() => (confirmingCategoryReset = false)}
+            title="Cancel"
+          >
+            <X class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 w-8 p-0 hover:bg-transparent text-destructive"
+            onclick={() => {
+              getTemplatesForCategory().forEach((t) => {
+                handleTemplateReset(t.id);
+                handleUserContentReset(t.id);
+              });
+              confirmingCategoryReset = false;
+            }}
+            title="Confirm Reset"
+          >
+            <Check class="h-4 w-4" />
+          </Button>
+        </div>
+      {:else}
+        <Button
+          variant="destructive"
+          size="sm"
+          onclick={() => (confirmingCategoryReset = true)}
+        >
+          <RotateCcw class="h-4 w-4" />
+          <span class="hidden sm:inline leading-snug">Reset Category</span>
+        </Button>
+      {/if}
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={async () => {
+          isExporting = true;
+          try {
+            await promptExportService.exportPrompts();
+          } finally {
+            isExporting = false;
+          }
+        }}
+        disabled={isExporting}
+      >
+        {#if isExporting}
+          <Loader2 class="h-4 w-4 animate-spin" />
+        {:else}
+          <Download class="h-4 w-4" />
+        {/if}
+        <span class="hidden sm:inline">Export</span>
+      </Button>
+      <Button variant="outline" size="sm" onclick={openImportModal}>
+        <Upload class="h-4 w-4" />
+        <span class="hidden sm:inline">Import</span>
+      </Button>
+    </div>
   </div>
 
-  <!-- Templates List -->
-  <div class="space-y-4 !mt-0 sm:!mt-3">
-    <div class="flex items-center justify-between -mb-3 sm:-mb-1">
-      <h3 class="text-sm font-medium text-foreground">
-        {getCategoryLabel()}
-      </h3>
-      <div class="flex items-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          class="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
-          onclick={() => {
-            getTemplatesForCategory().forEach((t) => {
-              handleTemplateReset(t.id);
-              handleUserContentReset(t.id);
-            });
-          }}
-        >
-          <RotateCcw class="h-3 w-3" />
-          Reset All
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          class="text-xs"
-          onclick={async () => {
-            isExporting = true;
-            try {
-              await promptExportService.exportPrompts();
-            } finally {
-              isExporting = false;
-            }
-          }}
-          disabled={isExporting}
-        >
-          {#if isExporting}
-            <Loader2 class="h-3.5 w-3.5 animate-spin" />
-          {:else}
-            <Download class="h-3.5 w-3.5" />
-          {/if}
-          Export
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          class="text-xs"
-          onclick={openImportModal}
-        >
-          <Upload class="h-3.5 w-3.5" />
-          Import
-        </Button>
-      </div>
-    </div>
+  <!-- Category Tabs -->
+  <Tabs.Root
+    value={promptsCategory}
+    onValueChange={(v) =>
+      (promptsCategory = v as "story" | "service" | "wizard")}
+  >
+    <Tabs.List class="grid w-full grid-cols-3">
+      <Tabs.Trigger value="story">Story</Tabs.Trigger>
+      <Tabs.Trigger value="service">Services</Tabs.Trigger>
+      <Tabs.Trigger value="wizard">Wizard</Tabs.Trigger>
+    </Tabs.List>
 
+    <!-- Templates List (Accordion) -->
+    <Tabs.Content value={promptsCategory} class="mt-4">
+      <Accordion.Root type="single" collapsible class="w-full space-y-2">
         {#each getTemplatesForCategory() as template}
-      <div class="rounded-lg border bg-card p-4">
-        {#if selectedTemplateId === template.id}
-          <PromptEditor
-            {template}
-            content={getTemplateContent(template.id)}
-            userContent={getUserContent(template.id)}
-            isModified={isTemplateModified(template.id)}
-            isUserModified={isUserContentModified(template.id)}
-            macroOverrides={settings.promptSettings.macroOverrides}
-            onChange={(content) =>
-              handleTemplateChange(template.id, content)}
-            onUserChange={(content) =>
-              handleUserContentChange(template.id, content)}
-            onReset={() => handleTemplateReset(template.id)}
-            onUserReset={() => handleUserContentReset(template.id)}
-            onMacroOverride={handleMacroOverride}
-            onMacroReset={handleMacroReset}
-          />
-          <button
-            type="button"
-            class="mt-3 text-xs text-muted-foreground hover:text-foreground"
-            onclick={() => (selectedTemplateId = null)}
+          <Accordion.Item
+            value={template.id}
+            class="border rounded-lg bg-card px-3 shadow-sm"
           >
-            Collapse
-          </button>
-        {:else}
-          <button
-            type="button"
-            class="flex items-center justify-between w-full text-left"
-            onclick={() => (selectedTemplateId = template.id)}
-          >
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-foreground">{template.name}</span>
+            <Accordion.Trigger class="hover:no-underline py-3">
+              <div class="flex items-center gap-2 text-left">
+                <span class="font-medium">{template.name}</span>
                 {#if isTemplateModified(template.id)}
-                  <span
-                    class="text-xs px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-400 border border-amber-700/30"
+                  <Badge
+                    variant="outline"
+                    class="text-amber-500 border-amber-500/50 text-[10px] h-5"
                   >
                     Modified
-                  </span>
+                  </Badge>
                 {/if}
               </div>
-              <p class="text-xs text-muted-foreground mt-0.5">
-                {template.description}
-              </p>
-            </div>
-            <span
-              class="text-xs text-primary hover:text-primary/80"
-            >
-              Edit
-            </span>
-          </button>
-        {/if}
-      </div>
-    {/each}
-  </div>
+            </Accordion.Trigger>
+            <Accordion.Content>
+              <div class="pb-4 pt-0">
+                <PromptEditor
+                  {template}
+                  content={getTemplateContent(template.id)}
+                  userContent={getUserContent(template.id)}
+                  isModified={isTemplateModified(template.id)}
+                  isUserModified={isUserContentModified(template.id)}
+                  macroOverrides={settings.promptSettings.macroOverrides}
+                  onChange={(content) =>
+                    handleTemplateChange(template.id, content)}
+                  onUserChange={(content) =>
+                    handleUserContentChange(template.id, content)}
+                  onReset={() => handleTemplateReset(template.id)}
+                  onUserReset={() => handleUserContentReset(template.id)}
+                  onMacroOverride={handleMacroOverride}
+                  onMacroReset={handleMacroReset}
+                />
+              </div>
+            </Accordion.Content>
+          </Accordion.Item>
+        {/each}
+      </Accordion.Root>
+    </Tabs.Content>
+  </Tabs.Root>
 
-  <!-- Macros Section -->
-  <div class="border-t border-border pt-4 space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h3 class="text-sm font-medium text-foreground">Macro Library</h3>
-        <p class="text-xs text-muted-foreground mt-0.5">
-          Click a macro to view and edit its values
-        </p>
+  <!-- Macro Library Section -->
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h3 class="text-lg font-medium">Macro Library</h3>
+      <p class="text-sm text-muted-foreground">
+        Global variables used across templates. Click to edit defaults.
+      </p>
+    </div>
+    {#if confirmingMacroReset}
+      <div
+        class="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200"
+      >
+        <span
+          class="text-xs font-medium text-muted-foreground hidden sm:inline"
+        >
+          Reset all macros?
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 w-8 p-0 hover:bg-transparent text-muted-foreground hover:text-foreground"
+          onclick={() => (confirmingMacroReset = false)}
+          title="Cancel"
+        >
+          <X class="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 w-8 p-0 hover:bg-transparent text-destructive"
+          onclick={() => {
+            settings.promptSettings.macroOverrides = [];
+            settings.savePromptSettings();
+            confirmingMacroReset = false;
+          }}
+          title="Confirm Reset"
+        >
+          <Check class="h-4 w-4" />
+        </Button>
       </div>
+    {:else}
       <Button
         variant="ghost"
         size="sm"
-        class="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
-        onclick={() => {
-          settings.promptSettings.macroOverrides = [];
-          settings.savePromptSettings();
-        }}
+        onclick={() => (confirmingMacroReset = true)}
       >
-        <RotateCcw class="h-3 w-3" />
+        <RotateCcw class="h-4 w-4" />
         Reset All Macros
       </Button>
-    </div>
+    {/if}
+  </div>
 
-    <!-- Simple Macros -->
-    <div class="rounded-lg border bg-card p-4">
-      <h4 class="text-xs font-medium text-muted-foreground mb-3">
-        Simple Macros
-      </h4>
-      <div class="flex flex-wrap gap-2">
-        {#each allMacros.filter((m) => m.type === "simple") as macro}
-          <MacroChip
-            {macro}
-            interactive={true}
-            onClick={() => {
-              editingMacro = macro;
-              showMacroEditor = true;
-            }}
-          />
-        {/each}
-      </div>
+  <!-- Inspector Area (Shows when editing) -->
+  {#if libraryEditingMacro}
+    <div class="mb-6 animate-in slide-in-from-top-2 fade-in duration-200">
+      <MacroInspector
+        macro={libraryEditingMacro}
+        override={findMacroOverride(libraryEditingMacro.id)}
+        onSave={handleLibraryMacroSave}
+        onReset={() => handleMacroReset(libraryEditingMacro!.id)}
+        onClose={() => (libraryEditingMacro = null)}
+      />
     </div>
+  {/if}
+
+  <div class="grid gap-6 md:grid-cols-2">
+    <!-- Simple Macros -->
+    <Card.Root>
+      <Card.Header>
+        <Card.Title class="text-base">Simple Macros</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <div class="flex flex-wrap gap-2">
+          {#each allMacros.filter((m) => m.type === "simple") as macro}
+            <MacroChip
+              {macro}
+              interactive={true}
+              onClick={() => {
+                // Toggle editing
+                if (libraryEditingMacro?.id === macro.id) {
+                  libraryEditingMacro = null;
+                } else {
+                  libraryEditingMacro = macro;
+                }
+              }}
+              class={libraryEditingMacro?.id === macro.id
+                ? "ring-2 ring-primary ring-offset-1"
+                : ""}
+            />
+          {/each}
+        </div>
+      </Card.Content>
+    </Card.Root>
 
     <!-- Complex Macros -->
-    <div class="rounded-lg border bg-card p-4">
-      <h4 class="text-xs font-medium text-muted-foreground mb-3">
-        Complex Macros (Variant-based)
-      </h4>
-      <div class="flex flex-wrap gap-2">
-        {#each allMacros.filter((m) => m.type === "complex") as macro}
-          <MacroChip
-            {macro}
-            interactive={true}
-            onClick={() => {
-              editingMacro = macro;
-              showComplexMacroEditor = true;
-            }}
-          />
-        {/each}
-      </div>
-    </div>
+    <Card.Root>
+      <Card.Header>
+        <Card.Title class="text-base">Complex Macros</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <div class="flex flex-wrap gap-2">
+          {#each allMacros.filter((m) => m.type === "complex") as macro}
+            <MacroChip
+              {macro}
+              interactive={true}
+              onClick={() => {
+                // Toggle editing
+                if (libraryEditingMacro?.id === macro.id) {
+                  libraryEditingMacro = null;
+                } else {
+                  libraryEditingMacro = macro;
+                }
+              }}
+              class={libraryEditingMacro?.id === macro.id
+                ? "ring-2 ring-primary ring-offset-1"
+                : ""}
+            />
+          {/each}
+        </div>
+      </Card.Content>
+    </Card.Root>
   </div>
 </div>
-
-<!-- Macro Editor Modals -->
-{#if editingMacro && editingMacro.type === "simple"}
-  <MacroEditor
-    isOpen={showMacroEditor}
-    macro={editingMacro as SimpleMacro}
-    currentOverride={findMacroOverride(editingMacro.id)}
-    onClose={() => {
-      showMacroEditor = false;
-      editingMacro = null;
-    }}
-    onSave={(value) => {
-      if (editingMacro) {
-        handleMacroOverride({ macroId: editingMacro.id, value });
-      }
-      showMacroEditor = false;
-      editingMacro = null;
-    }}
-    onReset={() => {
-      if (editingMacro) {
-        handleMacroReset(editingMacro.id);
-      }
-      showMacroEditor = false;
-      editingMacro = null;
-    }}
-  />
-{/if}
-
-{#if editingMacro && editingMacro.type === "complex"}
-  <ComplexMacroEditor
-    isOpen={showComplexMacroEditor}
-    macro={editingMacro as ComplexMacro}
-    currentOverride={findMacroOverride(editingMacro.id)}
-    onClose={() => {
-      showComplexMacroEditor = false;
-      editingMacro = null;
-    }}
-    onSave={(variantOverrides) => {
-      if (editingMacro) {
-        handleMacroOverride({ macroId: editingMacro.id, variantOverrides });
-      }
-      showComplexMacroEditor = false;
-      editingMacro = null;
-    }}
-    onReset={() => {
-      if (editingMacro) {
-        handleMacroReset(editingMacro.id);
-      }
-      showComplexMacroEditor = false;
-      editingMacro = null;
-    }}
-  />
-{/if}
