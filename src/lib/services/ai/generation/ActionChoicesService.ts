@@ -2,7 +2,7 @@ import { BaseAIService, type OpenAIProvider } from '../core/BaseAIService';
 import type { StoryEntry, Character, Location, Item, StoryBeat, Entry, GenerationPreset } from '$lib/types';
 import { promptService, type PromptContext } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
-import { AI_CONFIG, createLogger } from '../core/config';
+import { createLogger, getContextConfig, getLorebookConfig } from '../core/config';
 
 const log = createLogger('ActionChoices');
 
@@ -61,7 +61,8 @@ export class ActionChoicesService extends BaseAIService {
     const activeQuests = worldState.storyBeats.filter(b => b.status === 'active' || b.status === 'pending');
 
     // Get last few entries for immediate context
-    const lastEntries = recentEntries.slice(-AI_CONFIG.context.recentEntriesForChoices);
+    const contextConfig = getContextConfig();
+    const lastEntries = recentEntries.slice(-contextConfig.recentEntriesForChoices);
     const recentContext = lastEntries.map(e => {
       const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATIVE]';
       return `${prefix} ${e.content}`;
@@ -70,7 +71,7 @@ export class ActionChoicesService extends BaseAIService {
     // Extract user's action examples to learn their style
     const userActions = recentEntries
       .filter(e => e.type === 'user_action')
-      .slice(-AI_CONFIG.context.userActionsForStyle)
+      .slice(-contextConfig.userActionsForStyle)
       .map(e => e.content.trim());
 
     // Build style guidance based on user's actual writing
@@ -105,9 +106,10 @@ Match their vocabulary, tone, and phrasing patterns.`;
     }
 
     // Format lorebook entries for context
+    const lorebookConfig = getLorebookConfig();
     let lorebookContext = '';
     if (lorebookEntries && lorebookEntries.length > 0) {
-      const entryDescriptions = lorebookEntries.slice(0, AI_CONFIG.lorebook.maxForActionChoices).map(e => {
+      const entryDescriptions = lorebookEntries.slice(0, lorebookConfig.maxForActionChoices).map(e => {
         let desc = `• ${e.name} (${e.type})`;
         if (e.description) {
           desc += `: ${e.description}`;

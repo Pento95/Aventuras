@@ -13,7 +13,7 @@ import { settings } from '$lib/stores/settings.svelte';
 import type { OpenAIProvider } from '../core/OpenAIProvider';
 import { promptService } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
-import { AI_CONFIG, createLogger } from '../core/config';
+import { AI_CONFIG, createLogger, getContextConfig } from '../core/config';
 
 const log = createLogger('ContextBuilder');
 
@@ -304,8 +304,9 @@ export class ContextBuilder {
     if (remainingEntries.length === 0) return [];
 
     // Build recent content for prompt
+    const contextConfig = getContextConfig();
     const recentContent = recentEntries
-      .slice(-AI_CONFIG.context.recentEntriesForNameMatching)
+      .slice(-contextConfig.recentEntriesForNameMatching)
       .map(e => `[${e.type}]: ${e.content}`)
       .join('\n');
 

@@ -21,14 +21,9 @@ import { settings } from '$lib/stores/settings.svelte';
 import { story } from '$lib/stores/story.svelte';
 import { emitImageQueued, emitImageReady, emitImageAnalysisStarted, emitImageAnalysisComplete } from '$lib/services/events';
 import { normalizeImageDataUrl } from '$lib/utils/image';
+import { createLogger } from '../core/config';
 
-const DEBUG = true;
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[ImageGeneration]', ...args);
-  }
-}
+const log = createLogger('ImageGeneration');
 
 export interface ImageGenerationContext {
   storyId: string;

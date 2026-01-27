@@ -714,12 +714,45 @@ export interface InteractiveLorebookSpecificSettings {
 }
 
 export interface AgenticRetrievalSpecificSettings {
+  maxIterations: number;
 }
 
 export interface TimelineFillSpecificSettings {
 }
 
 export interface ChapterQuerySpecificSettings {
+}
+
+// Global context configuration - controls how much context is included in AI operations
+export interface ContextWindowSettings {
+  /** Number of recent entries for main narrative context */
+  recentEntriesForNarrative: number;
+  /** Number of recent entries for tiered context building */
+  recentEntriesForTiered: number;
+  /** Number of recent entries for classification/retrieval operations */
+  recentEntriesForRetrieval: number;
+  /** Number of recent entries for action choices context */
+  recentEntriesForChoices: number;
+  /** Number of user actions to analyze for style matching */
+  userActionsForStyle: number;
+  /** Number of recent entries for lore management context */
+  recentEntriesForLoreManagement: number;
+  /** Number of recent entries for name matching in tiered context */
+  recentEntriesForNameMatching: number;
+}
+
+// Lorebook injection limits
+export interface LorebookLimitsSettings {
+  /** Max lorebook entries for action choices */
+  maxForActionChoices: number;
+  /** Max lorebook entries for suggestions */
+  maxForSuggestions: number;
+  /** Max lorebook entries for agentic preview */
+  maxForAgenticPreview: number;
+  /** Threshold for switching to LLM-based selection */
+  llmThreshold: number;
+  /** Max entries per tier in context building */
+  maxEntriesPerTier: number;
 }
 
 export interface EntryRetrievalSpecificSettings {
@@ -763,6 +796,9 @@ export interface ServiceSpecificSettings {
   imageGeneration: ImageGenerationSpecificSettings;
   tts: TTSSpecificSettings;
   characterCardImport: CharacterCardImportSpecificSettings;
+  // Global configuration
+  contextWindow: ContextWindowSettings;
+  lorebookLimits: LorebookLimitsSettings;
 }
 
 export function getDefaultServiceSpecificSettings(): ServiceSpecificSettings {
@@ -781,6 +817,8 @@ export function getDefaultServiceSpecificSettings(): ServiceSpecificSettings {
     imageGeneration: getDefaultImageGenerationSpecificSettings(),
     tts: getDefaultTTSSpecificSettings(),
     characterCardImport: getDefaultCharacterCardImportSpecificSettings(),
+    contextWindow: getDefaultContextWindowSettings(),
+    lorebookLimits: getDefaultLorebookLimitsSettings(),
   };
 }
 
@@ -819,7 +857,9 @@ export function getDefaultInteractiveLorebookSpecificSettings(): InteractiveLore
 }
 
 export function getDefaultAgenticRetrievalSpecificSettings(): AgenticRetrievalSpecificSettings {
-  return {};
+  return {
+    maxIterations: 10,
+  };
 }
 
 export function getDefaultTimelineFillSpecificSettings(): TimelineFillSpecificSettings {
@@ -861,6 +901,28 @@ export function getDefaultTTSSpecificSettings(): TTSSpecificSettings {
 
 export function getDefaultCharacterCardImportSpecificSettings(): CharacterCardImportSpecificSettings {
   return {};
+}
+
+export function getDefaultContextWindowSettings(): ContextWindowSettings {
+  return {
+    recentEntriesForNarrative: 20,
+    recentEntriesForTiered: 10,
+    recentEntriesForRetrieval: 5,
+    recentEntriesForChoices: 3,
+    userActionsForStyle: 6,
+    recentEntriesForLoreManagement: 10,
+    recentEntriesForNameMatching: 3,
+  };
+}
+
+export function getDefaultLorebookLimitsSettings(): LorebookLimitsSettings {
+  return {
+    maxForActionChoices: 12,
+    maxForSuggestions: 15,
+    maxForAgenticPreview: 20,
+    llmThreshold: 30,
+    maxEntriesPerTier: 10,
+  };
 }
 
 export interface SystemServicesSettings {
@@ -1595,13 +1657,15 @@ class SettingsStore {
             styleReviewer: getDefaultStyleReviewerSpecificSettings(),
             loreManagement: getDefaultLoreManagementSpecificSettings(),
             interactiveLorebook: getDefaultInteractiveLorebookSpecificSettings(),
-            agenticRetrieval: getDefaultAgenticRetrievalSpecificSettings(),
+            agenticRetrieval: { ...getDefaultAgenticRetrievalSpecificSettings(), ...loaded.agenticRetrieval },
             timelineFill: getDefaultTimelineFillSpecificSettings(),
             chapterQuery: getDefaultChapterQuerySpecificSettings(),
             entryRetrieval: { ...getDefaultEntryRetrievalSpecificSettings(), ...loaded.entryRetrieval },
             imageGeneration: { ...getDefaultImageGenerationSpecificSettings(), ...loaded.imageGeneration },
             tts: { ...getDefaultTTSSpecificSettings(), ...loaded.tts },
             characterCardImport: getDefaultCharacterCardImportSpecificSettings(),
+            contextWindow: { ...getDefaultContextWindowSettings(), ...loaded.contextWindow },
+            lorebookLimits: { ...getDefaultLorebookLimitsSettings(), ...loaded.lorebookLimits },
           };
         } catch {
           // Keep defaults
@@ -2559,6 +2623,21 @@ class SettingsStore {
     const customModel = this.providerPreset === 'custom' ? this.getFirstModelFromDefaultProfile() : null;
     this.systemServicesSettings = getDefaultSystemServicesSettingsForProvider(this.providerPreset, customModel);
     await this.saveSystemServicesSettings();
+  }
+
+  async resetContextWindowSettings() {
+    this.serviceSpecificSettings.contextWindow = getDefaultContextWindowSettings();
+    await this.saveServiceSpecificSettings();
+  }
+
+  async resetLorebookLimitsSettings() {
+    this.serviceSpecificSettings.lorebookLimits = getDefaultLorebookLimitsSettings();
+    await this.saveServiceSpecificSettings();
+  }
+
+  async resetAgenticRetrievalSpecificSettings() {
+    this.serviceSpecificSettings.agenticRetrieval = getDefaultAgenticRetrievalSpecificSettings();
+    await this.saveServiceSpecificSettings();
   }
 
   // Update settings methods

@@ -18,7 +18,7 @@ import { TranslationService, type TranslationResult, type UITranslationItem } fr
 import { buildExtraBody } from './core/requestOverrides';
 import type { Message, GenerationResponse, StreamChunk } from './core/types';
 import type { Story, StoryEntry, Character, Location, Item, StoryBeat, Chapter, MemoryConfig, Entry, LoreManagementResult, TimeTracker } from '$lib/types';
-import { AI_CONFIG, createLogger } from './core/config';
+import { AI_CONFIG, createLogger, getContextConfig } from './core/config';
 
 const log = createLogger('AIService');
 
@@ -120,7 +120,8 @@ class AIService {
     messages.push({ role: 'user', content: primingMessage });
 
     // Add recent entries as conversation history
-    const recentEntries = entries.slice(-AI_CONFIG.context.recentEntriesForNarrative);
+    const contextConfig = getContextConfig();
+    const recentEntries = entries.slice(-contextConfig.recentEntriesForNarrative);
     for (const entry of recentEntries) {
       if (entry.type === 'user_action') {
         messages.push({ role: 'user', content: entry.content });
@@ -201,10 +202,11 @@ class AIService {
       try {
         // Build world state context (characters, locations, items, story beats)
         // Lorebook context is already included in retrievedChapterContext from ActionInput
+        const tieredContextConfig = getContextConfig();
         const contextResult = await this.buildTieredContext(
           worldState,
           userInput,
-          entries.slice(-AI_CONFIG.context.recentEntriesForTiered),
+          entries.slice(-tieredContextConfig.recentEntriesForTiered),
           retrievedChapterContext ?? undefined
         );
         tieredContextBlock = contextResult.contextBlock;

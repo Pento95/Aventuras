@@ -13,14 +13,9 @@ import { settings } from '$lib/stores/settings.svelte';
 import { buildExtraBody } from '$lib/services/ai/core/requestOverrides';
 import { promptService, type PromptContext } from './prompts';
 import { tryParseJsonWithHealing } from './ai/utils/jsonHealing';
+import { createLogger } from './ai/core/config';
 
-const DEBUG = true;
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[CharacterCardImporter]', ...args);
-  }
-}
+const log = createLogger('CharacterCardImporter');
 
 // ===== PNG Metadata Extraction =====
 

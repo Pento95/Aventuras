@@ -3,11 +3,17 @@
  *
  * Centralized configuration constants and logging utilities for all AI services.
  * This replaces the scattered hardcoded values and per-service DEBUG flags.
+ *
+ * MIGRATION NOTE: Use getContextConfig() and getLorebookConfig() instead of AI_CONFIG
+ * for values that should be user-configurable via Advanced Settings.
  */
 
+import { settings } from '$lib/stores/settings.svelte';
+
 /**
- * AI service configuration constants.
+ * AI service configuration constants (defaults).
  * These values control context window sizes, limits, and thresholds.
+ * Use getContextConfig() and getLorebookConfig() to get user-configurable values.
  */
 export const AI_CONFIG = {
 	/** Context window sizes for different operations */
@@ -90,3 +96,45 @@ export function createLogger(serviceName: string) {
  * Type for the logger function returned by createLogger.
  */
 export type Logger = ReturnType<typeof createLogger>;
+
+/**
+ * Get context window configuration from user settings with fallback to defaults.
+ * Use this instead of AI_CONFIG.context for user-configurable values.
+ */
+export function getContextConfig() {
+	const ctx = settings.serviceSpecificSettings?.contextWindow;
+	return {
+		recentEntriesForNarrative: ctx?.recentEntriesForNarrative ?? AI_CONFIG.context.recentEntriesForNarrative,
+		recentEntriesForTiered: ctx?.recentEntriesForTiered ?? AI_CONFIG.context.recentEntriesForTiered,
+		recentEntriesForRetrieval: ctx?.recentEntriesForRetrieval ?? AI_CONFIG.context.recentEntriesForRetrieval,
+		recentEntriesForChoices: ctx?.recentEntriesForChoices ?? AI_CONFIG.context.recentEntriesForChoices,
+		userActionsForStyle: ctx?.userActionsForStyle ?? AI_CONFIG.context.userActionsForStyle,
+		recentEntriesForLoreManagement: ctx?.recentEntriesForLoreManagement ?? AI_CONFIG.context.recentEntriesForLoreManagement,
+		recentEntriesForNameMatching: ctx?.recentEntriesForNameMatching ?? AI_CONFIG.context.recentEntriesForNameMatching,
+	};
+}
+
+/**
+ * Get lorebook limits configuration from user settings with fallback to defaults.
+ * Use this instead of AI_CONFIG.lorebook for user-configurable values.
+ */
+export function getLorebookConfig() {
+	const lb = settings.serviceSpecificSettings?.lorebookLimits;
+	return {
+		maxForActionChoices: lb?.maxForActionChoices ?? AI_CONFIG.lorebook.maxForActionChoices,
+		maxForSuggestions: lb?.maxForSuggestions ?? AI_CONFIG.lorebook.maxForSuggestions,
+		maxForAgenticPreview: lb?.maxForAgenticPreview ?? AI_CONFIG.lorebook.maxForAgenticPreview,
+		llmThreshold: lb?.llmThreshold ?? AI_CONFIG.lorebook.llmThreshold,
+		maxEntriesPerTier: lb?.maxEntriesPerTier ?? AI_CONFIG.lorebook.maxEntriesPerTier,
+	};
+}
+
+/**
+ * Get agentic retrieval configuration from user settings with fallback to defaults.
+ */
+export function getAgenticRetrievalConfig() {
+	const ar = settings.serviceSpecificSettings?.agenticRetrieval;
+	return {
+		maxIterations: ar?.maxIterations ?? 10,
+	};
+}

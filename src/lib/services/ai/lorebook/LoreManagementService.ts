@@ -26,7 +26,7 @@ import type {
 import type { ReasoningEffort } from '$lib/types';
 import { promptService, type PromptContext, type StoryMode, type POV, type Tense } from '$lib/services/prompts';
 import { parseJsonWithHealing } from '../utils/jsonHealing';
-import { AI_CONFIG, createLogger } from '../core/config';
+import { AI_CONFIG, createLogger, getContextConfig } from '../core/config';
 
 const log = createLogger('LoreManagement');
 
@@ -574,7 +574,8 @@ export class LoreManagementService extends BaseAIService {
       : 'No entries yet.';
 
     // Build recent story summary (last few messages)
-    const recentStory = context.recentMessages.slice(-AI_CONFIG.context.recentEntriesForLoreManagement).map(m => {
+    const contextConfig = getContextConfig();
+    const recentStory = context.recentMessages.slice(-contextConfig.recentEntriesForLoreManagement).map(m => {
       const prefix = m.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
       return `${prefix} ${m.content}`;
     }).join('\n\n');

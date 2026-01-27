@@ -6,13 +6,9 @@
  * Modules don't call each other directly - they communicate through events and shared state.
  */
 
-const DEBUG = true;
+import { createLogger } from './ai/core/config';
 
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[EventBus]', ...args);
-  }
-}
+const log = createLogger('EventBus');
 
 // Event types per design doc section 2.3
 export type EventType =

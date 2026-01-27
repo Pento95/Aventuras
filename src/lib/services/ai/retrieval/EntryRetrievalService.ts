@@ -52,7 +52,7 @@ export interface ActivationTracker {
   currentPosition: number;
 }
 
-import { AI_CONFIG, createLogger } from '../core/config';
+import { AI_CONFIG, createLogger, getContextConfig } from '../core/config';
 
 const log = createLogger('EntryRetrieval');
 
@@ -554,8 +554,9 @@ export class EntryRetrievalService {
     if (!this.provider || availableEntries.length === 0) return [];
 
     // Build context for LLM - show more of the recent story
+    const contextConfig = getContextConfig();
     const recentContent = recentStoryEntries
-      .slice(-AI_CONFIG.context.recentEntriesForRetrieval)
+      .slice(-contextConfig.recentEntriesForRetrieval)
       .map(e => {
         const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
         return `${prefix}: ${e.content}`;

@@ -9,6 +9,7 @@ import { settings, getDefaultInteractiveLorebookSettings, type InteractiveLorebo
 import { buildExtraBody } from '../core/requestOverrides';
 import { promptService } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
+import { createLogger } from '../core/config';
 
 // Event types for progress updates
 export type StreamEvent =
@@ -19,13 +20,7 @@ export type StreamEvent =
   | { type: 'done'; result: SendMessageResult }
   | { type: 'error'; error: string };
 
-const DEBUG = true;
-
-function log(...args: unknown[]) {
-  if (DEBUG) {
-    console.log('[InteractiveLorebook]', ...args);
-  }
-}
+const log = createLogger('InteractiveLorebook');
 
 // Tool definitions for Interactive Lorebook Creation
 const INTERACTIVE_LOREBOOK_TOOLS: Tool[] = [

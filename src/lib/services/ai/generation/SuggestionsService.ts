@@ -2,7 +2,7 @@ import { BaseAIService, type OpenAIProvider } from '../core/BaseAIService';
 import type { StoryEntry, StoryBeat, Entry, GenerationPreset } from '$lib/types';
 import { promptService, type PromptContext, type POV, type Tense } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
-import { AI_CONFIG, createLogger } from '../core/config';
+import { createLogger, getContextConfig, getLorebookConfig } from '../core/config';
 
 const log = createLogger('Suggestions');
 
@@ -43,7 +43,9 @@ export class SuggestionsService extends BaseAIService {
     });
 
     // Get the last few entries for context
-    const lastEntries = recentEntries.slice(-AI_CONFIG.context.recentEntriesForRetrieval);
+    const contextConfig = getContextConfig();
+    const lorebookConfig = getLorebookConfig();
+    const lastEntries = recentEntries.slice(-contextConfig.recentEntriesForRetrieval);
     const lastContent = lastEntries.map(e => {
       const prefix = e.type === 'user_action' ? '[DIRECTION]' : '[NARRATIVE]';
       return `${prefix} ${e.content}`;
@@ -57,7 +59,7 @@ export class SuggestionsService extends BaseAIService {
     // Format lorebook entries for context
     let lorebookContext = '';
     if (lorebookEntries && lorebookEntries.length > 0) {
-      const entryDescriptions = lorebookEntries.slice(0, AI_CONFIG.lorebook.maxForSuggestions).map(e => {
+      const entryDescriptions = lorebookEntries.slice(0, lorebookConfig.maxForSuggestions).map(e => {
         let desc = `• ${e.name} (${e.type})`;
         if (e.description) {
           desc += `: ${e.description}`;

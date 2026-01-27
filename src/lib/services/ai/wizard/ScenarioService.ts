@@ -6,14 +6,9 @@ import type { Message } from '../core/types';
 import type { StoryMode, POV, Character, Location, Item } from '$lib/types';
 import { promptService, type PromptContext } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
+import { createLogger } from '../core/config';
 
-const DEBUG = true;
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[ScenarioService]', ...args);
-  }
-}
+const log = createLogger('ScenarioService');
 
 // Default model for scenario generation - fast and capable
 export const SCENARIO_MODEL = 'deepseek/deepseek-v3.2';

@@ -13,7 +13,7 @@ import type {
 import type { ReasoningEffort } from '$lib/types';
 import { promptService, type PromptContext, type StoryMode, type POV, type Tense } from '$lib/services/prompts';
 import { parseJsonWithHealing } from '../utils/jsonHealing';
-import { AI_CONFIG, createLogger } from '../core/config';
+import { AI_CONFIG, createLogger, getContextConfig, getLorebookConfig, getAgenticRetrievalConfig } from '../core/config';
 
 const log = createLogger('AgenticRetrieval');
 
@@ -137,11 +137,11 @@ export class AgenticRetrievalService extends BaseAIService {
   constructor(
     provider: OpenAIProvider,
     presetId: string = 'agentic',
-    maxIterations: number = 10,
+    maxIterations?: number,
     settingsOverride?: Partial<GenerationPreset>
   ) {
     super(provider, presetId, settingsOverride);
-    this.maxIterations = maxIterations;
+    this.maxIterations = maxIterations ?? getAgenticRetrievalConfig().maxIterations;
   }
 
   /**
@@ -314,9 +314,11 @@ export class AgenticRetrievalService extends BaseAIService {
 
   private buildInitialPrompt(context: AgenticRetrievalContext, mode: StoryMode = 'adventure', pov?: POV, tense?: Tense): string {
     const promptContext = this.getPromptContext(mode, pov, tense);
+    const contextConfig = getContextConfig();
+    const lorebookConfig = getLorebookConfig();
 
     // Format recent context
-    const recentContext = context.recentEntries.slice(-AI_CONFIG.context.recentEntriesForRetrieval).map(e => {
+    const recentContext = context.recentEntries.slice(-contextConfig.recentEntriesForRetrieval).map(e => {
       const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
       return `${prefix} ${e.content}`;
     }).join('\n\n');
@@ -325,7 +327,7 @@ export class AgenticRetrievalService extends BaseAIService {
       ? context.chapters.map(c => `- Chapter ${c.number}: ${c.title || 'Untitled'} (${c.characters.join(', ')})`).join('\n')
       : '(none)';
 
-    const maxPreview = AI_CONFIG.lorebook.maxForAgenticPreview;
+    const maxPreview = lorebookConfig.maxForAgenticPreview;
     const entryList = context.entries.length > 0
       ? context.entries.slice(0, maxPreview).map(e => `- ${e.name} (${e.type})`).join('\n')
       : '(none)';

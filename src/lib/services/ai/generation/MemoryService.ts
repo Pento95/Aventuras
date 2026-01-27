@@ -24,7 +24,7 @@ function formatTimeRange(startTime: TimeTracker | null, endTime: TimeTracker | n
   return ` [${start}]`;
 }
 
-import { AI_CONFIG, createLogger } from '../core/config';
+import { AI_CONFIG, createLogger, getContextConfig } from '../core/config';
 
 const log = createLogger('Memory');
 
@@ -290,7 +290,8 @@ NOTE: Only use for reference. This is NOT what you will be summarizing.
       locations: ch.locations,
     }));
 
-    const recentContext = recentEntries.slice(-AI_CONFIG.context.recentEntriesForRetrieval).map(e => e.content).join('\n');
+    const contextConfig = getContextConfig();
+    const recentContext = recentEntries.slice(-contextConfig.recentEntriesForRetrieval).map(e => e.content).join('\n');
 
     const promptContext = this.getPromptContext(mode, pov, tense);
     const prompt = promptService.renderUserPrompt('retrieval-decision', promptContext, {

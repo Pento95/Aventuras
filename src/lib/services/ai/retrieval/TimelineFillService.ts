@@ -2,6 +2,7 @@ import { BaseAIService, type OpenAIProvider } from '../core/BaseAIService';
 import type { Chapter, StoryEntry, TimeTracker, Location, GenerationPreset } from '$lib/types';
 import { promptService, type PromptContext, type StoryMode, type POV, type Tense } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
+import { createLogger } from '../core/config';
 
 // Format time tracker for timeline display (always shows full format)
 function formatTime(time: TimeTracker | null): string {
@@ -12,13 +13,7 @@ function formatTime(time: TimeTracker | null): string {
   return `Year ${year}, Day ${day}, ${t.hours} hours ${t.minutes} minutes`;
 }
 
-const DEBUG = true;
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[TimelineFill]', ...args);
-  }
-}
+const log = createLogger('TimelineFill');
 
 // ===== Interfaces =====
 

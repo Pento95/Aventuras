@@ -10,6 +10,9 @@
     Search,
     Bug,
     Code2,
+    Layers,
+    ListTree,
+    Sparkles,
   } from "lucide-svelte";
   import { Switch } from "$lib/components/ui/switch";
   import { Label } from "$lib/components/ui/label";
@@ -23,6 +26,9 @@
   let showLoreManagementSection = $state(false);
   let showClassifierSection = $state(false);
   let showEntryRetrievalSection = $state(false);
+  let showContextWindowSection = $state(false);
+  let showLorebookLimitsSection = $state(false);
+  let showAgenticRetrievalSection = $state(false);
 
   // Manual mode toggle handler
   async function handleManualModeToggle(checked: boolean) {
@@ -517,6 +523,426 @@
                 <span>Unlimited</span>
                 <span>1000 Words</span>
               </div>
+            </div>
+          </div>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </div>
+
+    <!-- Agentic Retrieval Settings -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+      <Collapsible.Root bind:open={showAgenticRetrievalSection}>
+        <div class="flex items-center p-3 pl-4 gap-3">
+          <Collapsible.Trigger class="flex items-center gap-2 flex-1 text-left group/trigger">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-md bg-pink-500/10 transition-colors group-hover/trigger:bg-pink-500/20"
+            >
+              <Sparkles class="h-4 w-4 text-pink-500" />
+            </div>
+            <div class="flex-1">
+              <Label class="font-medium leading-none">Agentic Retrieval</Label>
+              <p class="text-xs text-muted-foreground mt-1">
+                Tool-based retrieval iteration limits
+              </p>
+            </div>
+          </Collapsible.Trigger>
+          <div class="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              onclick={() => settings.resetAgenticRetrievalSpecificSettings()}
+              title="Reset to default"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+            </Button>
+            <Collapsible.Trigger asChild let:builder>
+              <Button
+                builders={[builder]}
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+              >
+                {#if showAgenticRetrievalSection}
+                  <ChevronDown
+                    class="h-4 w-4 rotate-180 transition-transform duration-200"
+                  />
+                {:else}
+                  <ChevronDown
+                    class="h-4 w-4 transition-transform duration-200"
+                  />
+                {/if}
+                <span class="sr-only">Toggle</span>
+              </Button>
+            </Collapsible.Trigger>
+          </div>
+        </div>
+
+        <Collapsible.Content>
+          <div class="border-t bg-muted/10 p-4 space-y-6">
+            <!-- Max Iterations -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Max Iterations</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.agenticRetrieval
+                    ?.maxIterations ?? 10}
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.agenticRetrieval
+                    ?.maxIterations ?? 10,
+                ]}
+                min={5}
+                max={30}
+                step={5}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.agenticRetrieval.maxIterations =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <div
+                class="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wider font-medium"
+              >
+                <span>Quick</span>
+                <span>Thorough</span>
+              </div>
+            </div>
+          </div>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </div>
+
+    <!-- Context Window Settings -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+      <Collapsible.Root bind:open={showContextWindowSection}>
+        <div class="flex items-center p-3 pl-4 gap-3">
+          <Collapsible.Trigger class="flex items-center gap-2 flex-1 text-left group/trigger">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 transition-colors group-hover/trigger:bg-blue-500/20"
+            >
+              <Layers class="h-4 w-4 text-blue-500" />
+            </div>
+            <div class="flex-1">
+              <Label class="font-medium leading-none">Context Window</Label>
+              <p class="text-xs text-muted-foreground mt-1">
+                Recent entries included in AI operations
+              </p>
+            </div>
+          </Collapsible.Trigger>
+          <div class="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              onclick={() => settings.resetContextWindowSettings()}
+              title="Reset to default"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+            </Button>
+            <Collapsible.Trigger asChild let:builder>
+              <Button
+                builders={[builder]}
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+              >
+                {#if showContextWindowSection}
+                  <ChevronDown
+                    class="h-4 w-4 rotate-180 transition-transform duration-200"
+                  />
+                {:else}
+                  <ChevronDown
+                    class="h-4 w-4 transition-transform duration-200"
+                  />
+                {/if}
+                <span class="sr-only">Toggle</span>
+              </Button>
+            </Collapsible.Trigger>
+          </div>
+        </div>
+
+        <Collapsible.Content>
+          <div class="border-t bg-muted/10 p-4 space-y-6">
+            <!-- Narrative Context -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Narrative Context</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForNarrative ?? 20} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForNarrative ?? 20,
+                ]}
+                min={5}
+                max={50}
+                step={5}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.contextWindow.recentEntriesForNarrative =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Entries sent to the narrator for story generation
+              </p>
+            </div>
+
+            <!-- Retrieval Context -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Retrieval/Classification</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForRetrieval ?? 5} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForRetrieval ?? 5,
+                ]}
+                min={2}
+                max={15}
+                step={1}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.contextWindow.recentEntriesForRetrieval =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Entries for retrieval and classification operations
+              </p>
+            </div>
+
+            <!-- Tiered Context -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Tiered Context Building</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForTiered ?? 10} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForTiered ?? 10,
+                ]}
+                min={3}
+                max={20}
+                step={1}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.contextWindow.recentEntriesForTiered =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Entries for lorebook entry injection
+              </p>
+            </div>
+
+            <!-- Action Choices Context -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Action Choices</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForChoices ?? 3} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.contextWindow
+                    ?.recentEntriesForChoices ?? 3,
+                ]}
+                min={1}
+                max={10}
+                step={1}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.contextWindow.recentEntriesForChoices =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Entries for generating action choices
+              </p>
+            </div>
+          </div>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </div>
+
+    <!-- Lorebook Limits Settings -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+      <Collapsible.Root bind:open={showLorebookLimitsSection}>
+        <div class="flex items-center p-3 pl-4 gap-3">
+          <Collapsible.Trigger class="flex items-center gap-2 flex-1 text-left group/trigger">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-md bg-orange-500/10 transition-colors group-hover/trigger:bg-orange-500/20"
+            >
+              <ListTree class="h-4 w-4 text-orange-500" />
+            </div>
+            <div class="flex-1">
+              <Label class="font-medium leading-none">Lorebook Limits</Label>
+              <p class="text-xs text-muted-foreground mt-1">
+                Max entries injected per operation
+              </p>
+            </div>
+          </Collapsible.Trigger>
+          <div class="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              onclick={() => settings.resetLorebookLimitsSettings()}
+              title="Reset to default"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+            </Button>
+            <Collapsible.Trigger asChild let:builder>
+              <Button
+                builders={[builder]}
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+              >
+                {#if showLorebookLimitsSection}
+                  <ChevronDown
+                    class="h-4 w-4 rotate-180 transition-transform duration-200"
+                  />
+                {:else}
+                  <ChevronDown
+                    class="h-4 w-4 transition-transform duration-200"
+                  />
+                {/if}
+                <span class="sr-only">Toggle</span>
+              </Button>
+            </Collapsible.Trigger>
+          </div>
+        </div>
+
+        <Collapsible.Content>
+          <div class="border-t bg-muted/10 p-4 space-y-6">
+            <!-- Max for Suggestions -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Suggestions</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.lorebookLimits
+                    ?.maxForSuggestions ?? 15} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.lorebookLimits
+                    ?.maxForSuggestions ?? 15,
+                ]}
+                min={5}
+                max={30}
+                step={5}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.lorebookLimits.maxForSuggestions =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Max entries for suggestion generation
+              </p>
+            </div>
+
+            <!-- Max for Action Choices -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Action Choices</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.lorebookLimits
+                    ?.maxForActionChoices ?? 12} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.lorebookLimits
+                    ?.maxForActionChoices ?? 12,
+                ]}
+                min={5}
+                max={25}
+                step={1}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.lorebookLimits.maxForActionChoices =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Max entries for action choice generation
+              </p>
+            </div>
+
+            <!-- Max per Tier -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>Per Tier</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.lorebookLimits
+                    ?.maxEntriesPerTier ?? 10} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.lorebookLimits
+                    ?.maxEntriesPerTier ?? 10,
+                ]}
+                min={3}
+                max={20}
+                step={1}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.lorebookLimits.maxEntriesPerTier =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Max entries per injection tier
+              </p>
+            </div>
+
+            <!-- LLM Threshold -->
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <Label>LLM Selection Threshold</Label>
+                <span class="text-xs font-medium bg-muted px-2 py-0.5 rounded">
+                  {settings.serviceSpecificSettings.lorebookLimits
+                    ?.llmThreshold ?? 30} entries
+                </span>
+              </div>
+              <Slider
+                value={[
+                  settings.serviceSpecificSettings.lorebookLimits
+                    ?.llmThreshold ?? 30,
+                ]}
+                min={10}
+                max={100}
+                step={10}
+                onValueChange={(v) => {
+                  settings.serviceSpecificSettings.lorebookLimits.llmThreshold =
+                    v[0];
+                  settings.saveServiceSpecificSettings();
+                }}
+              />
+              <p class="text-xs text-muted-foreground">
+                Entry count that triggers LLM-based selection
+              </p>
             </div>
           </div>
         </Collapsible.Content>
