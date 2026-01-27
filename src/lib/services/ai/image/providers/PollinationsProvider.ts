@@ -19,6 +19,7 @@ import type {
 } from './base';
 import { ImageGenerationError } from './base';
 import { createLogger } from '../../core/config';
+import { POLLINATIONS_DEFAULT_MODEL_ID, POLLINATIONS_REFERENCE_MODEL_ID } from '../constants';
 
 /**
  * Configuration for retry behavior
@@ -35,7 +36,7 @@ const POLLINATIONS_IMAGE_ENDPOINT = `${POLLINATIONS_BASE_URL}/image`;
 const POLLINATIONS_MODELS_ENDPOINT = `${POLLINATIONS_BASE_URL}/image/models`;
 
 // Default model
-const DEFAULT_MODEL = 'zimage';
+const DEFAULT_MODEL = POLLINATIONS_DEFAULT_MODEL_ID;
 
 export class PollinationsImageProvider implements ImageProvider {
 	id = 'pollinations';
@@ -374,7 +375,7 @@ export class PollinationsImageProvider implements ImageProvider {
 	private getFallbackModels(): ImageModelInfo[] {
 		return [
 			{
-				id: 'zimage',
+				id: POLLINATIONS_DEFAULT_MODEL_ID,
 				name: 'Z Image',
 				description: 'Default fast image generation',
 				supportsSizes: ['512x512', '1024x1024', '2048x2048'],
@@ -395,7 +396,7 @@ export class PollinationsImageProvider implements ImageProvider {
 				supportsImg2Img: false,
 			},
 			{
-				id: 'kontext',
+				id: POLLINATIONS_REFERENCE_MODEL_ID,
 				name: 'Flux Kontext',
 				description: 'In-context editing & generation',
 				supportsSizes: ['512x512', '1024x1024', '2048x2048'],

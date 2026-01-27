@@ -10,6 +10,7 @@
   import { ImageGenerationService } from "$lib/services/ai/image/ImageGenerationService";
   import type { ImageModelInfo } from "$lib/services/ai/image/providers/base";
   import ImageModelSelect from "$lib/components/settings/ImageModelSelect.svelte";
+  import { POLLINATIONS_DEFAULT_MODEL_ID, POLLINATIONS_REFERENCE_MODEL_ID } from "$lib/services/ai/image/constants";
 
   const imageProviders = [
     { value: "nanogpt", label: "NanoGPT" },
@@ -95,10 +96,10 @@
 
     if (!modelExists && !isLoadingPollinationsModels) {
       const zimageModel = filteredPollinationsModels.find(
-        (m) => m.id === "zimage",
+        (m) => m.id === POLLINATIONS_DEFAULT_MODEL_ID,
       );
       settings.systemServicesSettings.imageGeneration.model = zimageModel
-        ? "zimage"
+        ? POLLINATIONS_DEFAULT_MODEL_ID
         : filteredPollinationsModels[0].id;
       settings.saveSystemServicesSettings();
     }
@@ -122,8 +123,8 @@
             "qwen-image-edit-2511";
         } else if (provider === "pollinations") {
           settings.systemServicesSettings.imageGeneration.referenceModel =
-            "kontext";
-          settings.systemServicesSettings.imageGeneration.model = "zimage";
+            POLLINATIONS_REFERENCE_MODEL_ID;
+          settings.systemServicesSettings.imageGeneration.model = POLLINATIONS_DEFAULT_MODEL_ID;
         } else {
           settings.systemServicesSettings.imageGeneration.referenceModel =
             "qwen-image";

@@ -32,6 +32,7 @@
   import { Label } from "$lib/components/ui/label";
   import { cn } from "$lib/utils/cn";
   import IconRow from "$lib/components/ui/icon-row.svelte";
+  import { DEFAULT_FALLBACK_STYLE_PROMPT } from "$lib/services/ai/image/constants";
 
   let showAddForm = $state(false);
   let newName = $state("");
@@ -294,8 +295,7 @@
         stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
       } catch {
         // Use default style
-        stylePrompt =
-          "Soft cel-shaded anime illustration. Muted pastel color palette with low saturation. Dreamy, airy atmosphere.";
+        stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
       }
 
       // Build the portrait generation prompt using the template

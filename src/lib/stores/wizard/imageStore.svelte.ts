@@ -4,6 +4,7 @@ import {
 import { NanoGPTImageProvider } from "$lib/services/ai/image/providers/NanoGPTProvider";
 import { promptService } from "$lib/services/prompts";
 import type { GeneratedProtagonist, GeneratedCharacter } from "$lib/services/ai/wizard/ScenarioService";
+import { DEFAULT_FALLBACK_STYLE_PROMPT } from "$lib/services/ai/image/constants";
 
 export class ImageStore {
   protagonistVisualDescriptors = $state("");
@@ -48,8 +49,7 @@ export class ImageStore {
         };
         stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
       } catch {
-        stylePrompt =
-          "Soft cel-shaded anime illustration. Muted pastel color palette. Dreamy, airy atmosphere.";
+        stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
       }
 
       const promptContext = {
@@ -123,8 +123,7 @@ export class ImageStore {
         };
         stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
       } catch {
-        stylePrompt =
-          "Soft cel-shaded anime illustration. Muted pastel color palette. Dreamy, airy atmosphere.";
+        stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
       }
 
       const promptContext = {

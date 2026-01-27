@@ -4,6 +4,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Button } from '$lib/components/ui/button';
 	import { RefreshCw, Loader2 } from 'lucide-svelte';
+	import { DEFAULT_AVG_PROMPT_TOKENS, DEFAULT_AVG_IMAGE_TOKENS } from '$lib/services/ai/image/constants';
 
 	interface Props {
 		models: ImageModelInfo[];
@@ -57,14 +58,10 @@
 		const costPerTextToken = model.costPerTextToken ?? 0;
 		const costPerImageToken = model.costPerImageToken ?? 0;
 
-		// Average prompt size assumptions
-		const AVG_PROMPT_TOKENS = 100;
-		const AVG_IMAGE_TOKENS = 1000;
-
 		const totalCost =
 			model.costPerImage +
-			costPerTextToken * AVG_PROMPT_TOKENS +
-			costPerImageToken * AVG_IMAGE_TOKENS;
+			costPerTextToken * DEFAULT_AVG_PROMPT_TOKENS +
+			costPerImageToken * DEFAULT_AVG_IMAGE_TOKENS;
 
 		const imagesPerPollen = 1 / totalCost;
 

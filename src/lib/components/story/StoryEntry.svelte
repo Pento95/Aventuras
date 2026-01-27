@@ -47,6 +47,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Input } from "$lib/components/ui/input";
+  import { IMAGE_STUCK_THRESHOLD_MS, DEFAULT_FALLBACK_STYLE_PROMPT } from "$lib/services/ai/image/constants";
 
   let { entry }: { entry: StoryEntry } = $props();
 
@@ -172,8 +173,6 @@
   let embeddedImages = $state<EmbeddedImage[]>([]);
   let expandedImageId = $state<string | null>(null);
   let clickedElement = $state<HTMLElement | null>(null);
-
-  const STUCK_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 
   // Branching state
   let isBranching = $state(false);
@@ -590,7 +589,7 @@
           };
           stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
         } catch {
-          stylePrompt = "Soft cel-shaded anime illustration.";
+          stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
         }
 
         // Reconstruct full prompt
@@ -629,7 +628,7 @@
       };
       stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
     } catch {
-      stylePrompt = "Soft cel-shaded anime illustration.";
+      stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
     }
 
     const fullPrompt = `${editingImagePrompt.trim()}. ${stylePrompt}`;
