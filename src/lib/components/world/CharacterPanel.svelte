@@ -20,9 +20,12 @@
     Save,
   } from "lucide-svelte";
   import type { Character } from "$lib/types";
-  import { NanoGPTImageProvider } from "$lib/services/ai/image/providers/NanoGPTProvider";
+  import { ImageGenerationService } from "$lib/services/ai/image/ImageGenerationService";
   import { promptService } from "$lib/services/prompts";
   import { normalizeImageDataUrl } from "$lib/utils/image";
+  import { createLogger } from "$lib/services/ai/core/config";
+
+  const log = createLogger("CharacterPortrait");
   import { Button, buttonVariants } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Textarea } from "$lib/components/ui/textarea";
@@ -94,7 +97,9 @@
 
   // Parse visual descriptors into categorized groups
   // Dynamically detects any "Category:" prefix pattern
-  function parseVisualDescriptors(descriptors: string[]): CategorizedDescriptor[] {
+  function parseVisualDescriptors(
+    descriptors: string[],
+  ): CategorizedDescriptor[] {
     const categoryMap = new Map<string, string[]>();
     const categoryOrder: string[] = [];
 
@@ -175,7 +180,9 @@
     // Convert to array with colors assigned sequentially
     return categoryOrder.map((label, index) => ({
       label,
-      color: label ? CATEGORY_COLORS[index % CATEGORY_COLORS.length] : "text-muted-foreground",
+      color: label
+        ? CATEGORY_COLORS[index % CATEGORY_COLORS.length]
+        : "text-muted-foreground",
       values: categoryMap.get(label)!,
     }));
   }
@@ -367,9 +374,19 @@
   async function generatePortrait(character: Character) {
     const imageSettings = settings.systemServicesSettings.imageGeneration;
 
-    // Validate requirements
-    if (!imageSettings.nanoGptApiKey) {
-      portraitError = "NanoGPT API key required for portrait generation";
+    log("Starting portrait generation", {
+      characterName: character.name,
+      provider: imageSettings.imageProvider,
+      portraitMode: imageSettings.portraitMode,
+      model: imageSettings.portraitMode ? imageSettings.portraitModel : imageSettings.model,
+      styleId: imageSettings.styleId,
+    });
+
+    // Validate API key for selected provider
+    if (!ImageGenerationService.hasRequiredCredentials()) {
+      const providerName = ImageGenerationService.getProviderDisplayName();
+      log("Missing credentials for provider", { provider: providerName });
+      portraitError = `${providerName} API key required for portrait generation`;
       return;
     }
 
@@ -380,6 +397,7 @@
       .filter(Boolean);
 
     if (descriptors.length === 0) {
+      log("No visual descriptors provided");
       portraitError = "Add appearance descriptors first";
       return;
     }
@@ -422,25 +440,63 @@
         },
       );
 
-      // Create the image provider
-      const provider = new NanoGPTImageProvider(imageSettings.nanoGptApiKey);
+      // Determine which model to use based on portraitMode
+      const modelToUse = imageSettings.portraitMode
+        ? imageSettings.portraitModel
+        : imageSettings.model;
+
+      if (!modelToUse) {
+        log("No model configured for portrait generation");
+        portraitError = "No image model configured. Please select a model in Settings > Images.";
+        return;
+      }
+
+      if (!imageSettings.imageProvider) {
+        log("No image provider configured");
+        portraitError = "No image provider configured. Please select a provider in Settings > Images.";
+        return;
+      }
+
+      // Create the appropriate image provider based on settings
+      const provider = ImageGenerationService.createProviderInstance();
+
+      const requestParams = {
+        prompt: portraitPrompt,
+        model: modelToUse,
+        size: "1024x1024",
+        response_format: "b64_json" as const,
+      };
+
+      log("Sending portrait generation request", {
+        provider: imageSettings.imageProvider,
+        model: requestParams.model,
+        portraitMode: imageSettings.portraitMode,
+        size: requestParams.size,
+        promptLength: requestParams.prompt.length,
+        descriptorCount: descriptors.length,
+      });
 
       // Generate the image
-      const response = await provider.generateImage({
-        prompt: portraitPrompt,
-        model: imageSettings.portraitModel || "z-image-turbo",
-        size: "1024x1024",
-        response_format: "b64_json",
-      });
+      const response = await provider.generateImage(requestParams);
 
       if (response.images.length === 0 || !response.images[0].b64_json) {
         throw new Error("No image data returned");
       }
 
+      log("Portrait generated successfully", {
+        characterName: character.name,
+        imageCount: response.images.length,
+        model: response.model,
+      });
+
       editPortrait = `data:image/png;base64,${response.images[0].b64_json}`;
     } catch (error) {
-      portraitError =
-        error instanceof Error ? error.message : "Failed to generate portrait";
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate portrait";
+      log("Portrait generation failed", {
+        characterName: character.name,
+        error: errorMessage,
+      });
+      portraitError = errorMessage;
     } finally {
       generatingPortraitId = null;
     }
@@ -555,9 +611,15 @@
           class={cn(
             "group rounded-lg border bg-card shadow-sm transition-all px-2.5 py-2",
             isEditing && "ring-1 ring-primary/20 border-border",
-            !isEditing && character.status === "active" && "border-green-500/30",
-            !isEditing && character.status === "inactive" && "border-muted-foreground/20",
-            !isEditing && character.status === "deceased" && "border-destructive/30",
+            !isEditing &&
+              character.status === "active" &&
+              "border-green-500/30",
+            !isEditing &&
+              character.status === "inactive" &&
+              "border-muted-foreground/20",
+            !isEditing &&
+              character.status === "deceased" &&
+              "border-destructive/30",
           )}
         >
           {#if isEditing}
@@ -697,11 +759,11 @@
                       )}
                     >
                       {#if uploadingPortraitId === character.id}
-                        <Loader2 class="mr-2 h-3.5 w-3.5 animate-spin" />
+                        <Loader2 class="h-3.5 w-3.5 animate-spin" />
                         <span>Uploading...</span>
                       {:else}
-                        <ImageUp class="mr-2 h-3.5 w-3.5" />
-                        <span>Upload Image</span>
+                        <ImageUp class="h-3.5 w-3.5" />
+                        <span>Upload</span>
                       {/if}
                       <input
                         type="file"
@@ -725,11 +787,11 @@
                         : "Generate from appearance"}
                     >
                       {#if generatingPortraitId === character.id}
-                        <Loader2 class="mr-2 h-3.5 w-3.5 animate-spin" />
+                        <Loader2 class="h-3.5 w-3.5 animate-spin" />
                         <span>Generating...</span>
                       {:else}
-                        <Wand2 class="mr-2 h-3.5 w-3.5" />
-                        <span>Generate AI Portrait</span>
+                        <Wand2 class="h-3.5 w-3.5" />
+                        <span>Generate</span>
                       {/if}
                     </Button>
                   </div>
@@ -778,7 +840,8 @@
                     class={cn(
                       "h-8 w-8 ring-2 transition-all hover:ring-primary",
                       character.status === "active" && "ring-green-500/50",
-                      character.status === "inactive" && "ring-muted-foreground/30",
+                      character.status === "inactive" &&
+                        "ring-muted-foreground/30",
                       character.status === "deceased" && "ring-destructive/50",
                     )}
                   >
@@ -787,7 +850,8 @@
                       alt={character.name}
                       class={cn(
                         "object-cover",
-                        character.status === "inactive" && "grayscale opacity-60",
+                        character.status === "inactive" &&
+                          "grayscale opacity-60",
                         character.status === "deceased" && "grayscale",
                       )}
                     />
@@ -798,7 +862,9 @@
                     </Avatar.Fallback>
                   </Avatar.Root>
                   {#if character.status === "deceased"}
-                    <div class="absolute inset-0 flex items-center justify-center rounded-full bg-destructive/20">
+                    <div
+                      class="absolute inset-0 flex items-center justify-center rounded-full bg-destructive/20"
+                    >
                       <Skull class="h-4 w-4 text-destructive" />
                     </div>
                   {/if}
@@ -823,7 +889,8 @@
                     "font-medium text-sm leading-tight",
                     character.status === "active" && "text-foreground",
                     character.status === "inactive" && "text-muted-foreground",
-                    character.status === "deceased" && "text-muted-foreground line-through",
+                    character.status === "deceased" &&
+                      "text-muted-foreground line-through",
                   )}
                 >
                   {character.translatedName ?? character.name}
@@ -849,7 +916,9 @@
 
             <!-- Swap Protagonist UI -->
             {#if pendingProtagonistId === character.id}
-              <div class="mt-2 rounded-md border border-border bg-muted/40 p-2.5">
+              <div
+                class="mt-2 rounded-md border border-border bg-muted/40 p-2.5"
+              >
                 <p class="mb-1.5 text-xs text-muted-foreground">
                   New role for <span class="text-foreground font-medium"
                     >{currentProtagonistName}</span
@@ -887,10 +956,23 @@
 
             <!-- Expanded Details -->
             {#if !isCollapsed && hasDetails(character)}
-              {@const hasTraits = character.traits.length > 0 || (character.translatedTraits && character.translatedTraits.length > 0)}
-              {@const hasDescriptors = character.visualDescriptors.length > 0 || (character.translatedVisualDescriptors && character.translatedVisualDescriptors.length > 0)}
-              {@const parsedDescriptors = hasDescriptors ? parseVisualDescriptors(character.translatedVisualDescriptors ?? character.visualDescriptors) : []}
-              {@const descriptorsExpanded = expandedDescriptors.has(character.id)}
+              {@const hasTraits =
+                character.traits.length > 0 ||
+                (character.translatedTraits &&
+                  character.translatedTraits.length > 0)}
+              {@const hasDescriptors =
+                character.visualDescriptors.length > 0 ||
+                (character.translatedVisualDescriptors &&
+                  character.translatedVisualDescriptors.length > 0)}
+              {@const parsedDescriptors = hasDescriptors
+                ? parseVisualDescriptors(
+                    character.translatedVisualDescriptors ??
+                      character.visualDescriptors,
+                  )
+                : []}
+              {@const descriptorsExpanded = expandedDescriptors.has(
+                character.id,
+              )}
               <div class="mt-2 flex flex-col gap-1.5">
                 {#if hasTraits}
                   <div class="flex flex-wrap gap-1">
@@ -921,17 +1003,25 @@
                     {#if descriptorsExpanded}
                       <div class="flex flex-col gap-1">
                         {#each parsedDescriptors as { label, color, values }}
-                          <div class="flex flex-col gap-0.5 rounded bg-muted/40 px-2 py-1">
+                          <div
+                            class="flex flex-col gap-0.5 rounded bg-muted/40 px-2 py-1"
+                          >
                             {#if label}
-                              <span class={cn("font-medium", color)}>{label}</span>
+                              <span class={cn("font-medium", color)}
+                                >{label}</span
+                              >
                             {/if}
-                            <span class="text-muted-foreground">{values.join(", ")}</span>
+                            <span class="text-muted-foreground"
+                              >{values.join(", ")}</span
+                            >
                           </div>
                         {/each}
                       </div>
                     {:else}
                       <p class="text-muted-foreground pl-4 line-clamp-2">
-                        {parsedDescriptors.map(d => d.values.slice(0, 2).join(", ")).join(" · ")}
+                        {parsedDescriptors
+                          .map((d) => d.values.slice(0, 2).join(", "))
+                          .join(" · ")}
                       </p>
                     {/if}
                   </div>

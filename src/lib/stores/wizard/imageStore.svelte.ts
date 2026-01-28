@@ -1,10 +1,13 @@
 import {
   settings
 } from "$lib/stores/settings.svelte";
-import { NanoGPTImageProvider } from "$lib/services/ai/image/providers/NanoGPTProvider";
+import { ImageGenerationService } from "$lib/services/ai/image/ImageGenerationService";
 import { promptService } from "$lib/services/prompts";
 import type { GeneratedProtagonist, GeneratedCharacter } from "$lib/services/ai/wizard/ScenarioService";
 import { DEFAULT_FALLBACK_STYLE_PROMPT } from "$lib/services/ai/image/constants";
+import { createLogger } from "$lib/services/ai/core/config";
+
+const log = createLogger("WizardPortrait");
 
 export class ImageStore {
   protagonistVisualDescriptors = $state("");
@@ -23,13 +26,25 @@ export class ImageStore {
     if (!protagonist || this.isGeneratingProtagonistPortrait) return;
 
     const imageSettings = settings.systemServicesSettings.imageGeneration;
-    if (!imageSettings.nanoGptApiKey) {
-      this.portraitError = "NanoGPT API key required for portrait generation";
+
+    log("Starting protagonist portrait generation", {
+      protagonistName: protagonist.name,
+      provider: imageSettings.imageProvider,
+      portraitMode: imageSettings.portraitMode,
+      model: imageSettings.portraitMode ? imageSettings.portraitModel : imageSettings.model,
+      styleId: imageSettings.styleId,
+    });
+
+    if (!ImageGenerationService.hasRequiredCredentials()) {
+      const providerName = ImageGenerationService.getProviderDisplayName();
+      log("Missing credentials for provider", { provider: providerName });
+      this.portraitError = `${providerName} API key required for portrait generation`;
       return;
     }
 
     const descriptors = this.protagonistVisualDescriptors.trim();
     if (!descriptors) {
+      log("No visual descriptors provided");
       this.portraitError = "Add appearance descriptors first";
       return;
     }
@@ -69,22 +84,59 @@ export class ImageStore {
         },
       );
 
-      const provider = new NanoGPTImageProvider(imageSettings.nanoGptApiKey);
-      const response = await provider.generateImage({
+      // Determine which model to use based on portraitMode
+      const modelToUse = imageSettings.portraitMode
+        ? imageSettings.portraitModel
+        : imageSettings.model;
+
+      if (!modelToUse) {
+        log("No model configured for portrait generation");
+        this.portraitError = "No image model configured. Please select a model in Settings > Images.";
+        return;
+      }
+
+      if (!imageSettings.imageProvider) {
+        log("No image provider configured");
+        this.portraitError = "No image provider configured. Please select a provider in Settings > Images.";
+        return;
+      }
+
+      const provider = ImageGenerationService.createProviderInstance();
+
+      const requestParams = {
         prompt: portraitPrompt,
-        model: imageSettings.portraitModel || "z-image-turbo",
+        model: modelToUse,
         size: "1024x1024",
-        response_format: "b64_json",
+        response_format: "b64_json" as const,
+      };
+
+      log("Sending protagonist portrait request", {
+        provider: imageSettings.imageProvider,
+        model: requestParams.model,
+        portraitMode: imageSettings.portraitMode,
+        size: requestParams.size,
+        promptLength: requestParams.prompt.length,
       });
+
+      const response = await provider.generateImage(requestParams);
 
       if (response.images.length === 0 || !response.images[0].b64_json) {
         throw new Error("No image data returned");
       }
 
+      log("Protagonist portrait generated successfully", {
+        protagonistName: protagonist.name,
+        model: response.model,
+      });
+
       this.protagonistPortrait = `data:image/png;base64,${response.images[0].b64_json}`;
     } catch (error) {
-      this.portraitError =
-        error instanceof Error ? error.message : "Failed to generate portrait";
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate portrait";
+      log("Protagonist portrait generation failed", {
+        protagonistName: protagonist.name,
+        error: errorMessage,
+      });
+      this.portraitError = errorMessage;
     } finally {
       this.isGeneratingProtagonistPortrait = false;
     }
@@ -95,8 +147,19 @@ export class ImageStore {
     if (!char || this.generatingPortraitName !== null) return;
 
     const imageSettings = settings.systemServicesSettings.imageGeneration;
-    if (!imageSettings.nanoGptApiKey) {
-      this.portraitError = "NanoGPT API key required for portrait generation";
+
+    log("Starting supporting character portrait generation", {
+      characterName: charName,
+      provider: imageSettings.imageProvider,
+      portraitMode: imageSettings.portraitMode,
+      model: imageSettings.portraitMode ? imageSettings.portraitModel : imageSettings.model,
+      styleId: imageSettings.styleId,
+    });
+
+    if (!ImageGenerationService.hasRequiredCredentials()) {
+      const providerName = ImageGenerationService.getProviderDisplayName();
+      log("Missing credentials for provider", { provider: providerName });
+      this.portraitError = `${providerName} API key required for portrait generation`;
       return;
     }
 
@@ -104,6 +167,7 @@ export class ImageStore {
       this.supportingCharacterVisualDescriptors[charName] || ""
     ).trim();
     if (!descriptors) {
+      log("No visual descriptors provided for character", { characterName: charName });
       this.portraitError = `Add appearance descriptors for ${char.name} first`;
       return;
     }
@@ -143,25 +207,63 @@ export class ImageStore {
         },
       );
 
-      const provider = new NanoGPTImageProvider(imageSettings.nanoGptApiKey);
-      const response = await provider.generateImage({
+      // Determine which model to use based on portraitMode
+      const modelToUse = imageSettings.portraitMode
+        ? imageSettings.portraitModel
+        : imageSettings.model;
+
+      if (!modelToUse) {
+        log("No model configured for portrait generation");
+        this.portraitError = "No image model configured. Please select a model in Settings > Images.";
+        return;
+      }
+
+      if (!imageSettings.imageProvider) {
+        log("No image provider configured");
+        this.portraitError = "No image provider configured. Please select a provider in Settings > Images.";
+        return;
+      }
+
+      const provider = ImageGenerationService.createProviderInstance();
+
+      const requestParams = {
         prompt: portraitPrompt,
-        model: imageSettings.portraitModel || "z-image-turbo",
+        model: modelToUse,
         size: "1024x1024",
-        response_format: "b64_json",
+        response_format: "b64_json" as const,
+      };
+
+      log("Sending supporting character portrait request", {
+        characterName: charName,
+        provider: imageSettings.imageProvider,
+        model: requestParams.model,
+        portraitMode: imageSettings.portraitMode,
+        size: requestParams.size,
+        promptLength: requestParams.prompt.length,
       });
+
+      const response = await provider.generateImage(requestParams);
 
       if (response.images.length === 0 || !response.images[0].b64_json) {
         throw new Error("No image data returned");
       }
+
+      log("Supporting character portrait generated successfully", {
+        characterName: charName,
+        model: response.model,
+      });
 
       this.supportingCharacterPortraits[charName] =
         `data:image/png;base64,${response.images[0].b64_json}`;
       // Force update for reactive map
       this.supportingCharacterPortraits = { ...this.supportingCharacterPortraits };
     } catch (error) {
-      this.portraitError =
-        error instanceof Error ? error.message : "Failed to generate portrait";
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate portrait";
+      log("Supporting character portrait generation failed", {
+        characterName: charName,
+        error: errorMessage,
+      });
+      this.portraitError = errorMessage;
     } finally {
       this.generatingPortraitName = null;
     }

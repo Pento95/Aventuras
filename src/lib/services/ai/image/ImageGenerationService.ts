@@ -96,12 +96,44 @@ export class ImageGenerationService {
   }
 
   /**
+   * Check if API key is available for the currently selected provider
+   */
+  static hasRequiredCredentials(): boolean {
+    const imageSettings = settings.systemServicesSettings.imageGeneration;
+    const provider = imageSettings.imageProvider ?? 'nanogpt';
+
+    switch (provider) {
+      case 'chutes':
+        return !!imageSettings.chutesApiKey;
+      case 'pollinations':
+        return true; // Works without API key
+      default:
+        return !!imageSettings.nanoGptApiKey;
+    }
+  }
+
+  /**
+   * Get display name for the currently selected provider (for user-friendly error messages)
+   */
+  static getProviderDisplayName(): string {
+    const provider = settings.systemServicesSettings.imageGeneration.imageProvider ?? 'nanogpt';
+    switch (provider) {
+      case 'chutes':
+        return 'Chutes';
+      case 'pollinations':
+        return 'Pollinations.ai';
+      default:
+        return 'NanoGPT';
+    }
+  }
+
+  /**
    * Create the appropriate image provider based on settings
    */
-  private static createProviderInstance(provider?: string, apiKey?: string): ImageProvider {
+  static createProviderInstance(provider?: string, apiKey?: string): ImageProvider {
     const imageSettings = settings.systemServicesSettings.imageGeneration;
     const effectiveProvider = provider ?? imageSettings.imageProvider ?? 'nanogpt';
-    const effectiveApiKey = apiKey ?? this.getApiKey();
+    const effectiveApiKey = apiKey ?? ImageGenerationService.getApiKey();
 
     if (effectiveProvider === 'chutes') {
       return new ChutesImageProvider(effectiveApiKey, DEBUG.enabled);
@@ -508,15 +540,35 @@ export class ImageGenerationService {
         throw new Error('No API key configured for portrait generation');
       }
 
+      // Determine which model to use based on portraitMode
+      const modelToUse = imageSettings.portraitMode
+        ? imageSettings.portraitModel
+        : imageSettings.model;
+
+      if (!modelToUse) {
+        log('No model configured for portrait generation', { characterName });
+        return null;
+      }
+
+      if (!imageSettings.imageProvider) {
+        log('No image provider configured', { characterName });
+        return null;
+      }
+
       // Create provider if needed
       const provider = this.getOrCreateImageProvider();
 
-      log('Generating portrait', { characterName, model: imageSettings.portraitModel, provider: imageSettings.imageProvider ?? 'nanogpt' });
+      log('Generating portrait', {
+        characterName,
+        model: modelToUse,
+        portraitMode: imageSettings.portraitMode,
+        provider: imageSettings.imageProvider
+      });
 
-      // Generate portrait using portrait model
+      // Generate portrait using the appropriate model
       const response = await provider.generateImage({
         prompt,
-        model: imageSettings.portraitModel || 'z-image-turbo',
+        model: modelToUse,
         size: '1024x1024',
         response_format: 'b64_json',
       });

@@ -6,7 +6,7 @@
   import { aiService } from "$lib/services/ai";
   import { database } from "$lib/services/database";
   import { SimpleActivationTracker } from "$lib/services/ai/retrieval/EntryRetrievalService";
-  import type { ImageGenerationContext } from "$lib/services/ai/image/ImageGenerationService";
+  import { ImageGenerationService, type ImageGenerationContext } from "$lib/services/ai/image/ImageGenerationService";
   import type { TimelineFillResult } from "$lib/services/ai/retrieval/TimelineFillService";
   import { TranslationService } from "$lib/services/ai/utils/TranslationService";
   import {
@@ -2286,8 +2286,8 @@
         disabled={manualImageGenDisabled}
         class="btn btn-secondary text-xs flex items-center gap-1.5"
         title={manualImageGenDisabled &&
-        !settings.systemServicesSettings.imageGeneration.nanoGptApiKey
-          ? "Add a NanoGPT API key in Settings to generate images"
+        !ImageGenerationService.hasRequiredCredentials()
+          ? `Add a ${ImageGenerationService.getProviderDisplayName()} API key in Settings to generate images`
           : "Generate images for the last narration"}
       >
         <ImageIcon class="h-4 w-4" />
