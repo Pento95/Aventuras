@@ -56,11 +56,129 @@
   let editPortrait = $state<string | null>(null);
   let expandedPortrait = $state<{ src: string; name: string } | null>(null);
   let savedToVaultId = $state<string | null>(null);
+  let expandedDescriptors = $state<Set<string>>(new Set());
+
+  function toggleDescriptorExpand(characterId: string) {
+    const newSet = new Set(expandedDescriptors);
+    if (newSet.has(characterId)) {
+      newSet.delete(characterId);
+    } else {
+      newSet.add(characterId);
+    }
+    expandedDescriptors = newSet;
+  }
+
   const currentProtagonistName = $derived.by(
     () =>
       story.characters.find((c) => c.relationship === "self")?.name ??
       "current",
   );
+
+  // Color palette for descriptor categories (cycles through these)
+  const CATEGORY_COLORS = [
+    "text-amber-600 dark:text-amber-400",
+    "text-purple-600 dark:text-purple-400",
+    "text-sky-600 dark:text-sky-400",
+    "text-emerald-600 dark:text-emerald-400",
+    "text-rose-600 dark:text-rose-400",
+    "text-orange-600 dark:text-orange-400",
+    "text-teal-600 dark:text-teal-400",
+    "text-indigo-600 dark:text-indigo-400",
+  ];
+
+  interface CategorizedDescriptor {
+    label: string;
+    color: string;
+    values: string[];
+  }
+
+  // Parse visual descriptors into categorized groups
+  // Dynamically detects any "Category:" prefix pattern
+  function parseVisualDescriptors(descriptors: string[]): CategorizedDescriptor[] {
+    const categoryMap = new Map<string, string[]>();
+    const categoryOrder: string[] = [];
+
+    // Pattern to find any category prefix (word(s) followed by colon)
+    const categoryPattern = /([A-Za-z][A-Za-z\s]*):\s*/g;
+
+    // Track current category for items without prefixes
+    let currentCategory = "";
+
+    for (const desc of descriptors) {
+      // Find all category matches in this string
+      const matches = [...desc.matchAll(categoryPattern)];
+
+      if (matches.length > 1) {
+        // Multiple categories in one string
+        for (let i = 0; i < matches.length; i++) {
+          const match = matches[i];
+          const label = match[1].trim();
+          const startIndex = match.index! + match[0].length;
+          const endIndex =
+            i < matches.length - 1 ? matches[i + 1].index! : desc.length;
+
+          const content = desc
+            .slice(startIndex, endIndex)
+            .replace(/,\s*$/, "")
+            .trim();
+
+          const values = content
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean);
+
+          if (!categoryMap.has(label)) {
+            categoryOrder.push(label);
+          }
+          const existing = categoryMap.get(label) ?? [];
+          categoryMap.set(label, [...existing, ...values]);
+          currentCategory = label;
+        }
+      } else if (matches.length === 1) {
+        // Single category prefix
+        const match = matches[0];
+        const label = match[1].trim();
+        const content = desc.slice(match.index! + match[0].length).trim();
+
+        const values = content
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
+
+        if (!categoryMap.has(label)) {
+          categoryOrder.push(label);
+        }
+        const existing = categoryMap.get(label) ?? [];
+        categoryMap.set(label, [...existing, ...values]);
+        currentCategory = label;
+      } else {
+        // No category prefix - belongs to the most recent category or uncategorized
+        const values = desc
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
+
+        if (currentCategory) {
+          const existing = categoryMap.get(currentCategory) ?? [];
+          categoryMap.set(currentCategory, [...existing, ...values]);
+        } else {
+          // No category yet, store as uncategorized
+          if (!categoryMap.has("")) {
+            categoryOrder.push("");
+          }
+          const existing = categoryMap.get("") ?? [];
+          categoryMap.set("", [...existing, ...values]);
+        }
+      }
+    }
+
+    // Convert to array with colors assigned sequentially
+    return categoryOrder.map((label, index) => ({
+      label,
+      color: label ? CATEGORY_COLORS[index % CATEGORY_COLORS.length] : "text-muted-foreground",
+      values: categoryMap.get(label)!,
+    }));
+  }
 
   async function addCharacter() {
     if (!newName.trim()) return;
@@ -769,8 +887,12 @@
 
             <!-- Expanded Details -->
             {#if !isCollapsed && hasDetails(character)}
+              {@const hasTraits = character.traits.length > 0 || (character.translatedTraits && character.translatedTraits.length > 0)}
+              {@const hasDescriptors = character.visualDescriptors.length > 0 || (character.translatedVisualDescriptors && character.translatedVisualDescriptors.length > 0)}
+              {@const parsedDescriptors = hasDescriptors ? parseVisualDescriptors(character.translatedVisualDescriptors ?? character.visualDescriptors) : []}
+              {@const descriptorsExpanded = expandedDescriptors.has(character.id)}
               <div class="mt-2 flex flex-col gap-1.5">
-                {#if character.traits.length > 0 || (character.translatedTraits && character.translatedTraits.length > 0)}
+                {#if hasTraits}
                   <div class="flex flex-wrap gap-1">
                     {#each character.translatedTraits ?? character.traits as trait}
                       <span
@@ -781,15 +903,37 @@
                     {/each}
                   </div>
                 {/if}
-                {#if character.visualDescriptors.length > 0 || (character.translatedVisualDescriptors && character.translatedVisualDescriptors.length > 0)}
-                  <div class="flex flex-wrap gap-1">
-                    {#each character.translatedVisualDescriptors ?? character.visualDescriptors as descriptor}
-                      <span
-                        class="inline-flex items-center rounded-sm bg-pink-500/10 px-1.5 py-0.5 text-[10px] font-medium text-pink-600 dark:text-pink-400"
-                      >
-                        {descriptor}
-                      </span>
-                    {/each}
+                {#if hasDescriptors}
+                  <div class="text-[10px]">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1 text-muted-foreground hover:text-foreground mb-1"
+                      onclick={() => toggleDescriptorExpand(character.id)}
+                    >
+                      <ChevronDown
+                        class={cn(
+                          "h-3 w-3 transition-transform",
+                          descriptorsExpanded && "rotate-180",
+                        )}
+                      />
+                      <span class="font-medium">Appearance</span>
+                    </button>
+                    {#if descriptorsExpanded}
+                      <div class="flex flex-col gap-1">
+                        {#each parsedDescriptors as { label, color, values }}
+                          <div class="flex flex-col gap-0.5 rounded bg-muted/40 px-2 py-1">
+                            {#if label}
+                              <span class={cn("font-medium", color)}>{label}</span>
+                            {/if}
+                            <span class="text-muted-foreground">{values.join(", ")}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <p class="text-muted-foreground pl-4 line-clamp-2">
+                        {parsedDescriptors.map(d => d.values.slice(0, 2).join(", ")).join(" · ")}
+                      </p>
+                    {/if}
                   </div>
                 {/if}
                 {#if character.description || character.translatedDescription}
