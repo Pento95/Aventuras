@@ -455,6 +455,9 @@ class StoryStore {
     // Load persisted activation data for this story (stickiness tracking)
     await ui.loadActivationData(storyId);
 
+    // Clear stale lorebook retrieval from previous story to prevent cross-story contamination
+    ui.setLastLorebookRetrieval(null);
+
     // Set current story ID for retry backup tracking
     ui.setCurrentRetryStoryId(storyId);
 
