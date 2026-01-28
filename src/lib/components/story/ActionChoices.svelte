@@ -92,7 +92,7 @@
           class="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0"
         />
         <span
-          class="text-foreground text-sm sm:text-base text-left wrap-break-word whitespace-normal line-clamp-2"
+          class="text-foreground text-sm sm:text-base text-left wrap-break-word whitespace-normal"
         >
           {choice.text}
         </span>
