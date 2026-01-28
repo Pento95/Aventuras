@@ -10,6 +10,7 @@ import { buildExtraBody } from '../core/requestOverrides';
 import { promptService } from '$lib/services/prompts';
 import { tryParseJsonWithHealing } from '../utils/jsonHealing';
 import { createLogger } from '../core/config';
+import { FandomService } from '../../fandom';
 
 // Event types for progress updates
 export type StreamEvent =
@@ -207,6 +208,78 @@ const INTERACTIVE_LOREBOOK_TOOLS: Tool[] = [
       },
     },
   },
+  // Fandom wiki integration tools
+  {
+    type: 'function',
+    function: {
+      name: 'search_fandom',
+      description: 'Search for articles on a Fandom wiki. Use this to find characters, locations, items, or lore from established fictional universes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          wiki: {
+            type: 'string',
+            description: 'The wiki name/subdomain (e.g., "harrypotter", "starwars", "lotr", "elderscrolls"). This is the part before .fandom.com in the URL.',
+          },
+          query: {
+            type: 'string',
+            description: 'The search query (e.g., "Hermione Granger", "Mos Eisley", "Daedric Princes")',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of results to return (default: 10, max: 50)',
+          },
+        },
+        required: ['wiki', 'query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_fandom_article_info',
+      description: 'Get the structure of a Fandom wiki article including its sections and categories. Use this to understand what information is available before fetching specific sections.',
+      parameters: {
+        type: 'object',
+        properties: {
+          wiki: {
+            type: 'string',
+            description: 'The wiki name/subdomain (e.g., "harrypotter", "starwars")',
+          },
+          title: {
+            type: 'string',
+            description: 'The exact article title from search results',
+          },
+        },
+        required: ['wiki', 'title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'fetch_fandom_section',
+      description: 'Fetch the content of a specific section from a Fandom wiki article. Use section index "0" for the introduction/lead section, or use section indices from get_fandom_article_info.',
+      parameters: {
+        type: 'object',
+        properties: {
+          wiki: {
+            type: 'string',
+            description: 'The wiki name/subdomain (e.g., "harrypotter", "starwars")',
+          },
+          title: {
+            type: 'string',
+            description: 'The exact article title',
+          },
+          section_index: {
+            type: 'string',
+            description: 'The section index to fetch. Use "0" for the introduction, or indices from get_fandom_article_info (e.g., "1", "2", "3").',
+          },
+        },
+        required: ['wiki', 'title', 'section_index'],
+      },
+    },
+  },
 ];
 
 // Types for pending changes and chat messages
@@ -256,10 +329,12 @@ export class InteractiveLorebookService {
   private lorebookName: string = '';
   private initialized: boolean = false;
   private presetId: string;
+  private fandomService: FandomService;
 
   constructor(provider: OpenAIProvider, presetId: string) {
     this.provider = provider;
     this.presetId = presetId;
+    this.fandomService = new FandomService();
   }
 
   /**
@@ -332,13 +407,13 @@ export class InteractiveLorebookService {
     let responseContent = '';
     let reasoning: string | undefined;
 
-    const MAX_ITERATIONS = 10;
     let iterations = 0;
     let continueLoop = true;
 
     try {
       // Agentic loop - continue until AI responds without tool calls
-      while (continueLoop && iterations < MAX_ITERATIONS) {
+      // No iteration cap for interactive lorebook mode to allow complex multi-step operations
+      while (continueLoop) {
         iterations++;
         log(`Agentic loop iteration ${iterations}`);
 
@@ -382,7 +457,7 @@ export class InteractiveLorebookService {
 
           // Process each tool call
           for (const toolCall of response.tool_calls) {
-            const { result, pendingChange, parsedArgs } = this.processToolCall(toolCall, entries);
+            const { result, pendingChange, parsedArgs } = await this.processToolCall(toolCall, entries);
 
             // Track tool call for display
             const toolCallDisplay: ToolCallDisplay = {
@@ -424,12 +499,6 @@ export class InteractiveLorebookService {
           continueLoop = false;
         }
       }
-
-      if (iterations >= MAX_ITERATIONS) {
-        log('Warning: Max iterations reached in agentic loop');
-        responseContent = responseContent || 'I apologize, but I seem to be having trouble completing my response. Please try again.';
-      }
-
     } catch (error) {
       log('Error in agentic loop:', error);
       throw error;
@@ -469,7 +538,6 @@ export class InteractiveLorebookService {
     // Track all pending changes across iterations (for final result)
     const allPendingChanges: PendingChange[] = [];
 
-    const MAX_ITERATIONS = 10;
     let iterations = 0;
     let continueLoop = true;
     let finalResponseContent = '';
@@ -477,7 +545,8 @@ export class InteractiveLorebookService {
 
     try {
       // Agentic loop - continue until AI responds without tool calls
-      while (continueLoop && iterations < MAX_ITERATIONS) {
+      // No iteration cap for interactive lorebook mode to allow complex multi-step operations
+      while (continueLoop) {
         // Check for abort before each iteration
         if (signal?.aborted) {
           log('Request aborted by user');
@@ -534,7 +603,7 @@ export class InteractiveLorebookService {
 
           // Process each tool call
           for (const toolCall of response.tool_calls) {
-            const { result, pendingChange, parsedArgs } = this.processToolCall(toolCall, entries);
+            const { result, pendingChange, parsedArgs } = await this.processToolCall(toolCall, entries);
 
             // Yield tool start event
             yield { type: 'tool_start', toolCallId: toolCall.id, toolName: toolCall.function.name, args: parsedArgs };
@@ -594,12 +663,6 @@ export class InteractiveLorebookService {
           continueLoop = false;
         }
       }
-
-      if (iterations >= MAX_ITERATIONS) {
-        log('Warning: Max iterations reached in agentic loop');
-        finalResponseContent = finalResponseContent || 'I apologize, but I seem to be having trouble completing my response. Please try again.';
-      }
-
     } catch (error) {
       log('Error in agentic loop:', error);
       yield { type: 'error', error: error instanceof Error ? error.message : 'Unknown error' };
@@ -620,11 +683,12 @@ export class InteractiveLorebookService {
 
   /**
    * Process a tool call and return the result + any pending change.
+   * This method is async to support Fandom wiki API calls.
    */
-  private processToolCall(
+  private async processToolCall(
     toolCall: ToolCall,
     entries: VaultLorebookEntry[]
-  ): { result: string; pendingChange?: PendingChange; parsedArgs: Record<string, unknown> } {
+  ): Promise<{ result: string; pendingChange?: PendingChange; parsedArgs: Record<string, unknown> }> {
     const args = tryParseJsonWithHealing<Record<string, unknown>>(toolCall.function.arguments);
     if (!args) {
       log('Failed to parse tool call arguments:', toolCall.function.arguments);
@@ -642,7 +706,7 @@ export class InteractiveLorebookService {
           ? entries.filter(e => e.type === typeFilter)
           : entries;
 
-        const result = filtered.map((e, i) => ({
+        const result = filtered.map((e) => ({
           index: entries.indexOf(e),
           name: e.name,
           type: e.type,
@@ -831,6 +895,109 @@ export class InteractiveLorebookService {
           pendingChange,
           parsedArgs: args,
         };
+      }
+
+      // Fandom wiki integration tools
+      case 'search_fandom': {
+        const wiki = args.wiki as string;
+        const query = args.query as string;
+        const limit = (args.limit as number) ?? 10;
+
+        if (!wiki || !query) {
+          return {
+            result: JSON.stringify({ error: 'Both wiki and query are required' }),
+            parsedArgs: args,
+          };
+        }
+
+        try {
+          const results = await this.fandomService.search(wiki, query, limit);
+          return {
+            result: JSON.stringify({
+              wiki,
+              query,
+              resultCount: results.length,
+              results: results.map(r => ({
+                title: r.title,
+                snippet: r.snippet,
+                wordcount: r.wordcount,
+              })),
+            }),
+            parsedArgs: args,
+          };
+        } catch (error) {
+          return {
+            result: JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to search wiki' }),
+            parsedArgs: args,
+          };
+        }
+      }
+
+      case 'get_fandom_article_info': {
+        const wiki = args.wiki as string;
+        const title = args.title as string;
+
+        if (!wiki || !title) {
+          return {
+            result: JSON.stringify({ error: 'Both wiki and title are required' }),
+            parsedArgs: args,
+          };
+        }
+
+        try {
+          const info = await this.fandomService.getArticleInfo(wiki, title);
+          return {
+            result: JSON.stringify({
+              title: info.title,
+              pageid: info.pageid,
+              categories: info.categories.slice(0, 10), // Limit categories for context size
+              sections: info.sections.map(s => ({
+                index: s.index,
+                title: s.line,
+                level: s.level,
+              })),
+              hint: 'Use fetch_fandom_section with section_index="0" to get the introduction, or use other section indices to fetch specific sections.',
+            }),
+            parsedArgs: args,
+          };
+        } catch (error) {
+          return {
+            result: JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to get article info' }),
+            parsedArgs: args,
+          };
+        }
+      }
+
+      case 'fetch_fandom_section': {
+        const wiki = args.wiki as string;
+        const title = args.title as string;
+        const sectionIndex = args.section_index as string;
+
+        if (!wiki || !title || sectionIndex === undefined) {
+          return {
+            result: JSON.stringify({ error: 'wiki, title, and section_index are all required' }),
+            parsedArgs: args,
+          };
+        }
+
+        try {
+          const section = await this.fandomService.getSection(wiki, title, sectionIndex);
+          return {
+            result: JSON.stringify({
+              title: section.title,
+              sectionTitle: section.sectionTitle,
+              sectionIndex: section.sectionIndex,
+              content: section.content,
+              hint: 'You can now use this information to create_entry for the lorebook. Synthesize the wiki content into a concise, useful lorebook entry.',
+            }),
+            parsedArgs: args,
+          };
+        } catch (error) {
+          return {
+            result: JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to fetch section' }),
+            parsedArgs: args,
+          };
+        }
       }
 
       default:
