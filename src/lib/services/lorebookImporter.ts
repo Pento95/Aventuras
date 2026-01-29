@@ -2,14 +2,15 @@
  * Lorebook Importer Service
  *
  * Imports lorebooks from various formats (primarily SillyTavern) into Aventura's Entry system.
+ *
+ * STATUS: PARTIALLY STUBBED - Awaiting SDK migration
+ * - Parsing and basic type inference: WORKING
+ * - LLM classification: STUBBED
  */
 
 import type { Entry, EntryType, EntryInjectionMode, EntryCreator } from '$lib/types';
-import { OpenAIProvider } from './ai/core/OpenAIProvider';
 import { settings } from '$lib/stores/settings.svelte';
-import { buildExtraBody } from '$lib/services/ai/core/requestOverrides';
-import { promptService, type PromptContext, type StoryMode } from '$lib/services/prompts';
-import { tryParseJsonWithHealing } from './ai/utils/jsonHealing';
+import type { StoryMode } from '$lib/services/prompts';
 import { createLogger } from './ai/core/config';
 
 const log = createLogger('LorebookImporter');
@@ -26,14 +27,14 @@ interface SillyTavernEntry {
   uid: number;
   key: string[];
   keysecondary: string[];
-  comment: string;           // Entry name/title
-  content: string;           // Entry description
-  constant: boolean;         // Always inject
+  comment: string;
+  content: string;
+  constant: boolean;
   vectorized: boolean;
-  selective: boolean;        // Use keyword matching
-  selectiveLogic: number;    // 0 = AND, 1 = OR, etc.
+  selective: boolean;
+  selectiveLogic: number;
   addMemo: boolean;
-  order: number;             // Priority
+  order: number;
   position: number;
   disable: boolean;
   ignoreBudget: boolean;
@@ -69,7 +70,6 @@ interface SillyTavernEntry {
 
 interface SillyTavernLorebook {
   entries: Record<string, SillyTavernEntry>;
-  // Optional metadata fields
   name?: string;
   description?: string;
   scan_depth?: number;
@@ -107,7 +107,6 @@ export interface LorebookImportResult {
 
 // ===== Entry Type Inference =====
 
-// Keywords that suggest entry types
 const TYPE_KEYWORDS: Record<EntryType, string[]> = {
   character: [
     'character', 'person', 'npc', 'protagonist', 'antagonist', 'villain', 'hero',
@@ -137,13 +136,9 @@ const TYPE_KEYWORDS: Record<EntryType, string[]> = {
   ],
 };
 
-/**
- * Infer the entry type from content and name.
- */
 function inferEntryType(name: string, content: string): EntryType {
   const textToAnalyze = `${name} ${content}`.toLowerCase();
 
-  // Count keyword matches for each type
   const scores: Record<EntryType, number> = {
     character: 0,
     location: 0,
@@ -161,8 +156,7 @@ function inferEntryType(name: string, content: string): EntryType {
     }
   }
 
-  // Find the type with the highest score
-  let maxType: EntryType = 'concept'; // Default
+  let maxType: EntryType = 'concept';
   let maxScore = 0;
 
   for (const [type, score] of Object.entries(scores) as [EntryType, number][]) {
@@ -176,11 +170,8 @@ function inferEntryType(name: string, content: string): EntryType {
 }
 
 /**
- * LLM-based entry type classification using Agent Profiles system.
- * Classifies entries in batches with concurrent requests for faster processing.
- * @param entries - The entries to classify
- * @param onProgress - Optional progress callback
- * @param mode - Story mode (affects prompt context defaults)
+ * LLM-based entry type classification.
+ * @throws Error - LLM classification not implemented during SDK migration
  */
 export async function classifyEntriesWithLLM(
   entries: ImportedEntry[],
@@ -189,140 +180,16 @@ export async function classifyEntriesWithLLM(
 ): Promise<ImportedEntry[]> {
   if (entries.length === 0) return entries;
 
-  // Get preset configuration from Agent Profiles system
-  const presetId = settings.getServicePresetId('lorebookClassifier');
-  const preset = settings.getPresetConfig(presetId, 'Lorebook Classifier');
+  log('LLM classification not implemented - using keyword-based inference');
 
-  // Get lorebook-specific settings (batchSize, maxConcurrent)
-  const specificSettings = settings.serviceSpecificSettings.lorebookClassifier;
-
-  // Get API settings from the profile assigned to this preset (null = use main narrative profile)
-  const profileId = preset.profileId ?? settings.apiSettings.mainNarrativeProfileId;
-  const apiSettings = settings.getApiSettingsForProfile(profileId);
-
-  if (!apiSettings.openaiApiKey) {
-    log('No API key available, skipping LLM classification');
-    return entries;
+  // Return entries as-is with keyword-based types (already set during parsing)
+  if (onProgress) {
+    onProgress(entries.length, entries.length);
   }
 
-  const provider = new OpenAIProvider(apiSettings);
-  const BATCH_SIZE = specificSettings.batchSize;
-  const MAX_CONCURRENT = specificSettings.maxConcurrent;
-  const classifiedEntries = [...entries];
-
-  log('Starting LLM classification', {
-    totalEntries: entries.length,
-    batchSize: BATCH_SIZE,
-    maxConcurrent: MAX_CONCURRENT,
-    model: preset.model,
-  });
-
-  // Create batches
-  const batches: { startIndex: number; batch: ImportedEntry[]; batchIndex: number }[] = [];
-  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    batches.push({
-      startIndex: i,
-      batch: entries.slice(i, i + BATCH_SIZE),
-      batchIndex: Math.floor(i / BATCH_SIZE),
-    });
-  }
-
-  // Process a single batch
-  async function processBatch(batchInfo: { startIndex: number; batch: ImportedEntry[]; batchIndex: number }): Promise<void> {
-    const { startIndex, batch, batchIndex } = batchInfo;
-
-    try {
-      const entriesForPrompt = batch.map((entry, idx) => ({
-        index: startIndex + idx,
-        name: entry.name,
-        content: entry.description,
-        keywords: entry.keywords,
-      }));
-
-      const promptContext: PromptContext = {
-        mode,
-        pov: mode === 'creative-writing' ? 'third' : 'second',
-        tense: mode === 'creative-writing' ? 'past' : 'present',
-        protagonistName: 'the protagonist',
-      };
-
-      const systemPrompt = promptService.renderPrompt('lorebook-classifier', promptContext);
-      const userPrompt = promptService.renderUserPrompt('lorebook-classifier', promptContext, {
-        entriesJson: JSON.stringify(entriesForPrompt, null, 2),
-      });
-
-      const response = await provider.generateResponse({
-        model: preset.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: preset.temperature,
-        maxTokens: preset.maxTokens,
-        extraBody: buildExtraBody({
-          manualMode: settings.advancedRequestSettings.manualMode,
-          manualBody: preset.manualBody,
-          reasoningEffort: preset.reasoningEffort,
-          providerOnly: preset.providerOnly,
-        }),
-      });
-
-      // Parse the response
-      const classifications = tryParseJsonWithHealing<{ index: number; type: string }[]>(response.content);
-      if (!classifications) {
-        log('Failed to parse LLM classification response');
-      } else {
-        for (const classification of classifications) {
-          const validTypes: EntryType[] = ['character', 'location', 'item', 'faction', 'concept', 'event'];
-          if (
-            typeof classification.index === 'number' &&
-            classification.index >= 0 &&
-            classification.index < classifiedEntries.length &&
-            validTypes.includes(classification.type as EntryType)
-          ) {
-            classifiedEntries[classification.index] = {
-              ...classifiedEntries[classification.index],
-              type: classification.type as EntryType,
-            };
-          }
-        }
-
-        log(`Batch ${batchIndex + 1} classified`, {
-          batchSize: batch.length,
-          classified: classifications.length
-        });
-      }
-    } catch (error) {
-      log('LLM classification batch failed:', error);
-    }
-  }
-
-  // Process batches with concurrency limit
-  let completedCount = 0;
-  const totalBatches = batches.length;
-
-  // Process in groups of MAX_CONCURRENT
-  for (let i = 0; i < batches.length; i += MAX_CONCURRENT) {
-    const concurrentBatches = batches.slice(i, i + MAX_CONCURRENT);
-    await Promise.all(concurrentBatches.map(processBatch));
-
-    completedCount += concurrentBatches.length;
-    const entriesCompleted = Math.min(completedCount * BATCH_SIZE, entries.length);
-
-    if (onProgress) {
-      onProgress(entriesCompleted, entries.length);
-    }
-
-    log(`Completed ${completedCount}/${totalBatches} batches`);
-  }
-
-  log('LLM classification complete');
-  return classifiedEntries;
+  return entries;
 }
 
-/**
- * Determine injection mode from SillyTavern entry flags.
- */
 function determineInjectionMode(entry: SillyTavernEntry): EntryInjectionMode {
   if (entry.disable) {
     return 'never';
@@ -333,13 +200,9 @@ function determineInjectionMode(entry: SillyTavernEntry): EntryInjectionMode {
   if (entry.selective && entry.key.length > 0) {
     return 'keyword';
   }
-  // Default to relevant (LLM-based selection)
   return 'relevant';
 }
 
-/**
- * Parse a SillyTavern lorebook JSON string.
- */
 export function parseSillyTavernLorebook(jsonString: string): LorebookImportResult {
   const result: LorebookImportResult = {
     success: false,
@@ -357,7 +220,6 @@ export function parseSillyTavernLorebook(jsonString: string): LorebookImportResu
   try {
     const data = JSON.parse(jsonString);
 
-    // Validate basic structure
     if (!data.entries || typeof data.entries !== 'object') {
       result.errors.push('Invalid lorebook format: missing "entries" object');
       return result;
@@ -375,21 +237,18 @@ export function parseSillyTavernLorebook(jsonString: string): LorebookImportResu
 
     for (const entry of entries) {
       try {
-        // Skip if no content AND no comment (empty entry)
         if (!entry.content?.trim() && !entry.comment?.trim()) {
           result.warnings.push(`Skipped empty entry (UID: ${entry.uid})`);
           result.metadata.skippedEntries++;
           continue;
         }
 
-        // Use comment as name, fallback to first keyword or generate one
         let name = entry.comment?.trim();
         if (!name) {
           name = entry.key?.[0] || `Entry ${entry.uid}`;
           result.warnings.push(`Entry UID ${entry.uid} has no name, using "${name}"`);
         }
 
-        // Combine primary and secondary keywords
         const keywords = [
           ...(entry.key || []),
           ...(entry.keysecondary || []),
@@ -435,15 +294,10 @@ export function parseSillyTavernLorebook(jsonString: string): LorebookImportResu
   return result;
 }
 
-/**
- * Check if the data is in Aventura JSON format.
- * Aventura format is an array of Entry objects with specific fields.
- */
 function isAventuraFormat(data: unknown): data is Entry[] {
   if (!Array.isArray(data)) return false;
   if (data.length === 0) return false;
 
-  // Check if first item looks like an Entry object
   const first = data[0];
   return (
     typeof first === 'object' &&
@@ -458,9 +312,6 @@ function isAventuraFormat(data: unknown): data is Entry[] {
   );
 }
 
-/**
- * Parse an Aventura JSON lorebook (array of Entry objects).
- */
 export function parseAventuraLorebook(jsonString: string): LorebookImportResult {
   const result: LorebookImportResult = {
     success: false,
@@ -490,7 +341,6 @@ export function parseAventuraLorebook(jsonString: string): LorebookImportResult 
 
     for (const entry of data) {
       try {
-        // Validate required fields
         if (!entry.name?.trim()) {
           result.warnings.push(`Skipped entry with no name`);
           result.metadata.skippedEntries++;
@@ -503,7 +353,6 @@ export function parseAventuraLorebook(jsonString: string): LorebookImportResult 
           continue;
         }
 
-        // Convert Entry to ImportedEntry format for consistency
         const importedEntry: ImportedEntry = {
           name: entry.name,
           type: entry.type || 'concept',
@@ -513,7 +362,7 @@ export function parseAventuraLorebook(jsonString: string): LorebookImportResult 
           priority: entry.injection?.priority ?? 100,
           disabled: entry.injection?.mode === 'never',
           group: null,
-          originalData: entry as unknown as SillyTavernEntry, // Store original for full restoration
+          originalData: entry as unknown as SillyTavernEntry,
         };
 
         result.entries.push(importedEntry);
@@ -544,27 +393,20 @@ export function parseAventuraLorebook(jsonString: string): LorebookImportResult 
   return result;
 }
 
-/**
- * Auto-detect format and parse a lorebook JSON string.
- * Supports both Aventura and SillyTavern formats.
- */
 export function parseLorebook(jsonString: string): LorebookImportResult {
   try {
     const data = JSON.parse(jsonString);
 
-    // Check for Aventura format (array of Entry objects)
     if (isAventuraFormat(data)) {
       log('Detected Aventura format');
       return parseAventuraLorebook(jsonString);
     }
 
-    // Check for SillyTavern format (object with entries property)
     if (data && typeof data === 'object' && 'entries' in data) {
       log('Detected SillyTavern format');
       return parseSillyTavernLorebook(jsonString);
     }
 
-    // Unknown format
     return {
       success: false,
       entries: [],
@@ -595,11 +437,6 @@ export function parseLorebook(jsonString: string): LorebookImportResult {
   }
 }
 
-/**
- * Convert imported entries to Aventura Entry format.
- * For Aventura imports, restores original Entry data when available.
- * Note: Entries are created without storyId - this should be set when saving to database.
- */
 export function convertToEntries(
   importedEntries: ImportedEntry[],
   createdBy: EntryCreator = 'import'
@@ -607,11 +444,9 @@ export function convertToEntries(
   const now = Date.now();
 
   return importedEntries.map(imported => {
-    // Check if originalData is a full Aventura Entry (has state and injection.mode)
     const original = imported.originalData as unknown as Partial<Entry>;
     const isAventuraEntry = original && 'state' in original && 'injection' in original && original.injection?.mode;
 
-    // For Aventura imports, restore the full entry data
     if (isAventuraEntry && original.state) {
       return {
         name: original.name || imported.name,
@@ -634,14 +469,12 @@ export function convertToEntries(
         createdAt: now,
         updatedAt: now,
         loreManagementBlacklisted: original.loreManagementBlacklisted || false,
-        branchId: null, // Imported entries start on main branch
+        branchId: null,
       };
     }
 
-    // For SillyTavern imports, create new state based on type
     const baseState = { type: imported.type };
 
-    // Create type-specific state
     let state: Entry['state'];
     switch (imported.type) {
       case 'character':
@@ -717,7 +550,7 @@ export function convertToEntries(
       type: imported.type,
       description: imported.description,
       hiddenInfo: null,
-      aliases: imported.keywords.slice(0, 5), // Use first 5 keywords as aliases
+      aliases: imported.keywords.slice(0, 5),
       state,
       adventureState: null,
       creativeState: null,
@@ -733,15 +566,11 @@ export function convertToEntries(
       createdAt: now,
       updatedAt: now,
       loreManagementBlacklisted: false,
-      branchId: null, // Imported entries start on main branch
+      branchId: null,
     };
   });
 }
 
-/**
- * Parse a lorebook file and return a preview of the entries.
- * This is used in the wizard to show users what will be imported.
- */
 export function previewLorebook(jsonString: string): {
   success: boolean;
   preview: {
@@ -770,9 +599,6 @@ export function previewLorebook(jsonString: string): {
   };
 }
 
-/**
- * Group imported entries by their type for display.
- */
 export function groupEntriesByType(entries: ImportedEntry[]): Record<EntryType, ImportedEntry[]> {
   const grouped: Record<EntryType, ImportedEntry[]> = {
     character: [],
@@ -790,9 +616,6 @@ export function groupEntriesByType(entries: ImportedEntry[]): Record<EntryType, 
   return grouped;
 }
 
-/**
- * Get summary statistics for imported entries.
- */
 export function getImportSummary(entries: ImportedEntry[]): {
   total: number;
   byType: Record<EntryType, number>;

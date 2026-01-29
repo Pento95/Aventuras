@@ -1,7 +1,7 @@
 <script lang="ts">
   import MainNarrative from "../MainNarrative.svelte";
   import AgentProfiles from "../AgentProfiles.svelte";
-  import type { ProviderInfo } from "$lib/services/ai/types";
+  import type { ProviderInfo } from "$lib/services/ai/core/types";
 
   interface Props {
     providerOptions: ProviderInfo[];

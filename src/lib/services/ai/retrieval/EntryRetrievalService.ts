@@ -5,15 +5,15 @@
  * Implements three tiers of entry injection for lorebook entries:
  * - Tier 1: Always inject (injection.mode === 'always', or state-based like isPresent)
  * - Tier 2: Keyword matching (match name/aliases/keywords against user input & recent story)
- * - Tier 3: LLM selection (remaining entries sent to LLM to decide relevance)
+ * - Tier 3: LLM selection (STUBBED - awaiting SDK migration)
  */
 
 import type { Entry, EntryType, StoryEntry, Character, Location, Item, GenerationPreset } from '$lib/types';
-import type { OpenAIProvider } from '../core/OpenAIProvider';
 import { settings } from '$lib/stores/settings.svelte';
 import { buildExtraBody } from '../core/requestOverrides';
-import { promptService, type PromptContext } from '$lib/services/prompts';
-import { tryParseJsonWithHealing } from '../utils/jsonHealing';
+import { createLogger, getContextConfig } from '../core/config';
+
+const log = createLogger('EntryRetrieval');
 
 /**
  * Live world state - the actively tracked entities that should always be Tier 1
@@ -51,10 +51,6 @@ export interface ActivationTracker {
   /** Get current story position */
   currentPosition: number;
 }
-
-import { AI_CONFIG, createLogger, getContextConfig } from '../core/config';
-
-const log = createLogger('EntryRetrieval');
 
 export interface EntryRetrievalConfig {
   /** Maximum entries to include from Tier 3 (0 = unlimited) */
@@ -118,13 +114,16 @@ export interface EntryRetrievalResult {
   contextBlock: string;
 }
 
+/**
+ * Service that retrieves relevant lorebook entries using tiered injection.
+ * NOTE: Tier 3 (LLM selection) has been stubbed during SDK migration.
+ *       Tier 1 and Tier 2 work without AI.
+ */
 export class EntryRetrievalService {
-  private provider: OpenAIProvider | null;
   private config: EntryRetrievalConfig;
   private presetId: string;
 
-  constructor(provider: OpenAIProvider | null, config: Partial<EntryRetrievalConfig> = {}, presetId: string = 'classification') {
-    this.provider = provider;
+  constructor(config: Partial<EntryRetrievalConfig> = {}, presetId: string = 'classification') {
     this.presetId = presetId;
     this.config = { ...DEFAULT_ENTRY_RETRIEVAL_CONFIG, ...config };
     const maxWords = Number.isFinite(this.config.maxWordsPerEntry) ? this.config.maxWordsPerEntry : 0;
@@ -154,7 +153,7 @@ export class EntryRetrievalService {
    *   - Lorebook entries with injection.mode === 'always'
    *   - "Sticky" entries (recently activated via Tier 2/3, duration based on type)
    * Tier 2: Keyword matched (name/aliases/keywords match user input or recent story)
-   * Tier 3: LLM selection (remaining entries evaluated by LLM for relevance)
+   * Tier 3: LLM selection (STUBBED - awaiting SDK migration)
    */
   async getRelevantEntries(
     entries: Entry[],
@@ -204,24 +203,26 @@ export class EntryRetrievalService {
     const remainingEntries = candidateEntries.filter(e => !tier1And2Ids.has(e.id));
     log('Remaining entries for Tier 3 LLM:', remainingEntries.length);
 
-    // Tier 3: LLM selection for remaining entries
+    // Tier 3: LLM selection - STUBBED (awaiting SDK migration)
     let tier3: RetrievedEntry[] = [];
 
-    if (this.config.enableLLMSelection && remainingEntries.length > 0 && this.provider) {
-      log('Sending remaining entries to LLM for selection:', remainingEntries.length);
-      tier3 = await this.getLLMSelectedEntries(remainingEntries, userInput, recentStoryEntries, signal);
-      log('Tier 3 entries (LLM selected):', tier3.length, tier3.map(e => e.entry.name));
+    if (this.config.enableLLMSelection && remainingEntries.length > 0) {
+      log('Tier 3 LLM selection SKIPPED - awaiting SDK migration', {
+        remainingEntries: remainingEntries.length,
+      });
+      // tier3 = await this.getLLMSelectedEntries(...) - STUBBED
     }
 
-    // Record activations for Tier 2 and Tier 3 entries (for stickiness tracking)
+    // Record activations for Tier 2 entries (for stickiness tracking)
+    // Note: Tier 3 activations would also be recorded here once SDK migration is complete
     if (activationTracker) {
-      for (const retrieved of [...tier2, ...tier3]) {
+      for (const retrieved of tier2) {
         // Don't record activations for live entities (they have synthetic IDs)
         if (!retrieved.entry.id.startsWith('live-')) {
           activationTracker.recordActivation(retrieved.entry.id, currentPosition);
         }
       }
-      log('Recorded activations for', tier2.length + tier3.length, 'entries at position', currentPosition);
+      log('Recorded activations for', tier2.length, 'entries at position', currentPosition);
     }
 
     // Combine and sort by priority
@@ -396,10 +397,6 @@ export class EntryRetrievalService {
       }
 
       // Check stickiness (recently activated entries stay in Tier 1)
-      // This is the primary mechanism for keeping relevant entries in context:
-      // - Entries are first selected via Tier 2 (keyword) or Tier 3 (LLM)
-      // - Once selected, they become "sticky" and stay in Tier 1 for N turns based on type
-      // - This avoids the problem of timestamp-based checks promoting all newly imported entries
       if (!shouldInclude && activationTracker && currentPosition !== undefined) {
         const lastActivation = activationTracker.getLastActivation(entry.id);
         if (lastActivation !== null) {
@@ -541,118 +538,16 @@ export class EntryRetrievalService {
     };
   }
 
-  /**
-   * Tier 3: LLM-based selection for entries not matched by Tier 1 or Tier 2.
-   * Evaluates remaining entries for contextual relevance.
-   */
+  /* COMMENTED OUT - Tier 3 LLM selection awaiting SDK migration:
   private async getLLMSelectedEntries(
     availableEntries: Entry[],
     userInput: string,
     recentStoryEntries: StoryEntry[],
     signal?: AbortSignal
   ): Promise<RetrievedEntry[]> {
-    if (!this.provider || availableEntries.length === 0) return [];
-
-    // Build context for LLM - show more of the recent story
-    const contextConfig = getContextConfig();
-    const recentContent = recentStoryEntries
-      .slice(-contextConfig.recentEntriesForRetrieval)
-      .map(e => {
-        const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
-        return `${prefix}: ${e.content}`;
-      })
-      .join('\n\n');
-
-    // Build numbered entry list (simple 1, 2, 3...)
-    const entryList = availableEntries
-      .map((e, i) => {
-        const description = e.description ? this.truncateEntryText(e.description) : '';
-        const desc = description ? `: ${description}` : '';
-        return `${i + 1}. [${e.type.toUpperCase()}] "${e.name}"${desc}`;
-      })
-      .join('\n');
-
-    // Build prompt context for the centralized system
-    const promptContext: PromptContext = {
-      mode: 'adventure',
-      pov: 'second',
-      tense: 'present',
-      protagonistName: 'the protagonist',
-    };
-
-    // Use centralized prompt system - include both system and user prompts
-    const systemPrompt = promptService.renderPrompt('tier3-entry-selection', promptContext);
-    const userPrompt = promptService.renderUserPrompt('tier3-entry-selection', promptContext, {
-      recentContent: recentContent || '(Story just started)',
-      userInput,
-      entrySummaries: entryList,
-    });
-
-    try {
-      const response = await this.provider.generateResponse({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        model: this.preset.model,
-        temperature: this.preset.temperature,
-        maxTokens: this.preset.maxTokens,
-        extraBody: this.extraBody,
-        signal,
-      });
-
-      log('LLM selection response:', response.content);
-
-      // Parse response - look for JSON array of numbers
-      let selectedIndices: number[] = [];
-
-      // Try to parse with JSON healing
-      const parsed = tryParseJsonWithHealing<number[]>(response.content);
-      if (parsed && Array.isArray(parsed)) {
-        selectedIndices = parsed.filter(n => typeof n === 'number' && n > 0);
-      }
-
-      // Fallback: extract any numbers from the response
-      if (selectedIndices.length === 0) {
-        const numMatches = response.content.matchAll(/\b(\d+)\b/g);
-        for (const match of numMatches) {
-          const num = parseInt(match[1], 10);
-          if (num > 0 && num <= availableEntries.length) {
-            selectedIndices.push(num);
-          }
-        }
-        // Deduplicate
-        selectedIndices = [...new Set(selectedIndices)];
-      }
-
-      log('Selected indices:', selectedIndices);
-
-      // Map indices back to entries (1-indexed)
-      const result: RetrievedEntry[] = [];
-
-      for (const idx of selectedIndices) {
-        const entry = availableEntries[idx - 1];
-        if (entry) {
-          result.push({
-            entry,
-            tier: 3,
-            priority: 50 + entry.injection.priority,
-            matchReason: 'contextually relevant',
-          });
-        }
-      }
-
-      // Apply max limit if configured (0 = unlimited)
-      if (this.config.maxTier3Entries > 0) {
-        return result.slice(0, this.config.maxTier3Entries);
-      }
-
-      return result;
-    } catch (error) {
-      log('LLM selection failed:', error);
-      return [];
-    }
+    // ... original Tier 3 implementation ...
   }
+  */
 
   /**
    * Check if text matches in search content.
@@ -789,12 +684,11 @@ export async function getRelevantEntries(
   entries: Entry[],
   userInput: string,
   recentStoryEntries: StoryEntry[],
-  provider?: OpenAIProvider,
   liveState?: LiveWorldState,
   activationTracker?: ActivationTracker
 ): Promise<EntryRetrievalResult> {
   const config = getEntryRetrievalConfigFromSettings();
-  const service = new EntryRetrievalService(provider || null, config);
+  const service = new EntryRetrievalService(config);
   return service.getRelevantEntries(entries, userInput, recentStoryEntries, liveState, activationTracker);
 }
 

@@ -5,8 +5,7 @@
   } from "$lib/stores/settings.svelte";
   import { Cpu, RefreshCw } from "lucide-svelte";
   import ProviderOnlySelector from "./ProviderOnlySelector.svelte";
-  import type { ProviderInfo } from "$lib/services/ai/types";
-  import { OpenAIProvider } from "$lib/services/ai/openrouter";
+  import type { ProviderInfo } from "$lib/services/ai/core/types";
   import type { ReasoningEffort } from "$lib/types";
   import { cn } from "$lib/utils/cn";
 
@@ -94,32 +93,10 @@
     modelError = null;
 
     try {
-      const apiSettings = settings.getApiSettingsForProfile(profile.id);
-      const provider = new OpenAIProvider(apiSettings);
-      const fetchedModels = await provider.listModels();
-
-      const filteredModelIds = fetchedModels
-        .filter((m) => {
-          const id = m.id.toLowerCase();
-          if (
-            id.includes("embedding") ||
-            id.includes("vision-only") ||
-            id.includes("tts") ||
-            id.includes("whisper")
-          ) {
-            return false;
-          }
-          return true;
-        })
-        .map((m) => m.id);
-
-      await settings.updateProfile(profile.id, {
-        fetchedModels: filteredModelIds,
-      });
-
-      console.log(
-        `[MainNarrative] Fetched ${filteredModelIds.length} models to profile`,
-      );
+      // Model fetching is not implemented during SDK migration
+      // Users should manually enter model names or use preset models
+      modelError = "Model fetching not available - awaiting SDK migration. Please enter model names manually.";
+      console.log("[MainNarrative] Model fetching not implemented");
     } catch (error) {
       console.error("[MainNarrative] Failed to fetch models:", error);
       modelError =

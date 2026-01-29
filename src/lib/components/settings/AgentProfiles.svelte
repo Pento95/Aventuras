@@ -1,7 +1,7 @@
 <script lang="ts">
   import { settings } from "$lib/stores/settings.svelte";
   import type { GenerationPreset } from "$lib/types";
-  import type { ProviderInfo } from "$lib/services/ai/types";
+  import type { ProviderInfo } from "$lib/services/ai/core/types";
   import { ask } from "@tauri-apps/plugin-dialog";
   import {
     X,

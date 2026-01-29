@@ -4,7 +4,7 @@
  * Designed for extensibility to support multiple TTS providers.
  */
 
-import { OPENROUTER_API_URL } from "../core/OpenAIProvider";
+import { OPENROUTER_API_URL } from '../sdk/providers/defaults';
 import type { APIProfile } from "$lib/types";
 import { corsFetch } from "$lib/services/discovery/utils";
 

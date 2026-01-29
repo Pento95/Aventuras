@@ -1,8 +1,8 @@
 <script lang="ts">
   import { ui } from "$lib/stores/ui.svelte";
   import { settings } from "$lib/stores/settings.svelte";
-  import type { ProviderInfo } from "$lib/services/ai/types";
-  import { DEFAULT_PROVIDERS } from "$lib/services/ai/providers";
+  import type { ProviderInfo } from "$lib/services/ai/core/types";
+  import { DEFAULT_PROVIDERS } from "$lib/services/ai/core/providers";
   import {
     Settings2,
     RotateCcw,

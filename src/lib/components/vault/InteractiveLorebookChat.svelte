@@ -7,7 +7,6 @@
     type ToolCallDisplay,
     type StreamEvent
   } from '$lib/services/ai/lorebook/InteractiveLorebookService';
-  import { OpenAIProvider } from '$lib/services/ai/core/OpenAIProvider';
   import { settings } from '$lib/stores/settings.svelte';
   import DiffView from './DiffView.svelte';
   import {
@@ -71,23 +70,16 @@
   function initializeService() {
     try {
       const presetId = settings.getServicePresetId('interactiveLorebook');
-      const preset = settings.getPresetConfig(presetId, 'Interactive Lorebook');
-      const apiSettings = settings.getApiSettingsForProfile(preset.profileId);
 
-      if (!apiSettings.openaiApiKey) {
-        error = 'No API key configured. Please set up an API key in settings.';
-        return;
-      }
-
-      const provider = new OpenAIProvider(apiSettings);
-      service = new InteractiveLorebookService(provider, presetId);
+      service = new InteractiveLorebookService(presetId);
       service.initialize(lorebook.name || 'New Lorebook', entries.length);
 
       // Add initial greeting message (display-only, not sent to API)
+      // Note: The actual AI functionality is stubbed during SDK migration
       messages = [{
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: `Hello! I'm here to help you create and organize entries for "${lorebook.name || 'your new lorebook'}". You can describe characters, locations, items, or any other lore elements you'd like to add, and I'll help you structure them as lorebook entries.\n\nWhat would you like to create?`,
+        content: `Hello! I'm here to help you create and organize entries for "${lorebook.name || 'your new lorebook'}".\n\n**Note:** Interactive lorebook chat is currently unavailable during SDK migration. Please use manual entry creation for now.`,
         timestamp: Date.now(),
         isGreeting: true,
       }];

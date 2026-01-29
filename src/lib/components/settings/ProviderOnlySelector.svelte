@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ProviderInfo } from '$lib/services/ai/types';
+  import type { ProviderInfo } from '$lib/services/ai/core/types';
   import { Button } from "$lib/components/ui/button";
   import * as Command from "$lib/components/ui/command";
   import * as Popover from "$lib/components/ui/popover";

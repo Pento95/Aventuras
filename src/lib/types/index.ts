@@ -616,11 +616,30 @@ export interface UIState {
   settingsModalOpen: boolean;
 }
 
+// Provider types matching Vercel AI SDK providers
+export type ProviderType =
+  | 'openrouter'   // @openrouter/ai-sdk-provider
+  | 'openai'       // @ai-sdk/openai
+  | 'anthropic'    // @ai-sdk/anthropic
+  | 'google';      // @ai-sdk/google (future)
+
+// Provider capabilities (for UI/logic decisions)
+export interface ProviderCapabilities {
+  supportsStructuredOutput: boolean;
+  supportsToolCalling: boolean;
+  supportsStreaming: boolean;
+  supportsReasoning: boolean;
+  reasoningFormat: 'effort' | 'reasoningEffort' | 'thinking' | null;
+  hasProviderRouting: boolean;
+  supportsCustomBaseUrl: boolean;
+}
+
 // API Profile for saving OpenAI-compatible endpoint configurations
 export interface APIProfile {
   id: string;                 // UUID
   name: string;               // User-friendly name (e.g., "Local LLM", "OpenRouter")
-  baseUrl: string;            // API base URL (e.g., "https://openrouter.ai/api/v1")
+  providerType: ProviderType; // Explicit provider selection (determines SDK provider)
+  baseUrl?: string;           // Optional custom base URL (works for all providers)
   apiKey: string;             // API key for this endpoint
   customModels: string[];     // Manually added models
   fetchedModels: string[];    // Auto-fetched from /models endpoint

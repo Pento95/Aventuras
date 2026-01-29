@@ -6,11 +6,11 @@
  * 2. Create pending EmbeddedImage records
  * 3. Queue async image generation for each scene
  *
- * Runs in parallel with other post-narrative tasks (suggestions, action choices).
+ * STATUS: STUBBED - Awaiting SDK migration for scene analysis
+ * Image providers (NanoGPT, Chutes, Pollinations) work without SDK.
  */
 
 import type { EmbeddedImage, Character } from '$lib/types';
-import type { OpenAIProvider } from '../core/OpenAIProvider';
 import type { ImageProvider, ImageModelInfo } from './providers/base';
 import { ImagePromptService, type ImagePromptContext, type ImageableScene } from './ImagePromptService';
 import { NanoGPTImageProvider } from './providers/NanoGPTProvider';
@@ -34,22 +34,23 @@ export interface ImageGenerationContext {
   userAction: string;
   presentCharacters: Character[];
   currentLocation?: string;
-  /** Full chat history for context (untruncated) */
   chatHistory?: string;
-  /** Activated lorebook entries context */
   lorebookContext?: string;
-  /** Translated narrative (if translation enabled) - used for sourceText matching */
   translatedNarrative?: string;
-  /** Target language for translation (e.g., "Spanish", "Japanese") */
   translationLanguage?: string;
 }
 
+/**
+ * Service that coordinates image generation for narratives.
+ * NOTE: Scene analysis (identifyScenes) is stubbed during SDK migration.
+ *       Direct image generation methods still work.
+ */
 export class ImageGenerationService {
   private promptService: ImagePromptService;
   private imageProvider: ImageProvider | null = null;
   private presetId: string;
 
-  constructor(provider: OpenAIProvider, presetId: string) {
+  constructor(presetId: string) {
     this.presetId = presetId;
     const preset = settings.getPresetConfig(presetId);
     const promptSettings = {
@@ -58,7 +59,7 @@ export class ImageGenerationService {
       maxTokens: preset.maxTokens,
       reasoningEffort: preset.reasoningEffort,
     };
-    this.promptService = new ImagePromptService(provider, promptSettings);
+    this.promptService = new ImagePromptService(promptSettings);
   }
 
   /**
@@ -68,13 +69,11 @@ export class ImageGenerationService {
     const imageSettings = settings.systemServicesSettings.imageGeneration;
     if (!imageSettings?.enabled) return false;
 
-    // Check if we have the appropriate API key for the selected provider
     const provider = imageSettings.imageProvider ?? 'nanogpt';
     if (provider === 'chutes') {
       return !!imageSettings.chutesApiKey;
     }
     if (provider === 'pollinations') {
-      // Pollinations works without API key (key is optional for premium features)
       return true;
     }
     return !!imageSettings.nanoGptApiKey;
@@ -106,14 +105,14 @@ export class ImageGenerationService {
       case 'chutes':
         return !!imageSettings.chutesApiKey;
       case 'pollinations':
-        return true; // Works without API key
+        return true;
       default:
         return !!imageSettings.nanoGptApiKey;
     }
   }
 
   /**
-   * Get display name for the currently selected provider (for user-friendly error messages)
+   * Get display name for the currently selected provider
    */
   static getProviderDisplayName(): string {
     const provider = settings.systemServicesSettings.imageGeneration.imageProvider ?? 'nanogpt';
@@ -182,19 +181,16 @@ export class ImageGenerationService {
 
   /**
    * Generate images for a narrative response.
-   * This is the main entry point called after narrative generation completes.
-   *
-   * @returns Promise that resolves when all images are queued (not completed)
+   * @throws Error - Scene analysis not implemented during SDK migration
    */
   async generateForNarrative(context: ImageGenerationContext): Promise<void> {
     const imageSettings = settings.systemServicesSettings.imageGeneration;
 
-    // Determine effective mode with backward compatibility
+    // Determine effective mode
     const storySettings = story.currentStory?.settings;
     let mode = storySettings?.imageGenerationMode;
 
     if (!mode) {
-      // Legacy fallback
       if (storySettings?.inlineImageMode) mode = 'inline';
       else if (imageSettings?.enabled) mode = 'auto';
       else mode = 'none';
@@ -205,12 +201,14 @@ export class ImageGenerationService {
       return;
     }
 
-    // Check if portrait mode is enabled
-    const portraitMode = imageSettings.portraitMode ?? false;
+    // Emit analysis started, then immediately emit failure
+    emitImageAnalysisStarted(context.entryId);
+    emitImageAnalysisFailed(context.entryId, 'Scene analysis not implemented - awaiting SDK migration');
 
-    // Build list of character names that have/don't have portraits
-    // IMPORTANT: Check the CURRENT story.characters state, not the context snapshot,
-    // to accurately reflect portraits (including user-provided ones) and handle retries correctly
+    throw new Error('ImageGenerationService.generateForNarrative() not implemented - scene analysis awaiting SDK migration');
+
+    /* COMMENTED OUT - Original implementation for reference:
+    const portraitMode = imageSettings.portraitMode ?? false;
     const presentCharacterNames = context.presentCharacters.map(c => c.name.toLowerCase());
     const charactersWithPortraits = story.characters
       .filter(c => presentCharacterNames.includes(c.name.toLowerCase()) && c.portrait)
@@ -219,161 +217,27 @@ export class ImageGenerationService {
       .filter(c => presentCharacterNames.includes(c.name.toLowerCase()) && !c.portrait)
       .map(c => c.name);
 
-    log('Starting image generation', {
-      storyId: context.storyId,
-      entryId: context.entryId,
-      narrativeLength: context.narrativeResponse.length,
-      presentCharacters: context.presentCharacters.length,
-      portraitMode,
-      charactersWithPortraits,
-      charactersWithoutPortraits,
-    });
+    const stylePrompt = this.getStylePrompt(imageSettings.styleId);
+    const characterDescriptors = context.presentCharacters
+      .filter(c => c.visualDescriptors && c.visualDescriptors.length > 0)
+      .map(c => ({ name: c.name, visualDescriptors: c.visualDescriptors ?? [] }));
 
-    try {
-      // Get the selected style template
-      const stylePrompt = this.getStylePrompt(imageSettings.styleId);
+    const promptContext: ImagePromptContext = { ... };
 
-      // Build character descriptors for the prompt service
-      const characterDescriptors = context.presentCharacters
-        .filter(c => c.visualDescriptors && c.visualDescriptors.length > 0)
-        .map(c => ({
-          name: c.name,
-          visualDescriptors: c.visualDescriptors ?? [],
-        }));
+    emitImageAnalysisStarted(context.entryId);
+    const scenes = await this.promptService.identifyScenes(promptContext);
+    emitImageAnalysisComplete(context.entryId, scenes.length, 0);
 
-      // Get max images setting (0 = unlimited)
-      const maxImages = imageSettings.maxImagesPerMessage ?? 3;
-
-      // Build prompt context
-      const promptContext: ImagePromptContext = {
-        narrativeResponse: context.narrativeResponse,
-        userAction: context.userAction,
-        presentCharacters: characterDescriptors,
-        currentLocation: context.currentLocation,
-        stylePrompt,
-        maxImages,
-        chatHistory: context.chatHistory,
-        lorebookContext: context.lorebookContext,
-        charactersWithPortraits,
-        charactersWithoutPortraits,
-        portraitMode,
-        translatedNarrative: context.translatedNarrative,
-        translationLanguage: context.translationLanguage,
-      };
-
-      // Emit event: starting image analysis
-      emitImageAnalysisStarted(context.entryId);
-
-      // Identify imageable scenes
-      const scenes = await this.promptService.identifyScenes(promptContext);
-
-      log('Scenes identified', {
-        count: scenes.length,
-        types: scenes.map(s => s.sceneType),
-        characters: scenes.map(s => s.characters),
-      });
-
-      // Separate portrait generation scenes from regular scenes FIRST
-      // Portraits don't count towards the image limit
-      const allPortraitScenes = scenes.filter(s => s.generatePortrait && s.characters.length > 0);
-      const allRegularScenes = scenes.filter(s => !s.generatePortrait);
-
-      // Apply max images limit only to regular scenes (portraits are unlimited)
-      const portraitScenes = allPortraitScenes.sort((a, b) => b.priority - a.priority);
-      const regularScenes = allRegularScenes.length === 0
-        ? []
-        : maxImages === 0
-          ? allRegularScenes.sort((a, b) => b.priority - a.priority)
-          : allRegularScenes.sort((a, b) => b.priority - a.priority).slice(0, maxImages);
-
-      // Emit event: analysis complete
-      emitImageAnalysisComplete(context.entryId, regularScenes.length, portraitScenes.length);
-
-      if (portraitScenes.length === 0 && regularScenes.length === 0) {
-        log('No imageable scenes found');
-        return;
-      }
-
-      log('Processing scenes', {
-        totalIdentified: scenes.length,
-        portraits: portraitScenes.length,
-        regularSelected: regularScenes.length,
-        maxRegularAllowed: maxImages,
-      });
-
-      // PHASE 1: Generate ALL portraits in PARALLEL first
-      // This allows the LLM to request both a portrait AND a scene for the same character
-      const updatedCharacters = [...context.presentCharacters];
-      const updatedCharactersWithPortraits = [...charactersWithPortraits];
-
-      if (portraitScenes.length > 0) {
-        log('Generating portraits in parallel', { count: portraitScenes.length });
-
-        // Launch all portrait generations in parallel
-        const portraitPromises = portraitScenes.map(scene => {
-          const characterName = scene.characters[0];
-          return this.generateCharacterPortrait(
-            context.storyId,
-            characterName,
-            scene.prompt,
-            imageSettings,
-            updatedCharacters
-          ).then(result => ({ characterName, result }));
-        });
-
-        // Wait for ALL portraits to complete before proceeding
-        const portraitResults = await Promise.all(portraitPromises);
-
-        // Update our local tracking for all successfully generated portraits
-        for (const { characterName, result } of portraitResults) {
-          if (result) {
-            // Update the character in our local array
-            const charIndex = updatedCharacters.findIndex(
-              c => c.name.toLowerCase() === characterName.toLowerCase()
-            );
-            if (charIndex !== -1) {
-              updatedCharacters[charIndex] = {
-                ...updatedCharacters[charIndex],
-                portrait: result.portraitDataUrl,
-              };
-              // Add to characters with portraits list
-              if (!updatedCharactersWithPortraits.includes(updatedCharacters[charIndex].name)) {
-                updatedCharactersWithPortraits.push(updatedCharacters[charIndex].name);
-              }
-            }
-            log('Portrait ready for immediate use', { character: characterName });
-          }
-        }
-
-        log('All portraits generated', {
-          requested: portraitScenes.length,
-          successful: portraitResults.filter(r => r.result).length
-        });
-      }
-
-      // PHASE 2: Generate regular scene images (can now use freshly generated portraits)
-      for (const scene of regularScenes) {
-        await this.queueImageGeneration(
-          context.storyId,
-          context.entryId,
-          scene,
-          imageSettings,
-          updatedCharacters  // Use updated characters with new portraits
-        );
-      }
-
-      log('All images queued');
-    } catch (error) {
-      log('Image generation failed', error);
-      // Don't throw - image generation failure shouldn't break the main flow
+    for (const scene of scenes) {
+      await this.queueImageGeneration(context.storyId, context.entryId, scene, imageSettings, context.presentCharacters);
     }
+    */
   }
 
   /**
    * Get the style prompt for the selected style ID
    */
   private getStylePrompt(styleId: string): string {
-    // Try to get from prompt service (user may have customized)
     try {
       const promptContext = {
         mode: 'adventure' as const,
@@ -389,7 +253,6 @@ export class ImageGenerationService {
       // Template not found, use fallback
     }
 
-    // Fallback to default styles
     const defaultStyles: Record<string, string> = {
       'image-style-soft-anime': DEFAULT_FALLBACK_STYLE_PROMPT,
       'image-style-semi-realistic': `Semi-realistic anime art with refined, detailed rendering. Realistic proportions with anime influence. Detailed hair strands, subtle skin tones, fabric folds. Naturalistic lighting with clear direction and soft falloff. Cinematic composition with depth of field. Rich, slightly desaturated colors with intentional color grading. Painterly quality with polished edges. Atmospheric and grounded mood.`,
@@ -400,212 +263,8 @@ export class ImageGenerationService {
   }
 
   /**
-   * Queue image generation for a single scene
-   */
-  private async queueImageGeneration(
-    storyId: string,
-    entryId: string,
-    scene: ImageableScene,
-    imageSettings: typeof settings.systemServicesSettings.imageGeneration,
-    presentCharacters: Character[]
-  ): Promise<void> {
-    // Handle portrait generation for new characters
-    const primaryCharacter = scene.characters[0];
-    if (scene.generatePortrait && primaryCharacter) {
-      log('Generating portrait for new character', { character: primaryCharacter });
-      await this.generateCharacterPortrait(
-        storyId,
-        primaryCharacter,
-        scene.prompt,
-        imageSettings,
-        presentCharacters
-      );
-      return;
-    }
-
-    const imageId = crypto.randomUUID();
-
-    // Determine if we should use reference images
-    let referenceImageUrls: string[] | undefined;
-    let modelToUse = imageSettings.model;
-
-    // If portrait mode is enabled and scene has characters, look for their portraits
-    const sceneCharacters = scene.characters;
-
-    if (imageSettings.portraitMode && sceneCharacters.length > 0) {
-      // Collect portraits for all characters in the scene (up to 3)
-      const portraitUrls: string[] = [];
-      const charactersWithPortraits: string[] = [];
-      const charactersWithoutPortraits: string[] = [];
-
-      for (const charName of sceneCharacters.slice(0, 3)) {
-        const character = presentCharacters.find(
-          c => c.name.toLowerCase() === charName.toLowerCase()
-        );
-
-        const portraitUrl = normalizeImageDataUrl(character?.portrait);
-        if (portraitUrl) {
-          portraitUrls.push(portraitUrl);
-          charactersWithPortraits.push(charName);
-        } else {
-          charactersWithoutPortraits.push(charName);
-        }
-      }
-
-      if (charactersWithoutPortraits.length > 0) {
-        // In portrait mode, skip scene if ANY character is missing a portrait
-        log('Skipping scene - not all characters have portraits in portrait mode', {
-          characters: sceneCharacters,
-          withPortraits: charactersWithPortraits,
-          missingPortraits: charactersWithoutPortraits,
-        });
-        return;
-      }
-
-      if (portraitUrls.length > 0) {
-        // Use reference model and attach all portraits
-        modelToUse = imageSettings.referenceModel || 'qwen-image';
-        referenceImageUrls = portraitUrls;
-        log('Using character portraits as reference', {
-          characters: charactersWithPortraits,
-          count: portraitUrls.length,
-          model: modelToUse,
-        });
-      } else {
-        // In portrait mode, skip scene images if no characters have portraits
-        log('Skipping scene - no characters have portraits in portrait mode', {
-          characters: sceneCharacters,
-        });
-        return;
-      }
-    }
-
-    // Create pending record in database
-    const embeddedImage: Omit<EmbeddedImage, 'createdAt'> = {
-      id: imageId,
-      storyId,
-      entryId,
-      sourceText: scene.sourceText,
-      prompt: scene.prompt,
-      styleId: imageSettings.styleId,
-      model: modelToUse,
-      imageData: '',
-      width: imageSettings.size === '1024x1024' ? 1024 : 512,
-      height: imageSettings.size === '1024x1024' ? 1024 : 512,
-      status: 'pending',
-    };
-
-    await database.createEmbeddedImage(embeddedImage);
-    log('Created pending image record', { imageId, sourceText: scene.sourceText, model: modelToUse });
-
-    // Emit queued event
-    emitImageQueued(imageId, entryId);
-
-    // Start async generation (fire-and-forget)
-    this.generateImage(imageId, scene.prompt, imageSettings, entryId, modelToUse, referenceImageUrls).catch(error => {
-      log('Async image generation failed', { imageId, error });
-    });
-  }
-
-  /**
-   * Generate a portrait for a character and save it to their profile.
-   * Returns the portrait data if successful, null otherwise.
-   */
-  private async generateCharacterPortrait(
-    storyId: string,
-    characterName: string,
-    prompt: string,
-    imageSettings: typeof settings.systemServicesSettings.imageGeneration,
-    presentCharacters: Character[]
-  ): Promise<{ characterId: string; portraitDataUrl: string } | null> {
-    try {
-      // Find the character
-      const character = presentCharacters.find(
-        c => c.name.toLowerCase() === characterName.toLowerCase()
-      );
-
-      if (!character) {
-        log('Character not found for portrait generation', { characterName });
-        return null;
-      }
-
-      if (character.portrait) {
-        log('Character already has portrait, skipping', { characterName });
-        return null;
-      }
-
-      // Get API key from settings
-      const apiKey = ImageGenerationService.getApiKey();
-      if (!apiKey) {
-        throw new Error('No API key configured for portrait generation');
-      }
-
-      // Determine which model to use based on portraitMode
-      const modelToUse = imageSettings.portraitMode
-        ? imageSettings.portraitModel
-        : imageSettings.model;
-
-      if (!modelToUse) {
-        log('No model configured for portrait generation', { characterName });
-        return null;
-      }
-
-      if (!imageSettings.imageProvider) {
-        log('No image provider configured', { characterName });
-        return null;
-      }
-
-      // Create provider if needed
-      const provider = this.getOrCreateImageProvider();
-
-      log('Generating portrait', {
-        characterName,
-        model: modelToUse,
-        portraitMode: imageSettings.portraitMode,
-        provider: imageSettings.imageProvider
-      });
-
-      // Generate portrait using the appropriate model
-      const response = await provider.generateImage({
-        prompt,
-        model: modelToUse,
-        size: '1024x1024',
-        response_format: 'b64_json',
-      });
-
-      if (response.images.length === 0 || !response.images[0].b64_json) {
-        throw new Error('No image data returned for portrait');
-      }
-
-      const portraitDataUrl = `data:image/png;base64,${response.images[0].b64_json}`;
-
-      // Update character with portrait in database
-      await database.updateCharacter(character.id, {
-        portrait: portraitDataUrl,
-      });
-
-      // Update the story store
-      if (story.currentStory?.id === storyId) {
-        story.characters = story.characters.map(c =>
-          c.id === character.id ? { ...c, portrait: portraitDataUrl } : c
-        );
-      }
-
-      log('Portrait generated and saved', { characterName, characterId: character.id });
-
-      // Return the portrait data so caller can update local state
-      return { characterId: character.id, portraitDataUrl };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      log('Portrait generation failed', { characterName, error: errorMessage });
-      return null;
-    }
-  }
-
-  /**
-   * Centralized image generation logic to avoid duplication.
-   * Used by both initial generation and retry operations.
-   * @private
+   * Centralized image generation logic.
+   * NOTE: This method still works - it doesn't require LLM.
    */
   private static async performImageGeneration(
     imageId: string,
@@ -617,7 +276,6 @@ export class ImageGenerationService {
     referenceImageUrls?: string[]
   ): Promise<void> {
     try {
-      // Generate image
       const response = await provider.generateImage({
         prompt,
         model,
@@ -630,7 +288,6 @@ export class ImageGenerationService {
         throw new Error('No image data returned');
       }
 
-      // Update record with image data
       await database.updateEmbeddedImage(imageId, {
         imageData: response.images[0].b64_json,
         status: 'complete',
@@ -654,8 +311,7 @@ export class ImageGenerationService {
 
   /**
    * Retry image generation for a failed/existing image using CURRENT settings.
-   * This allows the user to change the model/settings and try again.
-   * @public
+   * NOTE: This method still works - it doesn't require LLM.
    */
   static async retryImageGeneration(imageId: string, prompt: string): Promise<void> {
     if (!this.isEnabled()) {
@@ -663,7 +319,6 @@ export class ImageGenerationService {
       return;
     }
 
-    // Get current image record
     const image = await database.getEmbeddedImage(imageId);
     if (!image) {
       log('Cannot retry - image not found', { imageId });
@@ -675,7 +330,6 @@ export class ImageGenerationService {
     const model = imageSettings.model;
     const size = imageSettings.size;
 
-    // Update image record with current settings
     await database.updateEmbeddedImage(imageId, {
       model,
       status: 'generating',
@@ -691,7 +345,6 @@ export class ImageGenerationService {
       size,
     });
 
-    // Create provider and perform generation
     const apiKey = this.getApiKey();
     const imageProvider = this.createProviderInstance(provider, apiKey);
 
@@ -702,42 +355,6 @@ export class ImageGenerationService {
       model,
       size,
       imageProvider
-    );
-  }
-
-
-  /**
-   * Generate a single image (runs asynchronously)
-   */
-  private async generateImage(
-    imageId: string,
-    prompt: string,
-    imageSettings: typeof settings.systemServicesSettings.imageGeneration,
-    entryId: string,
-    modelOverride?: string,
-    referenceImageUrls?: string[]
-  ): Promise<void> {
-    // Update status to generating
-    await database.updateEmbeddedImage(imageId, { status: 'generating' });
-
-    // Get API key from settings
-    const apiKey = ImageGenerationService.getApiKey();
-    if (!apiKey) {
-      throw new Error('No API key configured for image generation');
-    }
-
-    // Create provider if needed
-    const provider = this.getOrCreateImageProvider();
-
-    // Use centralized generation logic
-    await ImageGenerationService.performImageGeneration(
-      imageId,
-      entryId,
-      prompt,
-      modelOverride || imageSettings.model,
-      imageSettings.size,
-      provider,
-      referenceImageUrls
     );
   }
 }

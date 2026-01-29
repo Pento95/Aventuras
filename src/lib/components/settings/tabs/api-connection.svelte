@@ -1,8 +1,9 @@
 <script lang="ts">
   import { settings } from "$lib/stores/settings.svelte";
-  import type { APIProfile } from "$lib/types";
-  import type { ProviderInfo } from "$lib/services/ai/types";
+  import type { APIProfile, ProviderType } from "$lib/types";
+  import type { ProviderInfo } from "$lib/services/ai/core/types";
   import { fetch } from "@tauri-apps/plugin-http";
+  import ProviderTypeSelector from "$lib/components/settings/ProviderTypeSelector.svelte";
   import {
     Plus,
     Edit2,
@@ -49,6 +50,7 @@
 
   // Form state
   let formName = $state("");
+  let formProviderType = $state<ProviderType>("openrouter");
   let formBaseUrl = $state("");
   let formApiKey = $state("");
   let formCustomModels = $state<string[]>([]);
@@ -56,6 +58,14 @@
   let formSetAsDefault = $state(false);
   let formNewModelInput = $state("");
   let formShowApiKey = $state(false);
+
+  // Provider defaults for base URLs
+  const providerDefaults: Record<ProviderType, string> = {
+    openrouter: "https://openrouter.ai/api/v1",
+    openai: "",
+    anthropic: "",
+    google: "",
+  };
 
   // Auto-save debounce state
   let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -65,10 +75,6 @@
   let fetchError = $state<string | null>(null);
   let openCollapsibles = $state<Set<string>>(new Set());
 
-  const urlPresets = [
-    { name: "OpenRouter", url: "https://openrouter.ai/api/v1" },
-    { name: "NanoGPT", url: "https://nano-gpt.com/api/v1" },
-  ];
 
   function startEdit(profile: APIProfile) {
     if (editingProfileId && editingProfileId !== profile.id && !isNewProfile) {
@@ -79,7 +85,8 @@
     editingProfileId = profile.id;
     isNewProfile = false;
     formName = profile.name;
-    formBaseUrl = profile.baseUrl;
+    formProviderType = profile.providerType;
+    formBaseUrl = profile.baseUrl ?? "";
     formApiKey = profile.apiKey;
     formCustomModels = [...profile.customModels];
     formFetchedModels = [...profile.fetchedModels];
@@ -93,7 +100,8 @@
     editingProfileId = crypto.randomUUID();
     isNewProfile = true;
     formName = "";
-    formBaseUrl = settings.apiSettings.openaiApiURL;
+    formProviderType = "openrouter";
+    formBaseUrl = "";
     formApiKey = "";
     formCustomModels = [];
     formFetchedModels = [];
@@ -109,12 +117,13 @@
   }
 
   async function handleSave() {
-    if (!formName.trim() || !formBaseUrl.trim()) return;
+    if (!formName.trim()) return;
 
     const profile: APIProfile = {
       id: editingProfileId!,
       name: formName.trim(),
-      baseUrl: formBaseUrl.trim().replace(/\/$/, ""),
+      providerType: formProviderType,
+      baseUrl: formBaseUrl.trim().replace(/\/$/, "") || undefined,
       apiKey: formApiKey,
       customModels: formCustomModels,
       fetchedModels: formFetchedModels,
@@ -143,8 +152,9 @@
   }
 
   async function handleFetchModels() {
-    if (!formBaseUrl) {
-      fetchError = "Please enter a base URL first";
+    const baseUrl = formBaseUrl || providerDefaults[formProviderType];
+    if (!baseUrl) {
+      fetchError = "No base URL available for this provider";
       return;
     }
 
@@ -153,7 +163,7 @@
     formFetchedModels = [];
 
     try {
-      const modelsUrl = formBaseUrl.replace(/\/$/, "") + "/models";
+      const modelsUrl = baseUrl.replace(/\/$/, "") + "/models";
       const response = await fetch(modelsUrl, {
         headers: formApiKey ? { Authorization: `Bearer ${formApiKey}` } : {},
       });
@@ -200,12 +210,9 @@
   }
 
   function handleSetDefault(profileId: string) {
-    const currentDefault = settings.getDefaultProfileIdForProvider();
-    if (currentDefault === profileId) {
-      if (settings.apiSettings.profiles.length > 1) {
-        settings.setDefaultProfile(undefined);
-      }
-    } else {
+    const currentDefault = settings.apiSettings.defaultProfileId;
+    // Only allow setting a new default, not unsetting
+    if (currentDefault !== profileId) {
       settings.setDefaultProfile(profileId);
     }
   }
@@ -231,7 +238,7 @@
 
   async function autoSaveEdit() {
     if (!editingProfileId || isNewProfile) return;
-    if (!formName.trim() || !formBaseUrl.trim()) return;
+    if (!formName.trim()) return;
 
     const existingProfile = settings.apiSettings.profiles.find(
       (p) => p.id === editingProfileId,
@@ -241,7 +248,8 @@
     const profile: APIProfile = {
       id: editingProfileId,
       name: formName.trim(),
-      baseUrl: formBaseUrl.trim().replace(/\/$/, ""),
+      providerType: formProviderType,
+      baseUrl: formBaseUrl.trim().replace(/\/$/, "") || undefined,
       apiKey: formApiKey,
       customModels: formCustomModels,
       fetchedModels: formFetchedModels,
@@ -262,6 +270,7 @@
   $effect(() => {
     if (editingProfileId && !isNewProfile) {
       formName;
+      formProviderType;
       formBaseUrl;
       formApiKey;
       formCustomModels;
@@ -299,34 +308,31 @@
           <Input
             id="new-name"
             label="Profile Name"
-            placeholder="e.g., OpenRouter, Local LLM"
+            placeholder="e.g., OpenRouter, My Local LLM"
             bind:value={formName}
           />
 
+          <ProviderTypeSelector
+            value={formProviderType}
+            onchange={(v) => {
+              formProviderType = v;
+              formBaseUrl = "";
+              formFetchedModels = [];
+              fetchError = null;
+            }}
+          />
+
           <div class="space-y-2">
-            <Label for="new-url">Base URL</Label>
-            <div class="flex flex-wrap gap-2 mb-2">
-              {#each urlPresets as preset}
-                <Badge
-                  variant={formBaseUrl === preset.url ? "default" : "outline"}
-                  class="cursor-pointer"
-                  onclick={() => {
-                    if (!formName) formName = preset.name;
-                    formBaseUrl = preset.url;
-                    formFetchedModels = [];
-                    fetchError = null;
-                  }}
-                >
-                  {preset.name}
-                </Badge>
-              {/each}
-            </div>
+            <Label for="new-url">Custom Base URL <span class="text-muted-foreground">(optional)</span></Label>
             <Input
               id="new-url"
-              placeholder="https://api.example.com/v1"
+              placeholder={providerDefaults[formProviderType] || "https://api.example.com/v1"}
               bind:value={formBaseUrl}
               class="font-mono text-xs"
             />
+            <p class="text-xs text-muted-foreground">
+              Leave empty to use the default endpoint. Set for Azure, local LLMs, or custom deployments.
+            </p>
           </div>
 
           <div class="space-y-2">
@@ -378,7 +384,7 @@
               <Button
                 variant="outline"
                 onclick={handleFetchModels}
-                disabled={isFetchingModels || !formBaseUrl}
+                disabled={isFetchingModels || (!formBaseUrl && !providerDefaults[formProviderType])}
               >
                 {#if isFetchingModels}
                   <RefreshCw class=" h-4 w-4 animate-spin" />
@@ -496,9 +502,9 @@
                   {/if}
                 </div>
                 <div class="items-center gap-2 mt-0.5 hidden md:flex">
-                  <span class="text-xs text-muted-foreground font-mono truncate"
-                    >{profile.baseUrl}</span
-                  >
+                  <Badge variant="secondary" class="text-xs capitalize">
+                    {profile.providerType}
+                  </Badge>
                   <Badge
                     variant="outline"
                     class="text-xs text-muted-foreground"
@@ -520,27 +526,19 @@
                     Default
                   </Badge>
                 {/if}
-                {#if settings.apiSettings.profiles.length > 1}
+                {#if settings.apiSettings.profiles.length > 1 && profile.id !== settings.apiSettings.defaultProfileId}
                   <Button
-                    variant="ghost"
+                    variant="text"
                     size="icon"
-                    class="w-5 {profile.id ===
-                    settings.getDefaultProfileIdForProvider()
-                      ? 'md:block hidden'
-                      : ''}"
+                    class="w-5"
                     onclick={() => handleSetDefault(profile.id)}
-                    title={profile.id ===
-                    settings.getDefaultProfileIdForProvider()
-                      ? "Remove default"
-                      : "Set as default"}
+                    title="Set as default"
                   >
-                    <Star
-                      class={`h-4 w-4 ${profile.id === settings.getDefaultProfileIdForProvider() ? "fill-primary text-primary" : ""}`}
-                    />
+                    <Star class="h-4 w-4" />
                   </Button>
                 {/if}
                 <Button
-                  variant="ghost"
+                  variant="text"
                   size="icon"
                   class="w-5"
                   onclick={(e) => {
@@ -565,30 +563,26 @@
                   placeholder="Profile name"
                 />
 
+                <ProviderTypeSelector
+                  value={formProviderType}
+                  onchange={(v) => {
+                    formProviderType = v;
+                    formBaseUrl = "";
+                    formFetchedModels = [];
+                    fetchError = null;
+                  }}
+                />
+
                 <div class="flex flex-col">
-                  <Label class="mb-2">Base URL</Label>
-                  <div class="flex flex-wrap gap-2 mb-2">
-                    {#each urlPresets as preset}
-                      <Badge
-                        variant={formBaseUrl === preset.url
-                          ? "default"
-                          : "outline"}
-                        class="cursor-pointer"
-                        onclick={() => {
-                          formBaseUrl = preset.url;
-                          formFetchedModels = [];
-                          fetchError = null;
-                        }}
-                      >
-                        {preset.name}
-                      </Badge>
-                    {/each}
-                  </div>
+                  <Label class="mb-2">Custom Base URL <span class="text-muted-foreground text-xs">(optional)</span></Label>
                   <Input
                     bind:value={formBaseUrl}
-                    placeholder="https://api.example.com/v1"
+                    placeholder={providerDefaults[formProviderType] || "https://api.example.com/v1"}
                     class="font-mono text-xs"
                   />
+                  <p class="text-xs text-muted-foreground mt-1">
+                    Leave empty for default endpoint.
+                  </p>
                 </div>
 
                 <div class="space-y-2">
@@ -611,7 +605,7 @@
                       variant="outline"
                       size="sm"
                       onclick={handleFetchModels}
-                      disabled={isFetchingModels || !formBaseUrl}
+                      disabled={isFetchingModels || (!formBaseUrl && !providerDefaults[formProviderType])}
                     >
                       {#if isFetchingModels}
                         <RefreshCw class=" h-3 w-3 animate-spin" />
@@ -703,15 +697,19 @@
               <!-- Read-only View -->
               <div class="space-y-4 border-t bg-muted/10 mt-2 p-4">
                 <div class="grid gap-1">
-                  <Label class="text-muted-foreground text-xs">Profile Name</Label
-                  >
+                  <Label class="text-muted-foreground text-xs">Profile Name</Label>
                   <div class="font-medium">{profile.name}</div>
+                </div>
+
+                <div class="grid gap-1">
+                  <Label class="text-muted-foreground text-xs">Provider</Label>
+                  <div class="font-medium capitalize">{profile.providerType}</div>
                 </div>
 
                 <div class="grid gap-1">
                   <Label class="text-muted-foreground text-xs">Base URL</Label>
                   <div class="font-mono text-sm bg-muted p-2 rounded truncate">
-                    {profile.baseUrl}
+                    {profile.baseUrl || providerDefaults[profile.providerType] || "(default)"}
                   </div>
                 </div>
 

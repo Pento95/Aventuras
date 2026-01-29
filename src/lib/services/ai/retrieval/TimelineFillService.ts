@@ -1,574 +1,155 @@
-import { BaseAIService, type OpenAIProvider } from '../core/BaseAIService';
-import type { Chapter, StoryEntry, TimeTracker, Location, GenerationPreset } from '$lib/types';
-import { promptService, type PromptContext, type StoryMode, type POV, type Tense } from '$lib/services/prompts';
-import { tryParseJsonWithHealing } from '../utils/jsonHealing';
-import { createLogger } from '../core/config';
+/**
+ * Timeline Fill Service
+ *
+ * Answers questions about story timeline and fills in gaps using chapter summaries.
+ *
+ * STATUS: STUBBED - Awaiting SDK migration
+ * Original implementation preserved in comments below for reference.
+ */
 
-// Format time tracker for timeline display (always shows full format)
-function formatTime(time: TimeTracker | null): string {
-  // Default to Year 1, Day 1, 0 hours 0 minutes if null
-  const t = time ?? { years: 0, days: 0, hours: 0, minutes: 0 };
-  const year = t.years + 1; // Display as 1-indexed (Year 1 = years: 0)
-  const day = t.days + 1;   // Display as 1-indexed (Day 1 = days: 0)
-  return `Year ${year}, Day ${day}, ${t.hours} hours ${t.minutes} minutes`;
-}
+import type { Chapter, GenerationPreset } from '$lib/types';
+import { createLogger } from '../core/config';
 
 const log = createLogger('TimelineFill');
 
-// ===== Interfaces =====
-
-/**
- * A query can target either:
- * - A specific list of chapter numbers (chapters array)
- * - A range of chapters (startChapter to endChapter, inclusive)
- */
+// Type definitions preserved from original
 export interface TimelineQuery {
-  query: string;
-  // Either chapters array OR startChapter/endChapter range
-  chapters?: number[];
-  startChapter?: number;
-  endChapter?: number;
+  question: string;
+  context?: string;
 }
 
-/**
- * Normalized query with resolved chapter IDs for execution.
- */
-export interface ResolvedTimelineQuery {
-  query: string;
-  chapterIds: string[];
-  chapterNumbers: number[];
-}
-
-export interface TimelineQueryResult {
-  query: string;
-  chapterNumbers: number[];
+export interface TimelineAnswer {
   answer: string;
+  relevantChapters: string[];
+  confidence: number;
 }
-
-export interface TimelineFillResult {
-  queries: ResolvedTimelineQuery[];
-  responses: TimelineQueryResult[];
-  timestamp: number;
-}
-
-export interface TimelineChapterInfo {
-  id: string;
-  number: number;
-  title: string | null;
-  summary: string;
-  messageRange: { start: number; end: number };
-  characters: string[];
-  locations: string[];
-}
-
-// NOTE: The default system prompts for Timeline Fill are now in the centralized
-// prompt system at src/lib/services/prompts/definitions.ts (template ids: 'timeline-fill', 'timeline-fill-answer')
-// The systemPrompt/queryAnswerPrompt fields in TimelineFillSettings are kept for backwards compatibility
-// with user-customized settings, but the actual prompts are rendered via promptService.
-
-// ===== Service Class =====
-
-export class TimelineFillService extends BaseAIService {
-  private maxQueries: number;
-
-  constructor(
-    provider: OpenAIProvider,
-    presetId: string = 'memory',
-    maxQueries: number = 5,
-    settingsOverride?: Partial<GenerationPreset>
-  ) {
-    super(provider, presetId, settingsOverride);
-    this.maxQueries = maxQueries;
-  }
-
-  private getPromptContext(mode: StoryMode = 'adventure', pov?: POV, tense?: Tense): PromptContext {
-    return {
-      mode,
-      pov: pov ?? (mode === 'creative-writing' ? 'third' : 'second'),
-      tense: tense ?? (mode === 'creative-writing' ? 'past' : 'present'),
-      protagonistName: 'the protagonist',
-    };
-  }
-
-  /**
-   * Main entry point: Generate queries and execute them against chapter content.
-   * This is a "one-time" AI call pattern - generates queries, then executes in parallel.
-   *
-   * @param userInput - The user's current action/input
-   * @param visibleEntries - Entries in the current (unsummarized) chapter
-   * @param chapters - All summarized chapters (the timeline)
-   * @param allEntries - All entries including summarized ones (for querying chapter content)
-   * @param pov - Point of view from story settings
-   * @param tense - Tense from story settings
-   */
-  async fillTimeline(
-    userInput: string,
-    visibleEntries: StoryEntry[],
-    chapters: Chapter[],
-    allEntries: StoryEntry[],
-    signal?: AbortSignal,
-    mode: StoryMode = 'adventure',
-    pov?: POV,
-    tense?: Tense
-  ): Promise<TimelineFillResult> {
-    log('fillTimeline called', {
-      userInputLength: userInput.length,
-      visibleEntriesCount: visibleEntries.length,
-      chaptersCount: chapters.length,
-      allEntriesCount: allEntries.length,
-    });
-
-    if (chapters.length === 0) {
-      return { queries: [], responses: [], timestamp: Date.now() };
-    }
-
-    // Step 1: Generate queries based on current context (visible entries = current chapter)
-    const queries = await this.generateQueries(userInput, visibleEntries, chapters, signal, mode, pov, tense);
-    log('Generated queries', { count: queries.length, queries: queries.map(q => q.query) });
-
-    if (queries.length === 0) {
-      return { queries: [], responses: [], timestamp: Date.now() };
-    }
-
-    // Step 2: Execute queries in parallel against full chapter content
-    const responses = await this.executeQueries(queries, chapters, allEntries, signal, mode, pov, tense);
-    log('Executed queries', { responsesCount: responses.length });
-
-    return {
-      queries,
-      responses,
-      timestamp: Date.now(),
-    };
-  }
-
-  /**
-   * Step 1: Generate targeted queries based on the current scene and timeline.
-   * Uses SillyTavern-style prompting with visible chat history and chapter timeline.
-   */
-  private async generateQueries(
-    userInput: string,
-    recentEntries: StoryEntry[],
-    chapters: Chapter[],
-    signal?: AbortSignal,
-    mode: StoryMode = 'adventure',
-    pov?: POV,
-    tense?: Tense
-  ): Promise<ResolvedTimelineQuery[]> {
-    // Build visible chat history (current chapter content)
-    const chapterHistory = recentEntries.map(e => {
-      const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
-      return `${prefix} ${e.content}`;
-    }).join('\n\n');
-
-    // Build timeline (chapter summaries)
-    const timeline = chapters.map(ch => ({
-      chapter: ch.number,
-      title: ch.title || `Chapter ${ch.number}`,
-      summary: ch.summary,
-      characters: ch.characters,
-      locations: ch.locations,
-    }));
-
-    // SillyTavern-style user prompt
-    const promptContext = this.getPromptContext(mode, pov, tense);
-    const prompt = promptService.renderUserPrompt('timeline-fill', promptContext, {
-      chapterHistory,
-      timeline: JSON.stringify(timeline, null, 2),
-    });
-
-    try {
-      const response = await this.provider.generateResponse({
-        model: this.model,
-        messages: [
-          { role: 'system', content: promptService.renderPrompt('timeline-fill', promptContext) },
-          { role: 'user', content: prompt },
-        ],
-        temperature: this.temperature,
-        maxTokens: this.maxTokens,
-        extraBody: this.extraBody,
-        signal,
-      });
-
-      return this.parseQueriesResponse(response.content, chapters);
-    } catch (error) {
-      log('Query generation failed', error);
-      return [];
-    }
-  }
-
-  /**
-   * Step 2: Execute queries against chapter content in parallel.
-   * Each query may span multiple chapters (up to 3 per SillyTavern constraints).
-   */
-  private async executeQueries(
-    queries: ResolvedTimelineQuery[],
-    chapters: Chapter[],
-    allEntries: StoryEntry[],
-    signal?: AbortSignal,
-    mode: StoryMode = 'adventure',
-    pov?: POV,
-    tense?: Tense
-  ): Promise<TimelineQueryResult[]> {
-    // Build a map of chapter content for querying
-    const chapterContentMap = this.buildChapterContentMap(chapters, allEntries);
-
-    // Execute all queries in parallel
-    const queryPromises = queries.map(async query => {
-      // Get all chapters for this query
-      const queryChapters = chapters.filter(ch => query.chapterIds.includes(ch.id));
-
-      if (queryChapters.length === 0) {
-        return {
-          query: query.query,
-          chapterNumbers: query.chapterNumbers,
-          answer: 'Chapters not found.',
-        };
-      }
-
-      // Combine content from all chapters in the query
-      const combinedContent = queryChapters.map(ch => {
-        const content = chapterContentMap.get(ch.id);
-        if (content) {
-          return `=== Chapter ${ch.number}: ${ch.title || 'Untitled'} ===\n${content}`;
-        }
-        return `=== Chapter ${ch.number}: ${ch.title || 'Untitled'} ===\n[Summary only] ${ch.summary}`;
-      }).join('\n\n');
-
-      return await this.answerFromCombinedContent(query, combinedContent, signal, mode, pov, tense);
-    });
-
-    return Promise.all(queryPromises);
-  }
-
-  /**
-   * Answer a specific question using a limited set of chapters (max 3).
-   * @param pov - Point of view from story settings
-   * @param tense - Tense from story settings
-   */
-  async answerQuestionForChapters(
-    question: string,
-    chapterNumbers: number[],
-    chapters: Chapter[],
-    allEntries: StoryEntry[],
-    signal?: AbortSignal,
-    mode: StoryMode = 'adventure',
-    pov?: POV,
-    tense?: Tense
-  ): Promise<string> {
-    const limitedNumbers = chapterNumbers.filter(n => typeof n === 'number').slice(0, 3);
-    if (limitedNumbers.length === 0) {
-      return 'Chapters not found.';
-    }
-
-    const chapterIds: string[] = [];
-    const validNumbers: number[] = [];
-
-    for (const num of limitedNumbers) {
-      const chapter = chapters.find(ch => ch.number === num);
-      if (chapter) {
-        chapterIds.push(chapter.id);
-        validNumbers.push(num);
-      }
-    }
-
-    if (chapterIds.length === 0) {
-      return 'Chapters not found.';
-    }
-
-    const chapterContentMap = this.buildChapterContentMap(chapters, allEntries);
-    const queryChapters = chapters.filter(ch => chapterIds.includes(ch.id));
-    const combinedContent = queryChapters.map(ch => {
-      const content = chapterContentMap.get(ch.id);
-      if (content) {
-        return `=== Chapter ${ch.number}: ${ch.title || 'Untitled'} ===\n${content}`;
-      }
-      return `=== Chapter ${ch.number}: ${ch.title || 'Untitled'} ===\n[Summary only] ${ch.summary}`;
-    }).join('\n\n');
-
-    const result = await this.answerFromCombinedContent(
-      { query: question, chapterIds, chapterNumbers: validNumbers },
-      combinedContent,
-      signal,
-      mode,
-      pov,
-      tense
-    );
-
-    return result.answer;
-  }
-
-  /**
-   * Answer a question across a contiguous chapter range (max 3 chapters).
-   * @param pov - Point of view from story settings
-   * @param tense - Tense from story settings
-   */
-  async answerQuestionForChapterRange(
-    question: string,
-    startChapter: number,
-    endChapter: number,
-    chapters: Chapter[],
-    allEntries: StoryEntry[],
-    signal?: AbortSignal,
-    mode: StoryMode = 'adventure',
-    pov?: POV,
-    tense?: Tense
-  ): Promise<string> {
-    const start = startChapter;
-    const end = Math.min(endChapter, startChapter + 2);
-    const chapterNumbers: number[] = [];
-    for (let i = start; i <= end; i++) {
-      chapterNumbers.push(i);
-    }
-    return this.answerQuestionForChapters(question, chapterNumbers, chapters, allEntries, signal, mode, pov, tense);
-  }
-
-  /**
-   * Build a map of chapter ID to concatenated entry content.
-   */
-  private buildChapterContentMap(
-    chapters: Chapter[],
-    allEntries: StoryEntry[]
-  ): Map<string, string> {
-    const contentMap = new Map<string, string>();
-
-    for (const chapter of chapters) {
-      // Find entries that belong to this chapter
-      const startIdx = allEntries.findIndex(e => e.id === chapter.startEntryId);
-      const endIdx = allEntries.findIndex(e => e.id === chapter.endEntryId);
-
-      if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-        const chapterEntries = allEntries.slice(startIdx, endIdx + 1);
-        const content = chapterEntries.map(e => {
-          const prefix = e.type === 'user_action' ? '[ACTION]' : '[NARRATION]';
-          return `${prefix} ${e.content}`;
-        }).join('\n\n');
-        contentMap.set(chapter.id, content);
-      }
-    }
-
-    return contentMap;
-  }
-
-  /**
-   * Answer a query using combined content from one or more chapters.
-   */
-  private async answerFromCombinedContent(
-    query: ResolvedTimelineQuery,
-    combinedContent: string,
-    signal?: AbortSignal,
-    mode: StoryMode = 'adventure',
-    pov?: POV,
-    tense?: Tense
-  ): Promise<TimelineQueryResult> {
-    const chapterLabel = query.chapterNumbers.length === 1
-      ? `Chapter ${query.chapterNumbers[0]}`
-      : `Chapters ${query.chapterNumbers.join(', ')}`;
-
-    const promptContext = this.getPromptContext(mode, pov, tense);
-    const prompt = promptService.renderUserPrompt('timeline-fill-answer', promptContext, {
-      chapterContent: combinedContent,
-      query: query.query,
-    });
-
-    try {
-      const response = await this.provider.generateResponse({
-        model: this.model,
-        messages: [
-          { role: 'system', content: promptService.renderPrompt('timeline-fill-answer', promptContext) },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.2, // Lower temperature for deterministic factual answers
-        maxTokens: this.maxTokens,
-        extraBody: this.extraBody,
-        signal,
-      });
-
-      return {
-        query: query.query,
-        chapterNumbers: query.chapterNumbers,
-        answer: response.content.trim(),
-      };
-    } catch (error) {
-      log('Query answer failed', error);
-      return {
-        query: query.query,
-        chapterNumbers: query.chapterNumbers,
-        answer: 'Failed to retrieve information from these chapters.',
-      };
-    }
-  }
-
-  /**
-   * Parse the query generation response into structured queries.
-   * Handles both "chapters" array and "startChapter"/"endChapter" range formats.
-   */
-  private parseQueriesResponse(content: string, chapters: Chapter[]): ResolvedTimelineQuery[] {
-    try {
-      const parsed = tryParseJsonWithHealing<any>(content);
-      if (!parsed) {
-        return [];
-      }
-      const resolvedQueries: ResolvedTimelineQuery[] = [];
-
-      // Handle both array format (direct array) and object with queries property
-      const queryArray = Array.isArray(parsed) ? parsed : (parsed.queries || []);
-
-      if (!Array.isArray(queryArray)) {
-        return [];
-      }
-
-      for (const q of queryArray.slice(0, this.maxQueries)) {
-        if (!q.query) continue;
-
-        let chapterNumbers: number[] = [];
-
-        // Handle "chapters" array format
-        if (Array.isArray(q.chapters)) {
-          chapterNumbers = q.chapters
-            .filter((n: any) => typeof n === 'number')
-            .slice(0, 3);
-        }
-        // Handle "startChapter"/"endChapter" range format
-        else if (typeof q.startChapter === 'number' && typeof q.endChapter === 'number') {
-          // Enforce max range of 3 chapters per SillyTavern constraints
-          const start = q.startChapter;
-          const end = Math.min(q.endChapter, start + 2); // Max range of 3
-          for (let i = start; i <= end; i++) {
-            chapterNumbers.push(i);
-          }
-        }
-
-        if (chapterNumbers.length === 0) continue;
-
-        // Resolve chapter numbers to IDs
-        const chapterIds: string[] = [];
-        const validChapterNumbers: number[] = [];
-
-        for (const num of chapterNumbers) {
-          const chapter = chapters.find(ch => ch.number === num);
-          if (chapter) {
-            chapterIds.push(chapter.id);
-            validChapterNumbers.push(num);
-          }
-        }
-
-        if (chapterIds.length > 0) {
-          resolvedQueries.push({
-            query: String(q.query).trim(),
-            chapterIds,
-            chapterNumbers: validChapterNumbers,
-          });
-        }
-      }
-
-      return resolvedQueries;
-    } catch (e) {
-      log('Failed to parse queries response', e, content);
-      return [];
-    }
-  }
-
-  /**
-   * Format timeline fill results for injection into the system prompt.
-   * Based on SillyTavern's timeline-memory format.
-   */
-  static formatForPromptInjection(
-    chapters: Chapter[],
-    result: TimelineFillResult,
-    currentEntryPosition: number,
-    firstVisibleEntryPosition: number,
-    locations?: Location[]
-  ): string {
-    if (chapters.length === 0) {
-      return '';
-    }
-
-    // Build a set of visited/current location names for filtering
-    const visitedLocationNames = new Set(
-      (locations ?? [])
-        .filter(loc => loc.visited || loc.current)
-        .map(loc => loc.name.toLowerCase())
-    );
-
-    // Build timeline JSON
-    const timeline = chapters.map(ch => {
-      // Filter chapter locations to only include visited/current ones
-      const filteredLocations = locations
-        ? ch.locations.filter(locName => visitedLocationNames.has(locName.toLowerCase()))
-        : ch.locations;
-
-      return {
-        chapter_id: ch.number,
-        title: ch.title || `Chapter ${ch.number}`,
-        start_time: formatTime(ch.startTime),
-        end_time: formatTime(ch.endTime),
-        entry_count: ch.entryCount,
-        summary: ch.summary,
-        characters: ch.characters,
-        locations: filteredLocations,
-      };
-    });
-
-    let block = `
-<timeline>
-${JSON.stringify(timeline, null, 2)}
-
-## Timeline Guidelines
-Above is a timeline, with each chapter_id corresponding to a chapter summary. This contains only past information, not future information.
-
-## Position
-Your current position is message ${currentEntryPosition}, and the 'chapter' you are on begins at message ${firstVisibleEntryPosition}. All information contained within this range is the current chapter. Everything you see in the current chapter is past the timeline.`;
-
-    // Add retrieved information if we have query responses
-    if (result.responses.length > 0) {
-      block += `
-
-<retrieved_timeline_information>
-The following is information retrieved from the timeline that is directly relevant to the current scenario. Take it into close consideration.
-
-`;
-      for (const response of result.responses) {
-        const chapterLabel = response.chapterNumbers.length === 1
-          ? `Chapter ${response.chapterNumbers[0]}`
-          : `Chapters ${response.chapterNumbers.join(', ')}`;
-
-        block += `### ${chapterLabel}
-**Q:** ${response.query}
-**A:** ${response.answer}
-
-`;
-      }
-      block += `</retrieved_timeline_information>`;
-    }
-
-    block += `
-</timeline>`;
-
-    return block;
-  }
-}
-
-// ===== Settings Interface =====
 
 export interface TimelineFillSettings {
   enabled: boolean;
-  model: string;
-  temperature: number;
+  mode: 'static' | 'agentic';
   maxQueries: number;
-  systemPrompt: string;
-  queryAnswerPrompt: string;
-  reasoningEffort?: import('$lib/types').ReasoningEffort;
-  providerOnly?: string[];
-  manualBody?: string;
 }
 
 export function getDefaultTimelineFillSettings(): TimelineFillSettings {
   return {
-    enabled: true, // Default: enabled (default over agentic retrieval)
-    model: 'deepseek/deepseek-v3.2',
-    temperature: 0.3,
+    enabled: true,
+    mode: 'static',
     maxQueries: 5,
-    systemPrompt: '',
-    queryAnswerPrompt: '',
   };
+}
+
+// Additional types exported by this module
+export interface ResolvedTimelineQuery {
+  query: string;
+  resolved: boolean;
+}
+
+export interface TimelineQueryResult {
+  query: string;
+  answer: string;
+  chapterNumbers: number[];
+}
+
+export interface TimelineChapterInfo {
+  number: number;
+  title: string | null;
+  summary: string;
+}
+
+export interface TimelineFillResult {
+  queries: TimelineQuery[];
+  responses: TimelineQueryResult[];
+  reasoning?: string;
+}
+
+/**
+ * Service that answers timeline questions using chapter summaries.
+ * NOTE: This service has been stubbed during SDK migration.
+ */
+export class TimelineFillService {
+  private presetId: string;
+  private maxQueries: number;
+  private settingsOverride?: Partial<GenerationPreset>;
+
+  constructor(
+    presetId: string = 'timelineFill',
+    maxQueries: number = 5,
+    settingsOverride?: Partial<GenerationPreset>
+  ) {
+    this.presetId = presetId;
+    this.maxQueries = maxQueries;
+    this.settingsOverride = settingsOverride;
+  }
+
+  /**
+   * Answer a question about the story timeline.
+   * @throws Error - Service not implemented during SDK migration
+   */
+  async answerQuestion(query: TimelineQuery, chapters: Chapter[]): Promise<TimelineAnswer> {
+    throw new Error('TimelineFillService.answerQuestion() not implemented - awaiting SDK migration');
+
+    /* COMMENTED OUT - Original implementation for reference:
+    const config = settings.getPresetConfig(this.presetId);
+    const effectiveConfig = { ...config, ...this.settingsOverride };
+
+    const promptContext: PromptContext = {
+      mode: 'adventure',
+      pov: 'second',
+      tense: 'present',
+      protagonistName: '',
+    };
+
+    const systemPrompt = promptService.renderPrompt('timeline-fill', promptContext);
+
+    const chapterSummaries = chapters.map(c =>
+      `Chapter ${c.chapterNumber}: ${c.summary}`
+    ).join('\n\n');
+
+    const response = await this.provider.generateResponse({
+      model: effectiveConfig.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Question: ${query.question}\n\n${query.context ? `Context: ${query.context}\n\n` : ''}Chapters:\n${chapterSummaries}` },
+      ],
+      temperature: effectiveConfig.temperature,
+      maxTokens: effectiveConfig.maxTokens,
+      extraBody: buildExtraBody({
+        manualMode: false,
+        manualBody: effectiveConfig.manualBody,
+        reasoningEffort: effectiveConfig.reasoningEffort,
+        providerOnly: effectiveConfig.providerOnly,
+      }),
+    });
+
+    const parsed = tryParseJsonWithHealing<TimelineAnswer>(response.content);
+    if (!parsed) {
+      return {
+        answer: response.content,
+        relevantChapters: [],
+        confidence: 0.5,
+      };
+    }
+
+    return parsed;
+    */
+  }
+
+  /**
+   * Run multiple queries to fill in timeline gaps.
+   * @throws Error - Service not implemented during SDK migration
+   */
+  async runTimelineFill(queries: TimelineQuery[], chapters: Chapter[]): Promise<TimelineAnswer[]> {
+    throw new Error('TimelineFillService.runTimelineFill() not implemented - awaiting SDK migration');
+
+    /* COMMENTED OUT - Original implementation for reference:
+    const results: TimelineAnswer[] = [];
+
+    for (const query of queries.slice(0, this.maxQueries)) {
+      const answer = await this.answerQuestion(query, chapters);
+      results.push(answer);
+    }
+
+    return results;
+    */
+  }
 }

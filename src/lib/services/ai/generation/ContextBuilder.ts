@@ -5,15 +5,11 @@
  * Implements three tiers of entry injection:
  * - Tier 1: Always inject (current location, present chars, inventory)
  * - Tier 2: Name matching (fuzzy match against recent input)
- * - Tier 3: LLM selection (for large entry counts, runs in parallel)
+ * - Tier 3: LLM selection (STUBBED - awaiting SDK migration)
  */
 
 import type { Character, Location, Item, StoryBeat, StoryEntry, Chapter } from '$lib/types';
-import { settings } from '$lib/stores/settings.svelte';
-import type { OpenAIProvider } from '../core/OpenAIProvider';
-import { promptService } from '$lib/services/prompts';
-import { tryParseJsonWithHealing } from '../utils/jsonHealing';
-import { AI_CONFIG, createLogger, getContextConfig } from '../core/config';
+import { createLogger, getContextConfig } from '../core/config';
 
 const log = createLogger('ContextBuilder');
 
@@ -62,17 +58,21 @@ export interface ContextResult {
   contextBlock: string;
 }
 
+/**
+ * Service that builds context from world state using tiered injection.
+ * NOTE: Tier 3 (LLM selection) has been stubbed during SDK migration.
+ *       Tier 1 and Tier 2 work without AI.
+ */
 export class ContextBuilder {
-  private provider: OpenAIProvider | null;
   private config: ContextConfig;
 
-  constructor(provider: OpenAIProvider | null, config: Partial<ContextConfig> = {}) {
-    this.provider = provider;
+  constructor(config: Partial<ContextConfig> = {}) {
     this.config = { ...DEFAULT_CONTEXT_CONFIG, ...config };
   }
 
   /**
    * Build context from world state using tiered injection.
+   * NOTE: Tier 3 is currently disabled pending SDK migration.
    */
   async buildContext(
     worldState: WorldState,
@@ -103,13 +103,17 @@ export class ContextBuilder {
     // Get IDs in tier 1 + 2
     const tier12Ids = new Set([...tier1Ids, ...tier2.map(e => e.id)]);
 
-    // Tier 3: LLM selection (conditional)
-    let tier3: RelevantEntry[] = [];
+    // Tier 3: LLM selection - STUBBED
+    // Would normally run when entry count exceeds llmThreshold
+    const tier3: RelevantEntry[] = [];
     const remainingCount = this.countRemainingEntries(worldState, tier12Ids);
 
-    if (this.config.enableLLMSelection && remainingCount > this.config.llmThreshold && this.provider) {
-      tier3 = await this.getTier3Entries(worldState, userInput, recentEntries, tier12Ids);
-      log('Tier 3 entries:', tier3.length);
+    if (this.config.enableLLMSelection && remainingCount > this.config.llmThreshold) {
+      log('Tier 3 LLM selection SKIPPED - awaiting SDK migration', {
+        remainingEntries: remainingCount,
+        threshold: this.config.llmThreshold,
+      });
+      // tier3 = await this.getTier3Entries(...) - STUBBED
     }
 
     // Combine all entries
@@ -286,95 +290,16 @@ export class ContextBuilder {
     return entries.slice(0, this.config.maxEntriesPerTier);
   }
 
-  /**
-   * Tier 3: LLM-based selection for remaining entries.
-   * Only runs when entry count exceeds threshold.
-   */
+  /* COMMENTED OUT - Tier 3 LLM selection awaiting SDK migration:
   private async getTier3Entries(
     worldState: WorldState,
     userInput: string,
     recentEntries: StoryEntry[],
     excludeIds: Set<string>
   ): Promise<RelevantEntry[]> {
-    if (!this.provider) return [];
-
-    // Gather remaining entries not in Tier 1/2
-    const remainingEntries = this.getRemainingEntriesList(worldState, excludeIds);
-
-    if (remainingEntries.length === 0) return [];
-
-    // Build recent content for prompt
-    const contextConfig = getContextConfig();
-    const recentContent = recentEntries
-      .slice(-contextConfig.recentEntriesForNameMatching)
-      .map(e => `[${e.type}]: ${e.content}`)
-      .join('\n');
-
-    // Build entry summaries for prompt
-    const entrySummaries = remainingEntries
-      .map((e, i) => {
-        const description = e.description || 'No description';
-        return `${i + 1}. [${e.type}] ${e.name}: ${description}`;
-      })
-      .join('\n');
-
-    // Use centralized prompt system
-    // Tier 3 selection is a service prompt that doesn't need story context
-    const minimalContext = {
-      mode: 'adventure' as const,
-      pov: 'second' as const,
-      tense: 'present' as const,
-      protagonistName: '',
-    };
-
-    const systemPrompt = promptService.renderPrompt('tier3-entry-selection', minimalContext);
-    const userPrompt = promptService.renderUserPrompt('tier3-entry-selection', minimalContext, {
-      recentContent,
-      userInput,
-      entrySummaries,
-    });
-
-    // Get preset configuration from Agent Profiles system
-    const preset = settings.getPresetConfig(settings.getServicePresetId('entryRetrieval'), 'Entry Retrieval');
-
-    try {
-      const response = await this.provider.generateResponse({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        model: preset.model,
-        temperature: preset.temperature,
-        maxTokens: preset.maxTokens,
-      });
-
-      // Parse response as JSON array
-      const parsed = tryParseJsonWithHealing<number[]>(response.content);
-      if (!parsed || !Array.isArray(parsed)) {
-        log('Failed to parse LLM selection response');
-        return [];
-      }
-
-      const selectedIndices: number[] = parsed.filter(n => typeof n === 'number');
-      const selectedEntries: RelevantEntry[] = [];
-
-      for (const idx of selectedIndices) {
-        const entry = remainingEntries[idx - 1]; // 1-indexed in prompt
-        if (entry) {
-          selectedEntries.push({
-            ...entry,
-            tier: 3,
-            priority: 30,
-          });
-        }
-      }
-
-      return selectedEntries.slice(0, this.config.maxEntriesPerTier);
-    } catch (error) {
-      log('Tier 3 LLM selection failed:', error);
-      return [];
-    }
+    // ... original Tier 3 implementation ...
   }
+  */
 
   /**
    * Check if a name fuzzy-matches against search text.
@@ -419,75 +344,6 @@ export class ContextBuilder {
     count += worldState.items.filter(i => !excludeIds.has(i.id)).length;
     count += worldState.storyBeats.filter(b => !excludeIds.has(b.id)).length;
     return count;
-  }
-
-  /**
-   * Get list of remaining entries not in the given set.
-   */
-  private getRemainingEntriesList(
-    worldState: WorldState,
-    excludeIds: Set<string>
-  ): RelevantEntry[] {
-    const entries: RelevantEntry[] = [];
-
-    for (const char of worldState.characters) {
-      if (!excludeIds.has(char.id)) {
-        entries.push({
-          type: 'character',
-          id: char.id,
-          name: char.name,
-          description: char.description,
-          tier: 3,
-          priority: 0,
-          metadata: {
-            relationship: char.relationship,
-            traits: char.traits,
-            visualDescriptors: char.visualDescriptors,
-          },
-        });
-      }
-    }
-
-    for (const loc of worldState.locations) {
-      if (!excludeIds.has(loc.id)) {
-        entries.push({
-          type: 'location',
-          id: loc.id,
-          name: loc.name,
-          description: loc.description,
-          tier: 3,
-          priority: 0,
-        });
-      }
-    }
-
-    for (const item of worldState.items) {
-      if (!excludeIds.has(item.id)) {
-        entries.push({
-          type: 'item',
-          id: item.id,
-          name: item.name,
-          description: item.description,
-          tier: 3,
-          priority: 0,
-        });
-      }
-    }
-
-    for (const beat of worldState.storyBeats) {
-      if (!excludeIds.has(beat.id)) {
-        entries.push({
-          type: 'storyBeat',
-          id: beat.id,
-          name: beat.title,
-          description: beat.description,
-          tier: 3,
-          priority: 0,
-        });
-      }
-    }
-
-    return entries;
   }
 
   /**
