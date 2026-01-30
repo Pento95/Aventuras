@@ -97,7 +97,7 @@
 
       <!-- Main Content -->
       <div class="flex-1 min-w-0 flex flex-col">
-        <div class="flex justify-between items-start gap-2">
+        <div class="flex justify-between gap-2">
           <!-- Header info -->
           <div class="min-w-0 flex-1">
             <h3
@@ -128,7 +128,7 @@
                   icon={Star}
                   variant="ghost"
                   size="icon"
-                  class="transition-all hover:bg-transparent hover:text-foreground text-muted-foreground w-5"
+                  class="transition-all hover:bg-transparent hover:text-foreground text-muted-foreground w-5 h-3.5"
                   iconClass={cn(
                     "h-3.5 w-3.5 transition-colors",
                     isFavorite
@@ -149,7 +149,7 @@
                   icon={Pencil}
                   variant="ghost"
                   size="icon"
-                  class="transition-all hover:bg-transparent hover:text-foreground text-muted-foreground w-5"
+                  class="transition-all hover:bg-transparent hover:text-foreground text-muted-foreground w-5 h-3.5"
                   iconClass="h-3.5 w-3.5"
                   onclick={(e) => {
                     e.stopPropagation();
