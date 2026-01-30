@@ -27,6 +27,7 @@
   }
 
   async function openStory(storyId: string) {
+    ui.resetScrollBreak();
     await story.loadStory(storyId);
     ui.setActivePanel("story");
   }

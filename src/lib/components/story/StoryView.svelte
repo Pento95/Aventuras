@@ -2,7 +2,7 @@
   import { story } from '$lib/stores/story.svelte';
   import { ui } from '$lib/stores/ui.svelte';
   import { settings } from '$lib/stores/settings.svelte';
-  import { Loader2, BookOpen } from 'lucide-svelte';
+  import { Loader2, BookOpen, ChevronDown } from 'lucide-svelte';
   import StoryEntry from './StoryEntry.svelte';
   import StreamingEntry from './StreamingEntry.svelte';
   import ActionInput from './ActionInput.svelte';
@@ -63,20 +63,36 @@
     visibleEntryCount = story.entries.length;
   }
 
+  function scrollToBottom() {
+    if (!storyContainer) return;
+
+    if (scrollRAF !== null) {
+      cancelAnimationFrame(scrollRAF);
+    }
+    
+    // Batch scroll update with requestAnimationFrame for better performance
+    scrollRAF = requestAnimationFrame(() => {
+      if (storyContainer) {
+        storyContainer.scrollTop = storyContainer.scrollHeight;
+      }
+      scrollRAF = null;
+    });
+  }
+
   // Check if container is scrolled near bottom
   function isNearBottom(): boolean {
     if (!storyContainer) return true;
     const threshold = 100; // pixels from bottom
     return storyContainer.scrollHeight - storyContainer.scrollTop - storyContainer.clientHeight < threshold;
   }
-
   // Handle scroll events during streaming
   function handleScroll() {
-    // Only track scroll during streaming
-    if (!ui.isStreaming) return;
-
-    // If user scrolled away from bottom, break auto-scroll until next user message
-    if (!isNearBottom()) {
+    // Keep userScrolledUp in sync with actual scroll position
+    // This allows re-engaging auto-scroll when the user scrolls back to bottom
+    const nearBottom = isNearBottom();
+    if (nearBottom && ui.userScrolledUp) {
+      ui.setScrollBreak(false);
+    } else if (!nearBottom && !ui.userScrolledUp) {
       ui.setScrollBreak(true);
     }
   }
@@ -86,44 +102,32 @@
   let scrollRAF: number | null = null;
   let prevEntryCount = 0;
 
+
   $effect(() => {
-    // Track both entries and streaming state for scroll
+    // Track entries, streaming state, and generation status for scroll
     const currentCount = story.entries.length;
-    const __ = ui.streamingContent;
+    const _ = ui.streamingContent;
+    const __ = ui.generationStatus;
+    const ___ = ui.isGenerating;
 
     // Detect if entries were added (vs deleted or unchanged)
     const wasAdded = currentCount > prevEntryCount;
     prevEntryCount = currentCount;
 
-    // Only auto-scroll when entries are added, not when deleted
-    // Also scroll during streaming for real-time updates
-    if (!wasAdded && !ui.isStreaming) return;
+    // Detect if we should scroll: 
+    // 1. We are NOT user-scrolled-up (pinned mode)
+    // 2. OR we just added a new user entry (force scroll to bottom for the new message)
+    const shouldScroll = !ui.userScrolledUp || wasAdded;
+    
+    if (!shouldScroll) return;
 
-    // Skip auto-scroll if user has scrolled up (persists until next user message)
-    if (ui.userScrolledUp) return;
-
-    // Cancel any pending scroll to avoid redundant operations
-    if (scrollRAF !== null) {
-      cancelAnimationFrame(scrollRAF);
-    }
-
-    // Batch scroll update with requestAnimationFrame for better performance
-    scrollRAF = requestAnimationFrame(() => {
-      if (storyContainer) {
-        storyContainer.scrollTop = storyContainer.scrollHeight;
-      }
-      scrollRAF = null;
-    });
+    scrollToBottom();
   });
 
   // Scroll to bottom when returning from gallery or other panels
   $effect(() => {
     if (ui.activePanel === 'story' && storyContainer) {
-      requestAnimationFrame(() => {
-        if (storyContainer) {
-          storyContainer.scrollTop = storyContainer.scrollHeight;
-        }
-      });
+      scrollToBottom();
     }
   });
 </script>
@@ -194,6 +198,21 @@
         {/if}
       {/if}
     </div>
+
+    <!-- Scroll to bottom button -->
+    {#if ui.userScrolledUp}
+      <div class="sticky bottom-2 flex justify-center w-full pointer-events-none pb-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          class="h-9 w-9 rounded-full shadow-lg border border-border bg-background/80 backdrop-blur-sm pointer-events-auto hover:bg-accent animate-in fade-in slide-in-from-bottom-2"
+          onclick={scrollToBottom}
+          aria-label="Scroll to bottom"
+        >
+          <ChevronDown class="h-5 w-5" />
+        </Button>
+      </div>
+    {/if}
   </div>
 
   <!-- Action input area -->
