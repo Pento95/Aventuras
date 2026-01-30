@@ -13,6 +13,7 @@ import type { ReasoningEffort, GenerationPreset } from '$lib/types';
 import type { StoryMode, POV, Character, Location, Item } from '$lib/types';
 import { promptService, type PromptContext } from '$lib/services/prompts';
 import { createLogger } from '../core/config';
+import { type ExpandedSetting, type GeneratedProtagonist, type GeneratedCharacter, type GeneratedOpening } from '$lib/services/ai/sdk/schemas/scenario';
 
 const log = createLogger('ScenarioService');
 
@@ -175,45 +176,6 @@ export interface WizardData {
   };
   title: string;
   openingGuidance?: string;
-}
-
-export interface ExpandedSetting {
-  name: string;
-  description: string;
-  keyLocations: {
-    name: string;
-    description: string;
-  }[];
-  atmosphere: string;
-  themes: string[];
-  potentialConflicts: string[];
-}
-
-export interface GeneratedProtagonist {
-  name: string;
-  description: string;
-  background: string;
-  motivation: string;
-  traits: string[];
-  appearance?: string;
-}
-
-export interface GeneratedCharacter {
-  name: string;
-  role: string;
-  description: string;
-  relationship: string;
-  traits: string[];
-  vaultId?: string;
-}
-
-export interface GeneratedOpening {
-  scene: string;
-  title: string;
-  initialLocation: {
-    name: string;
-    description: string;
-  };
 }
 
 class ScenarioService {
