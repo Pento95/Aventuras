@@ -5,3 +5,6 @@
 
 export { PreGenerationPhase } from './PreGenerationPhase';
 export type { RetryBackupData, PreGenerationResult, PreGenerationInput } from './PreGenerationPhase';
+
+export { RetrievalPhase } from './RetrievalPhase';
+export type { RetrievalDependencies, RetrievalInput } from './RetrievalPhase';
