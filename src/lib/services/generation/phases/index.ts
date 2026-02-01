@@ -11,3 +11,6 @@ export type { RetrievalDependencies, RetrievalInput } from './RetrievalPhase';
 
 export { NarrativePhase } from './NarrativePhase';
 export type { NarrativeDependencies, NarrativeInput, NarrativeResult } from './NarrativePhase';
+
+export { ClassificationPhase } from './ClassificationPhase';
+export type { ClassificationDependencies, ClassificationInput, ClassificationPhaseResult } from './ClassificationPhase';
