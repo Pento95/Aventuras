@@ -21,14 +21,13 @@
   import { aiTTSService } from "$lib/services/ai/utils/TTSService";
   import { parseMarkdown } from "$lib/utils/markdown";
   import { slide } from "svelte/transition";
+  import { sanitizeTextForTTS } from "$lib/utils/htmlSanitize";
   import {
-    sanitizeTextForTTS,
-    sanitizeVisualProse,
-  } from "$lib/utils/htmlSanitize";
-  import {
-    replacePicTagsWithImages,
-    type ImageReplacementInfo,
-  } from "$lib/utils/inlineImageParser";
+    processContentWithImages,
+    processVisualProseWithImages,
+    processContentWithInlineImages,
+    processVisualProseWithInlineImages,
+  } from "$lib/services/image";
   import { database } from "$lib/services/database";
   import {
     eventBus,
@@ -284,211 +283,9 @@
     }
   }
 
-  // Escape special regex characters
+  // Escape special regex characters (used in TTS sanitization)
   function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  // Process content to wrap source text matches in clickable spans
-  function processContentWithImages(
-    content: string,
-    images: EmbeddedImage[],
-  ): string {
-    if (images.length === 0) return parseMarkdown(content);
-
-    let processed = content;
-
-    // Sort images by source text length (longest first) to avoid partial matches
-    const sortedImages = [...images]
-      .filter(
-        (img) =>
-          img.status === "complete" ||
-          img.status === "generating" ||
-          img.status === "pending",
-      )
-      .sort((a, b) => b.sourceText.length - a.sourceText.length);
-
-    // Track which portions of text have been marked
-    const markers: {
-      start: number;
-      end: number;
-      imageId: string;
-      status: string;
-    }[] = [];
-
-    for (const img of sortedImages) {
-      // Case-insensitive search for the source text
-      const regex = new RegExp(escapeRegex(img.sourceText), "gi");
-      let match;
-      while ((match = regex.exec(processed)) !== null) {
-        const start = match.index;
-        const end = start + match[0].length;
-
-        // Check if this overlaps with an existing marker
-        const overlaps = markers.some(
-          (m) =>
-            (start >= m.start && start < m.end) ||
-            (end > m.start && end <= m.end) ||
-            (start <= m.start && end >= m.end),
-        );
-
-        if (!overlaps) {
-          markers.push({ start, end, imageId: img.id, status: img.status });
-        }
-      }
-    }
-
-    // Sort markers by position (reverse order for replacement)
-    markers.sort((a, b) => b.start - a.start);
-
-    // Apply markers from end to start to preserve positions
-    for (const marker of markers) {
-      const originalText = processed.slice(marker.start, marker.end);
-      const isRegenerating = regeneratingImageIds.has(marker.imageId);
-      const statusClass = isRegenerating
-        ? "regenerating"
-        : marker.status === "complete"
-          ? "complete"
-          : marker.status === "generating"
-            ? "generating"
-            : "pending";
-      const replacement = `<span class="embedded-image-link ${statusClass}" data-image-id="${marker.imageId}">${originalText}</span>`;
-      processed =
-        processed.slice(0, marker.start) +
-        replacement +
-        processed.slice(marker.end);
-    }
-
-    return parseMarkdown(processed);
-  }
-
-  // Process Visual Prose content with embedded images
-  function processVisualProseWithImages(
-    content: string,
-    images: EmbeddedImage[],
-    entryId: string,
-  ): string {
-    if (images.length === 0) return sanitizeVisualProse(content, entryId);
-
-    let processed = content;
-
-    // Sort images by source text length (longest first) to avoid partial matches
-    const sortedImages = [...images]
-      .filter(
-        (img) =>
-          img.status === "complete" ||
-          img.status === "generating" ||
-          img.status === "pending",
-      )
-      .sort((a, b) => b.sourceText.length - a.sourceText.length);
-
-    // Track which portions of text have been marked
-    const markers: {
-      start: number;
-      end: number;
-      imageId: string;
-      status: string;
-    }[] = [];
-
-    for (const img of sortedImages) {
-      // Case-insensitive search for the source text
-      const regex = new RegExp(escapeRegex(img.sourceText), "gi");
-      let match;
-      while ((match = regex.exec(processed)) !== null) {
-        const start = match.index;
-        const end = start + match[0].length;
-
-        // Check if this overlaps with an existing marker
-        const overlaps = markers.some(
-          (m) =>
-            (start >= m.start && start < m.end) ||
-            (end > m.start && end <= m.end) ||
-            (start <= m.start && end >= m.end),
-        );
-
-        if (!overlaps) {
-          markers.push({ start, end, imageId: img.id, status: img.status });
-        }
-      }
-    }
-
-    // Sort markers by position (reverse order for replacement)
-    markers.sort((a, b) => b.start - a.start);
-
-    // Apply markers from end to start to preserve positions
-    for (const marker of markers) {
-      const originalText = processed.slice(marker.start, marker.end);
-      const isRegenerating = regeneratingImageIds.has(marker.imageId);
-      const statusClass = isRegenerating
-        ? "regenerating"
-        : marker.status === "complete"
-          ? "complete"
-          : marker.status === "generating"
-            ? "generating"
-            : "pending";
-      const replacement = `<span class="embedded-image-link ${statusClass}" data-image-id="${marker.imageId}">${originalText}</span>`;
-      processed =
-        processed.slice(0, marker.start) +
-        replacement +
-        processed.slice(marker.end);
-    }
-
-    return sanitizeVisualProse(processed, entryId);
-  }
-
-  // Process content with inline <pic> tags - replaces tags with images
-  function processContentWithInlineImages(
-    content: string,
-    images: EmbeddedImage[],
-  ): string {
-    // Build map of original tag text -> image info for inline mode images
-    const imageMap = new Map<string, ImageReplacementInfo>();
-
-    const inlineImages = images.filter(
-      (img) => img.generationMode === "inline",
-    );
-
-    for (const img of inlineImages) {
-      imageMap.set(img.sourceText, {
-        imageData: img.imageData,
-        status: img.status,
-        id: img.id,
-        errorMessage: img.errorMessage,
-      });
-    }
-
-    // Replace <pic> tags with actual images
-    const processedContent = replacePicTagsWithImages(content, imageMap, regeneratingImageIds);
-
-    // Parse markdown for any remaining content
-    return parseMarkdown(processedContent);
-  }
-
-  // Process Visual Prose content with inline <pic> tags
-  function processVisualProseWithInlineImages(
-    content: string,
-    images: EmbeddedImage[],
-    entryId: string,
-  ): string {
-    // Build map of original tag text -> image info for inline mode images
-    const imageMap = new Map<string, ImageReplacementInfo>();
-
-    for (const img of images) {
-      if (img.generationMode === "inline") {
-        imageMap.set(img.sourceText, {
-          imageData: img.imageData,
-          status: img.status,
-          id: img.id,
-          errorMessage: img.errorMessage,
-        });
-      }
-    }
-
-    // Replace <pic> tags with actual images first
-    const processedContent = replacePicTagsWithImages(content, imageMap, regeneratingImageIds);
-
-    // Then sanitize as Visual Prose
-    return sanitizeVisualProse(processedContent, entryId);
   }
 
   // Handle creating missing inline images (stuck/lost records)
@@ -1317,6 +1114,7 @@
               displayContent,
               embeddedImages,
               entry.id,
+              regeneratingImageIds,
             )}
           {:else if visualProseMode}
             <!-- Visual Prose mode only -->
@@ -1324,16 +1122,18 @@
               displayContent,
               embeddedImages,
               entry.id,
+              regeneratingImageIds,
             )}
           {:else if inlineImageMode}
             <!-- Inline Image mode only -->
             {@html processContentWithInlineImages(
               displayContent,
               embeddedImages,
+              regeneratingImageIds,
             )}
           {:else}
             <!-- Standard mode with analyzed images -->
-            {@html processContentWithImages(displayContent, embeddedImages)}
+            {@html processContentWithImages(displayContent, embeddedImages, regeneratingImageIds)}
           {/if}
         {:else if entry.type === "user_action"}
           <!-- User action: show original input (before translation) -->
