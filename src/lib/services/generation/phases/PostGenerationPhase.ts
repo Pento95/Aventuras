@@ -11,7 +11,7 @@
  */
 
 import type {
-  GenerationEvent, PhaseStartEvent, PhaseCompleteEvent, AbortedEvent, ErrorEvent,
+  GenerationEvent, PhaseStartEvent, PhaseCompleteEvent, AbortedEvent, ErrorEvent, WorldState,
 } from '../types';
 import type { StoryEntry, Entry, TranslationSettings, Character, Location, Item, StoryBeat } from '$lib/types';
 import type { Suggestion, ActionChoice } from '$lib/services/ai/sdk/schemas';
@@ -41,9 +41,9 @@ export interface PostWorldState {
 export interface PostGenerationDependencies {
   generateSuggestions: (
     entries: StoryEntry[],
-    pendingQuests: string[],
-    lorebookEntries: Entry[],
-    promptContext: PromptContext
+    activeThreads: StoryBeat[],
+    lorebookEntries?: Entry[],
+    promptContext?: PromptContext
   ) => Promise<{ suggestions: Suggestion[] }>;
   translateSuggestions: (suggestions: Suggestion[], targetLanguage: string) => Promise<Suggestion[]>;
   generateActionChoices: (
@@ -62,7 +62,7 @@ export interface PostGenerationInput {
   isCreativeMode: boolean;
   disableSuggestions: boolean;
   entries: StoryEntry[];
-  pendingQuests: string[];
+  activeThreads: StoryBeat[];
   lorebookEntries: Entry[];
   promptContext: PromptContext;
   worldState: PostWorldState;
@@ -119,8 +119,8 @@ export class PostGenerationPhase {
   }
 
   private async generateSuggestions(input: PostGenerationInput): Promise<Suggestion[]> {
-    const { entries, pendingQuests, lorebookEntries, promptContext, translationSettings } = input;
-    const { suggestions } = await this.deps.generateSuggestions(entries, pendingQuests, lorebookEntries, promptContext);
+    const { entries, activeThreads, lorebookEntries, promptContext, translationSettings } = input;
+    const { suggestions } = await this.deps.generateSuggestions(entries, activeThreads, lorebookEntries, promptContext);
 
     if (TranslationService.shouldTranslate(translationSettings)) {
       try {

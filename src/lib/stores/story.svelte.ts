@@ -2391,7 +2391,7 @@ const newConfig = { ...this.memoryConfig, ...updates };
     locations: Location[];
     items: Item[];
     storyBeats: StoryBeat[];
-    lorebookEntries: Entry[];
+    lorebookEntries?: Entry[]; // Optional - lorebook entries persist across retry operations
     embeddedImages: EmbeddedImage[];
     timeTracker?: TimeTracker | null;
   }): Promise<void> {

@@ -23,7 +23,7 @@ export interface WorldState {
   locations: Location[];
   items: Item[];
   storyBeats: StoryBeat[];
-  currentLocation: Location | null;
+  currentLocation?: Location;
   chapters: Chapter[];
   memoryConfig: MemoryConfig;
   lorebookEntries: Entry[];

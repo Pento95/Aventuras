@@ -4,7 +4,7 @@
  */
 
 import type { GenerationEvent, GenerationContext, ErrorEvent } from './types';
-import type { EmbeddedImage, ActionInputType, TranslationSettings, Character } from '$lib/types';
+import type { EmbeddedImage, ActionInputType, TranslationSettings, Character, StoryBeat } from '$lib/types';
 import type { StoryMode, POV, Tense } from '$lib/services/prompts';
 import type { StyleReviewResult } from '$lib/services/ai/generation/StyleReviewerService';
 import type { ActivationTracker } from '$lib/services/ai/retrieval/EntryRetrievalService';
@@ -36,7 +36,7 @@ export interface PipelineConfig {
   imageSettings: ImageSettings;
   promptContext: PromptContext;
   disableSuggestions: boolean;
-  pendingQuests: string[];
+  activeThreads: StoryBeat[];
 }
 
 export interface PipelineResult {
@@ -108,7 +108,7 @@ export class GenerationPipeline {
 
       r.postGeneration = yield* this.postPhase.execute({
         isCreativeMode: cfg.storyMode === 'creative-writing', disableSuggestions: cfg.disableSuggestions,
-        entries: ctx.visibleEntries, pendingQuests: cfg.pendingQuests,
+        entries: ctx.visibleEntries, activeThreads: cfg.activeThreads,
         lorebookEntries: ctx.worldState.lorebookEntries, promptContext: cfg.promptContext,
         worldState: ctx.worldState, narrativeResponse: r.narrative.content,
         pov: cfg.pov, translationSettings: cfg.translationSettings, abortSignal: ctx.abortSignal,
