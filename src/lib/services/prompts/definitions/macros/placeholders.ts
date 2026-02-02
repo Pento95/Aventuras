@@ -671,6 +671,32 @@ export const CONTEXT_PLACEHOLDERS: ContextPlaceholder[] = [
     description:
       'Comma-separated visual appearance details for a single character (hair, eyes, clothing, etc.)',
   },
+  {
+    id: 'translated-narrative-block',
+    name: 'Translated Narrative Block',
+    token: 'translatedNarrativeBlock',
+    category: 'other',
+    description:
+      'Optional translated narrative block for image analysis (includes language label and translated text)',
+  },
+  // SillyTavern character card placeholder conventions
+  // These appear in prompt instructions telling the AI how to handle these tokens
+  {
+    id: 'char-placeholder',
+    name: 'Char Placeholder',
+    token: 'char',
+    category: 'wizard',
+    description:
+      'SillyTavern placeholder for the AI character - used in character card import instructions',
+  },
+  {
+    id: 'user-placeholder',
+    name: 'User Placeholder',
+    token: 'user',
+    category: 'wizard',
+    description:
+      'SillyTavern placeholder for the human user - used in character card import instructions',
+  },
 ];
 
 /**
