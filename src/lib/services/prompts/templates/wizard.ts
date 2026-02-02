@@ -18,18 +18,6 @@ export const settingExpansionPromptTemplate: PromptTemplate = {
   description: 'Generates rich, evocative settings for interactive fiction',
   content: `You are a world-building expert creating settings for interactive fiction. Generate rich, evocative settings that inspire creative storytelling.
 
-You MUST respond with valid JSON matching this exact schema:
-{
-  "name": "string - a memorable name for this setting/world",
-  "description": "string - 2-3 paragraphs describing the world, its rules, and atmosphere",
-  "keyLocations": [
-    { "name": "string", "description": "string - 1-2 sentences" }
-  ],
-  "atmosphere": "string - the overall mood and feeling of this world",
-  "themes": ["string array - 3-5 themes this setting explores"],
-  "potentialConflicts": ["string array - 3-5 story hooks or conflicts"]
-}
-
 Be creative but grounded. Make the setting feel lived-in and full of story potential.
 {{customInstruction}}`,
   userContent: `Create a {{genreLabel}} setting based on this seed idea:
@@ -51,18 +39,6 @@ export const settingRefinementPromptTemplate: PromptTemplate = {
   description: 'Refines an existing setting using current details and guidance',
   content: `You are a world-building expert refining an existing setting for interactive fiction. Improve clarity, depth, and cohesion while preserving established canon.
 
-You MUST respond with valid JSON matching this exact schema:
-{
-  "name": "string - a memorable name for this setting/world",
-  "description": "string - 2-3 paragraphs describing the world, its rules, and atmosphere",
-  "keyLocations": [
-    { "name": "string", "description": "string - 1-2 sentences" }
-  ],
-  "atmosphere": "string - the overall mood and feeling of this world",
-  "themes": ["string array - 3-5 themes this setting explores"],
-  "potentialConflicts": ["string array - 3-5 story hooks or conflicts"]
-}
-
 Rules:
 - Preserve existing details unless the guidance explicitly asks to change them
 - Keep the genre and tone consistent
@@ -72,9 +48,7 @@ Rules:
 
 CURRENT SETTING:
 {{currentSetting}}
-{{lorebookContext}}
-
-Return the full updated setting in the required JSON format.`,
+{{lorebookContext}}`,
 };
 
 /**
@@ -87,16 +61,6 @@ export const protagonistGenerationPromptTemplate: PromptTemplate = {
   category: 'wizard',
   description: 'Creates compelling protagonists for interactive fiction',
   content: `You are a character creation expert for interactive fiction. Create compelling protagonists that readers will want to embody or follow.
-
-You MUST respond with valid JSON matching this exact schema:
-{
-  "name": "string - a fitting name for this character (or leave generic if POV is second person)",
-  "description": "string - 1-2 sentences about who they are",
-  "background": "string - 2-3 sentences about their history",
-  "motivation": "string - what drives them, what they want",
-  "traits": ["string array - 3-5 personality traits"],
-  "appearance": "string - brief physical description (optional for 2nd person)"
-}
 
 Create a protagonist that fits naturally into the setting and has interesting story potential.`,
   userContent: `Create a protagonist for this {{genreLabel}} setting:
@@ -119,16 +83,6 @@ export const characterElaborationPromptTemplate: PromptTemplate = {
   category: 'wizard',
   description: 'Enriches user-provided character details',
   content: `You are a character development expert. The user has provided some details about their character. Your job is to elaborate and enrich these details while staying true to their vision.
-
-You MUST respond with valid JSON matching this exact schema:
-{
-  "name": "string - keep the user's name if provided, or suggest one if not",
-  "description": "string - 2-3 sentences expanding on who they are",
-  "background": "string - 2-3 sentences about their history, elaborating on what the user provided",
-  "motivation": "string - what drives them, expanding on the user's input",
-  "traits": ["string array - 4-5 personality traits, incorporating any the user mentioned"],
-  "appearance": "string - brief physical description if not provided"
-}
 
 Rules:
 - Preserve everything the user specified - don't contradict or replace their ideas
@@ -158,16 +112,6 @@ export const characterRefinementPromptTemplate: PromptTemplate = {
   description: 'Refines an existing character using current details and guidance',
   content: `You are a character development expert refining an existing character. Improve clarity, depth, and cohesion while preserving established details.
 
-You MUST respond with valid JSON matching this exact schema:
-{
-  "name": "string - keep the user's name if provided, or suggest one if not",
-  "description": "string - 2-3 sentences expanding on who they are",
-  "background": "string - 2-3 sentences about their history, elaborating on what the user provided",
-  "motivation": "string - what drives them, expanding on the user's input",
-  "traits": ["string array - 4-5 personality traits, incorporating any the user mentioned"],
-  "appearance": "string - brief physical description if not provided"
-}
-
 Rules:
 - Preserve existing details unless the guidance explicitly asks to change them
 - Improve coherence and depth without replacing core traits
@@ -178,9 +122,7 @@ Rules:
 
 CURRENT CHARACTER:
 {{currentCharacter}}
-{{settingContext}}
-
-Return the full updated character in the required JSON format.`,
+{{settingContext}}`,
 };
 
 /**
@@ -193,17 +135,6 @@ export const supportingCharactersPromptTemplate: PromptTemplate = {
   category: 'wizard',
   description: 'Creates compelling supporting characters',
   content: `You are a character creation expert. Create compelling supporting characters that complement the protagonist and drive story conflict.
-
-You MUST respond with valid JSON: an array of character objects:
-[
-  {
-    "name": "string",
-    "role": "string - their role in the story (ally, antagonist, mentor, love interest, etc.)",
-    "description": "string - 1-2 sentences about who they are",
-    "relationship": "string - their relationship to the protagonist",
-    "traits": ["string array - 2-4 personality traits"]
-  }
-]
 
 Create diverse characters with different roles and personalities.`,
   userContent: `Create {{count}} supporting characters for this {{genreLabel}} story:
@@ -475,9 +406,7 @@ SETTING: {{settingName}} - {{settingDescription}}
 PROTAGONIST: {{protagonistName}}{{protagonistDescription}}
 {{supportingCharactersSection}}
 {{povInstruction}}
-{{guidanceSection}}{{lorebookContext}}{{openingInstruction}}
-
-Return the full refined opening scene in the required JSON format.`,
+{{guidanceSection}}{{lorebookContext}}{{openingInstruction}}`,
 };
 
 /**
@@ -560,9 +489,7 @@ SETTING: {{settingName}} - {{settingDescription}}
 PROTAGONIST: {{protagonistName}}{{protagonistDescription}}
 {{supportingCharactersSection}}
 {{povInstruction}}
-{{guidanceSection}}{{lorebookContext}}{{openingInstruction}}
-
-Return the full refined opening scene in the required JSON format.`,
+{{guidanceSection}}{{lorebookContext}}{{openingInstruction}}`,
 };
 
 /**
@@ -623,22 +550,6 @@ The "{{user}}" refers to the player's character (protagonist). Characters identi
 - Any lore, world rules, or setting details
 - All {{user}} placeholders (keep them exactly as {{user}})
 
-## OUTPUT FORMAT
-Respond with valid JSON only (no markdown code blocks):
-{
-  "primaryCharacterName": "The ACTUAL name of the main character that {{char}} refers to",
-  "settingSeed": "The FULL cleaned text with {{char}} replaced by the actual name, but {{user}} kept as-is. This should be LONG - include ALL world-building, character details, and scenario setup. Only meta-instructions should be removed.",
-  "npcs": [
-    {
-      "name": "Character's actual name",
-      "role": "their role (e.g., 'ally', 'mentor', 'antagonist', 'love interest', 'guide', 'friend')",
-      "description": "1-2 sentences: who they are and key appearance details",
-      "personality": "key personality traits as comma-separated list",
-      "relationship": "their relationship to {{user}}"
-    }
-  ]
-}
-
 Note: Include ALL significant characters mentioned in the card as NPCs. The primary character ({{char}}) should be the first NPC in the array.`,
   userContent: `Clean this character card for use as a {{genre}} scenario setting.
 
@@ -654,7 +565,7 @@ IMPORTANT:
 ## CARD CONTENT
 {{cardContent}}
 
-Clean the above content. Identify all NPCs, replace {{char}} with the actual name, keep {{user}} as-is, and remove meta-content. Output valid JSON only.`,
+Clean the above content. Identify all NPCs, replace {{char}} with the actual name, keep {{user}} as-is, and remove meta-content.`,
 };
 
 /**
@@ -697,15 +608,6 @@ export const vaultCharacterImportPromptTemplate: PromptTemplate = {
 - W++ format → Natural sentences
 - Keep ALL information, just convert the format
 
-## OUTPUT FORMAT
-Respond with valid JSON only (no markdown code blocks):
-{
-  "name": "The character's actual name (what {{char}} refers to)",
-  "description": "1-2 paragraphs describing who this character is - their role, personality, and key characteristics. Written as clean prose.",
-  "traits": ["array", "of", "3-8", "personality", "traits"],
-  "visualDescriptors": ["array", "of", "physical", "appearance", "details", "for", "image", "generation"]
-}
-
 ## GUIDELINES FOR EACH FIELD
 
 ### description
@@ -727,7 +629,7 @@ Respond with valid JSON only (no markdown code blocks):
 ## CARD CONTENT
 {{cardContent}}
 
-Extract the character information into the JSON format. Remove all meta-instructions and roleplay formatting. Output valid JSON only.`,
+Extract the character information. Remove all meta-instructions and roleplay formatting.`,
 };
 
 /**
