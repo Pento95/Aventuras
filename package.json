@@ -33,7 +33,6 @@
     "gpt-tokenizer": "^3.4.0",
     "harper.js": "^1.2.0",
     "html5-qrcode": "^2.3.8",
-    "jsonrepair": "^3.13.2",
     "jszip": "^3.10.1",
     "lucide-svelte": "^0.468.0",
     "marked": "^17.0.1",
