@@ -575,7 +575,7 @@
   {/if}
 
   <!-- Input area -->
-  <div class="p-4 border-t bg-muted/10 pb-safe">
+  <div class="p-4 border-t bg-muted/10">
     <div class="flex items-end gap-2">
       <Textarea
         bind:value={inputValue}
