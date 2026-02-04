@@ -72,8 +72,8 @@ export class MemoryService {
 
     const system = promptService.renderPrompt('chapter-summarization', promptContext);
     const prompt = promptService.renderUserPrompt('chapter-summarization', promptContext, {
-      entriesText,
-      previousChaptersContext,
+      chapterContent: entriesText,
+      previousContext: previousChaptersContext,
     });
 
     const result = await generateStructured({
@@ -116,9 +116,9 @@ export class MemoryService {
 
     const system = promptService.renderPrompt('chapter-analysis', promptContext);
     const prompt = promptService.renderUserPrompt('chapter-analysis', promptContext, {
-      entriesText,
-      tokensOutsideBuffer: tokensOutsideBuffer.toString(),
-      lastChapterEndIndex: lastChapterEndIndex.toString(),
+      messagesInRange: entriesText,
+      firstValidId: (lastChapterEndIndex + 1).toString(),
+      lastValidId: (lastChapterEndIndex + entries.length).toString(),
     });
 
     const result = await generateStructured({
@@ -166,8 +166,9 @@ export class MemoryService {
     const system = promptService.renderPrompt('retrieval-decision', promptContext);
     const prompt = promptService.renderUserPrompt('retrieval-decision', promptContext, {
       userInput: context.userInput,
-      recentNarrative: context.recentNarrative,
-      availableChapters: chapterSummaries,
+      recentContext: context.recentNarrative,
+      chapterSummaries,
+      maxChaptersPerRetrieval: DEFAULT_MEMORY_CONFIG.maxChaptersPerRetrieval.toString(),
     });
 
     const result = await generateStructured({
