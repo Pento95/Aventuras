@@ -84,6 +84,18 @@
     }
   }
 
+  // Auto-select first image-capable profile if enabled but no profile selected
+  $effect(() => {
+    const imgSettings = settings.systemServicesSettings.imageGeneration;
+    if (imgSettings.enabled && !imgSettings.profileId) {
+      const profiles = getImageCapableProfiles();
+      if (profiles.length > 0) {
+        settings.systemServicesSettings.imageGeneration.profileId = profiles[0].id;
+        settings.saveSystemServicesSettings();
+      }
+    }
+  });
+
   // Load standard models when profile changes
   $effect(() => {
     const profileId = settings.systemServicesSettings.imageGeneration.profileId;
@@ -187,6 +199,13 @@
       checked={settings.systemServicesSettings.imageGeneration.enabled}
       onCheckedChange={(v) => {
         settings.systemServicesSettings.imageGeneration.enabled = v;
+        // Auto-select first image-capable profile when enabling if none selected
+        if (v && !settings.systemServicesSettings.imageGeneration.profileId) {
+          const profiles = getImageCapableProfiles();
+          if (profiles.length > 0) {
+            settings.systemServicesSettings.imageGeneration.profileId = profiles[0].id;
+          }
+        }
         settings.saveSystemServicesSettings();
       }}
     />

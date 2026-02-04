@@ -30,7 +30,7 @@ export function isImageGenerationEnabled(): boolean {
   if (!profile) return false;
 
   const capabilities = PROVIDERS[profile.providerType].capabilities;
-  return capabilities?.supportsImageGeneration ?? false;
+  return capabilities?.imageGeneration ?? false;
 }
 
 /**
@@ -47,7 +47,7 @@ export function hasRequiredCredentials(): boolean {
 
   // Check if provider supports image generation
   const capabilities = PROVIDERS[profile.providerType].capabilities;
-  if (!capabilities?.supportsImageGeneration) return false;
+  if (!capabilities?.imageGeneration) return false;
 
   // All profile-based providers have credentials if the profile exists
   // (API key is part of the profile)
@@ -106,8 +106,9 @@ export async function retryImageGeneration(imageId: string, prompt: string): Pro
   const model = imageSettings.model;
   const size = imageSettings.size;
 
-  // Update image status to generating
+  // Update image status to generating and save the new prompt
   await database.updateEmbeddedImage(imageId, {
+    prompt,
     model,
     status: 'generating',
     errorMessage: undefined,

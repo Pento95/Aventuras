@@ -51,7 +51,7 @@ export class InlineImageGenerationService {
 
     // Check if provider supports image generation
     const capabilities = PROVIDERS[profile.providerType].capabilities;
-    return capabilities?.supportsImageGeneration ?? false;
+    return capabilities?.imageGeneration ?? false;
   }
 
   /**

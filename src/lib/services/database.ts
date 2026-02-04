@@ -1478,6 +1478,9 @@ async createEmbeddedImage(image: Omit<EmbeddedImage, 'createdAt'>): Promise<Embe
     if (updates.height !== undefined) { setClauses.push('height = ?'); values.push(updates.height); }
     if (updates.status !== undefined) { setClauses.push('status = ?'); values.push(updates.status); }
     if (updates.errorMessage !== undefined) { setClauses.push('error_message = ?'); values.push(updates.errorMessage); }
+    if (updates.prompt !== undefined) { setClauses.push('prompt = ?'); values.push(updates.prompt); }
+    if (updates.model !== undefined) { setClauses.push('model = ?'); values.push(updates.model); }
+    if (updates.styleId !== undefined) { setClauses.push('style_id = ?'); values.push(updates.styleId); }
 
     if (setClauses.length === 0) return;
     values.push(id);

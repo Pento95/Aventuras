@@ -123,7 +123,7 @@ export class InlineImageTracker {
     const profile = settings.getProfile(profileId);
     if (!profile) return;
     const capabilities = PROVIDERS[profile.providerType].capabilities;
-    if (!capabilities?.supportsImageGeneration) return;
+    if (!capabilities?.imageGeneration) return;
 
     // Build full prompt with style
     const stylePrompt = this.getStylePrompt(imageSettings.styleId);
