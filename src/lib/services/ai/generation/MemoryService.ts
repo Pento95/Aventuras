@@ -188,8 +188,13 @@ export class MemoryService {
 
   /**
    * Build context block from retrieved chapters.
+   * @param getChapterEntries Optional callback to fetch full chapter entries for richer context
    */
-  buildRetrievedContextBlock(chapters: Chapter[], decision: RetrievalDecision): string {
+  buildRetrievedContextBlock(
+    chapters: Chapter[],
+    decision: RetrievalDecision,
+    getChapterEntries?: (chapter: Chapter) => StoryEntry[]
+  ): string {
     if (!decision.shouldRetrieve || decision.relevantChapterIds.length === 0) {
       return '';
     }
@@ -204,7 +209,21 @@ export class MemoryService {
 
     for (const chapter of relevantChapters) {
       block += `\n--- Chapter ${chapter.number} ---\n`;
-      block += chapter.summary;
+
+      // Use full entries if callback provided, otherwise use summary
+      if (getChapterEntries) {
+        const entries = getChapterEntries(chapter);
+        if (entries.length > 0) {
+          block += entries
+            .map(e => `[${e.type === 'user_action' ? 'ACTION' : 'NARRATIVE'}]: ${e.content}`)
+            .join('\n\n');
+        } else {
+          block += chapter.summary;
+        }
+      } else {
+        block += chapter.summary;
+      }
+
       if (chapter.keywords && chapter.keywords.length > 0) {
         block += `\n[Keywords: ${chapter.keywords.join(', ')}]`;
       }

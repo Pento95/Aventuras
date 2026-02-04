@@ -341,7 +341,9 @@ class AIService {
     decision: RetrievalDecision
   ): string {
     const memory = new MemoryService('memory');
-    return memory.buildRetrievedContextBlock(chapters, decision);
+    // Pass callback to fetch full chapter entries for richer context
+    const getChapterEntries = (chapter: Chapter) => story.getChapterEntries(chapter);
+    return memory.buildRetrievedContextBlock(chapters, decision, getChapterEntries);
   }
 
   /**
@@ -589,7 +591,9 @@ class AIService {
     });
 
     const timelineFillService = serviceFactory.createTimelineFillService();
-    return timelineFillService.runTimelineFill(visibleEntries, chapters);
+    // Pass callback to fetch full chapter entries for richer context
+    const getChapterEntries = (chapter: Chapter) => story.getChapterEntries(chapter);
+    return timelineFillService.runTimelineFill(visibleEntries, chapters, getChapterEntries);
   }
 
   /**
@@ -607,7 +611,9 @@ class AIService {
     });
 
     const chapterQueryService = serviceFactory.createChapterQueryService();
-    const answer = await chapterQueryService.answerQuestion(question, chapters, [chapterNumber]);
+    // Pass callback to fetch full chapter entries for richer context
+    const getChapterEntries = (chapter: Chapter) => story.getChapterEntries(chapter);
+    const answer = await chapterQueryService.answerQuestion(question, chapters, [chapterNumber], getChapterEntries);
     return answer.answer;
   }
 
@@ -634,7 +640,9 @@ class AIService {
     }
 
     const chapterQueryService = serviceFactory.createChapterQueryService();
-    const answer = await chapterQueryService.answerQuestion(question, chapters, chapterNumbers);
+    // Pass callback to fetch full chapter entries for richer context
+    const getChapterEntries = (chapter: Chapter) => story.getChapterEntries(chapter);
+    const answer = await chapterQueryService.answerQuestion(question, chapters, chapterNumbers, getChapterEntries);
     return answer.answer;
   }
 
