@@ -1528,6 +1528,34 @@ class UIStore {
       this.toastTimeout = null;
     }
   }
+
+  // Profile warning banner state
+  // This banner persists until the user fixes their profiles or dismisses it
+  profileWarningDismissed = $state(false);
+  private settingsActiveTab = $state<string>('api');
+
+  /**
+   * Get the active settings tab to navigate to.
+   */
+  get settingsTab(): string {
+    return this.settingsActiveTab;
+  }
+
+  /**
+   * Dismiss the profile warning banner for the current session.
+   * Users can still fix it later via Settings > API.
+   */
+  dismissProfileWarning() {
+    this.profileWarningDismissed = true;
+  }
+
+  /**
+   * Open settings modal and navigate to the API tab to fix profiles.
+   */
+  openSettingsToApiTab() {
+    this.settingsActiveTab = 'api';
+    this.settingsModalOpen = true;
+  }
 }
 
 export const ui = new UIStore();

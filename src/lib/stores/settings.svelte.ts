@@ -2912,6 +2912,36 @@ class SettingsStore {
       console.log('[Settings] Defaults auto-applied after profile change');
     }
   }
+
+  /**
+   * Get all invalid/corrupted API profiles.
+   * A profile is invalid if it's missing critical fields like providerType.
+   * This can happen when users upgrade from older versions that didn't have these fields.
+   * @returns Array of invalid profile IDs
+   */
+  getInvalidProfiles(): string[] {
+    const validProviderTypes = Object.keys(PROVIDERS);
+    return this.apiSettings.profiles
+      .filter(profile => {
+        // Check for missing or invalid providerType (critical field)
+        if (!profile.providerType || !validProviderTypes.includes(profile.providerType)) {
+          return true;
+        }
+        // Check for missing critical fields
+        if (!profile.id || !profile.name) {
+          return true;
+        }
+        return false;
+      })
+      .map(p => p.id);
+  }
+
+  /**
+   * Check if there are any invalid API profiles that need user attention.
+   */
+  hasInvalidProfiles(): boolean {
+    return this.getInvalidProfiles().length > 0;
+  }
 }
 
 export const settings = new SettingsStore();

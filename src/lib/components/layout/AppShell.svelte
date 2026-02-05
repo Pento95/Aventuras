@@ -4,6 +4,7 @@
   import { settings } from "$lib/stores/settings.svelte";
   import Sidebar from "./Sidebar.svelte";
   import Header from "./Header.svelte";
+  import ProfileWarningBanner from "./ProfileWarningBanner.svelte";
   import StoryView from "$lib/components/story/StoryView.svelte";
   import LibraryView from "$lib/components/story/LibraryView.svelte";
   import GalleryTab from "$lib/components/story/GalleryTab.svelte";
@@ -90,15 +91,20 @@
 />
 
 <div
-  class="app-shell relative flex h-screen w-screen bg-surface-900"
+  class="app-shell relative flex flex-col h-screen w-screen bg-surface-900"
   use:swipe={{
     onSwipeRight: handleSwipeRight,
     onSwipeLeft: handleSwipeLeft,
     threshold: 50,
   }}
 >
-  <!-- Mobile sidebar overlay (tap to close) -->
-  {#if ui.sidebarOpen && story.currentStory}
+  <!-- Profile Warning Banner (shown when API profiles need updating) -->
+  <ProfileWarningBanner />
+
+  <!-- Main app container -->
+  <div class="flex flex-1 min-h-0">
+    <!-- Mobile sidebar overlay (tap to close) -->
+    {#if ui.sidebarOpen && story.currentStory}
     <button
       class="mobile-sidebar-overlay"
       onclick={() => ui.toggleSidebar()}
@@ -150,6 +156,7 @@
       <Sidebar />
     </div>
   {/if}
+  </div>
 
   <!-- Settings Modal -->
   {#if ui.settingsModalOpen}

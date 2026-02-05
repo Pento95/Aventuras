@@ -60,15 +60,18 @@
     { id: "advanced", label: "Advanced", icon: SettingsIcon },
   ] as const;
 
-  let activeTab = $state<
-    | "api"
-    | "generation"
-    | "interface"
-    | "prompts"
-    | "images"
-    | "tts"
-    | "advanced"
-  >("api");
+  type SettingsTab = "api" | "generation" | "interface" | "prompts" | "images" | "tts" | "advanced";
+
+  // Use the tab from UI store (allows navigation from outside, e.g., profile warning banner)
+  let activeTab = $state<SettingsTab>(ui.settingsTab as SettingsTab);
+
+  // Sync activeTab when modal opens with a specific tab requested
+  $effect(() => {
+    if (ui.settingsModalOpen && ui.settingsTab !== activeTab) {
+      activeTab = ui.settingsTab as SettingsTab;
+    }
+  });
+
   let promptImportModalOpen = $state(false);
 
   let manualBodyEditorOpen = $state(false);
