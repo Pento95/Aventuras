@@ -92,7 +92,7 @@ export function createProviderFromProfile(profile: APIProfile, presetId: string,
       if (!baseURL) {
         throw new Error('OpenAI-compatible provider requires a custom base URL');
       }
-      return createOpenAI({
+      return createOpenAICompatible({
         name: 'openai-compatible',
         apiKey: profile.apiKey,
         baseURL,

@@ -335,8 +335,6 @@ export function streamPlainText(options: BaseGenerateOptions, serviceId: string)
     onFinish: (result) => {
       ui.addDebugResponse(debugId, serviceId, {
         result: result.content,
-        reasoning: result.reasoning,
-        usage: result.usage,
       }, startTime);
     },
   });
@@ -397,8 +395,6 @@ export function streamNarrative(options: NarrativeGenerateOptions) {
     onFinish: (result) => {
       ui.addDebugResponse(debugId, "narrative", {
         result: result.content,
-        reasoning: result.reasoning,
-        usage: result.usage,
       }, startTime);
       console.log('Narrative generation finished', result);
     }
