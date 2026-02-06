@@ -11,6 +11,7 @@ import { TranslationService } from '$lib/services/ai/utils/TranslationService'
 import { QUICK_START_SEEDS } from '$lib/services/templates'
 import { replaceUserPlaceholders } from '$lib/components/wizard/wizardTypes'
 import type { VaultScenario } from '$lib/types'
+import { lorebookVault } from '$lib/stores/lorebookVault.svelte'
 import { stringToDescriptors } from '$lib/utils/visualDescriptors'
 
 // Import Modular Stores
@@ -42,22 +43,13 @@ export class WizardStore {
     switch (this.currentStep) {
       case 1: // Mode
         return true
-      case 2: // Lorebook (optional)
-        return true
-      case 3: // World & Setting (combined)
-        // require setting seed description
-        // genre is optional in UI (defaults to custom/empty string is allowed? No, usually we want some genre)
-        // But previously genre step required selection.
-        // Let's require setting seed. Genre tag is nice but maybe not blocking if empty?
-        // Let's require at least a seed.
-        // Also check if we want to enforce genre?
-        // Old logic: narrative.selectedGenre !== "custom" || narrative.customGenre.length > 0
-        // New logic: We just use customGenre string for everything in UI.
-        // But backend might need 'custom' enum.
+      case 2: // World & Setting
         return this.setting.settingSeed.trim().length > 0
-      case 4: // Character (required - must have protagonist)
+      case 3: // Character (required - must have protagonist)
         return this.character.protagonist !== null
-      case 5: // Supporting Cast (optional)
+      case 4: // Supporting Cast (optional)
+        return true
+      case 5: // Lorebook (optional)
         return true
       case 6: // Portraits (optional)
         return true
@@ -161,6 +153,18 @@ export class WizardStore {
     } else {
       this.character.cardImportedFirstMessage = null
       this.character.cardImportedAlternateGreetings = []
+    }
+
+    // 5. Auto-link embedded lorebook if available
+    if (scenario.metadata?.linkedLorebookId) {
+      const linkedId = scenario.metadata.linkedLorebookId as string
+      const lorebook = lorebookVault.getById(linkedId)
+      if (lorebook) {
+        const alreadyAdded = this.narrative.importedLorebooks.some((lb) => lb.vaultId === linkedId)
+        if (!alreadyAdded) {
+          this.narrative.addLorebookFromVault(lorebook)
+        }
+      }
     }
 
     this.setting.showScenarioVaultPicker = false

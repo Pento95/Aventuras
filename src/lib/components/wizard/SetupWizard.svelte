@@ -41,10 +41,10 @@
   // Step Titles
   const stepTitles = [
     'Choose Your Mode',
-    'Import Lorebook (Optional)',
     'World & Setting',
     'Create Your Character',
     'Supporting Cast (Optional)',
+    'Import Lorebook (Optional)',
     'Character Portraits (Optional)',
     'Writing Style',
     'Generate Opening',
@@ -108,20 +108,6 @@
           onModeChange={(mode) => (wizard.narrative.selectedMode = mode)}
         />
       {:else if wizard.currentStep === 2}
-        <Step2Lorebook
-          importedLorebooks={wizard.narrative.importedLorebooks}
-          importError={wizard.narrative.importError}
-          onSelectFromVault={(l) => wizard.narrative.addLorebookFromVault(l)}
-          onRemoveLorebook={(id) => wizard.narrative.removeLorebook(id)}
-          onToggleExpanded={(id) => wizard.narrative.toggleLorebookExpanded(id)}
-          onClearAll={() => wizard.narrative.clearAllLorebooks()}
-          onNavigateToVault={() => {
-            ui.setActivePanel('vault')
-            ui.setVaultTab('lorebooks')
-            onClose()
-          }}
-        />
-      {:else if wizard.currentStep === 3}
         <Step3Setting
           settingSeed={wizard.setting.settingSeed}
           expandedSetting={wizard.setting.expandedSettingDisplay}
@@ -179,7 +165,7 @@
             onClose()
           }}
         />
-      {:else if wizard.currentStep === 4}
+      {:else if wizard.currentStep === 3}
         <Step4Characters
           selectedMode={wizard.narrative.selectedMode}
           expandedSetting={wizard.setting.expandedSettingDisplay}
@@ -239,7 +225,7 @@
             onClose()
           }}
         />
-      {:else if wizard.currentStep === 5}
+      {:else if wizard.currentStep === 4}
         <Step5SupportingCast
           protagonist={wizard.character.protagonistDisplay}
           supportingCharacters={wizard.character.supportingCharactersDisplay}
@@ -287,6 +273,20 @@
           onNavigateToVault={() => {
             ui.setActivePanel('vault')
             ui.setVaultTab('characters')
+            onClose()
+          }}
+        />
+      {:else if wizard.currentStep === 5}
+        <Step2Lorebook
+          importedLorebooks={wizard.narrative.importedLorebooks}
+          importError={wizard.narrative.importError}
+          onSelectFromVault={(l) => wizard.narrative.addLorebookFromVault(l)}
+          onRemoveLorebook={(id) => wizard.narrative.removeLorebook(id)}
+          onToggleExpanded={(id) => wizard.narrative.toggleLorebookExpanded(id)}
+          onClearAll={() => wizard.narrative.clearAllLorebooks()}
+          onNavigateToVault={() => {
+            ui.setActivePanel('vault')
+            ui.setVaultTab('lorebooks')
             onClose()
           }}
         />
