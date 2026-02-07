@@ -12,9 +12,11 @@
     Flag,
     Brain,
     Calendar,
+    Link,
   } from 'lucide-svelte'
   import TagBadge from '$lib/components/tags/TagBadge.svelte'
   import { tagStore } from '$lib/stores/tags.svelte'
+  import { lorebookVault } from '$lib/stores/lorebookVault.svelte'
   import VaultCard from './shared/VaultCard.svelte'
 
   type VaultItem = VaultCharacter | VaultLorebook | VaultScenario
@@ -47,6 +49,22 @@
 
   let isImporting = $derived(item.metadata?.importing === true)
 
+  // Linked lorebook detection
+  const hasLinkedLorebook = $derived(
+    (type === 'character' || type === 'scenario') && !!item.metadata?.linkedLorebookId,
+  )
+  const linkedLorebookName = $derived.by(() => {
+    if (!hasLinkedLorebook) return null
+    const id = item.metadata?.linkedLorebookId as string
+    return lorebookVault.getById(id)?.name ?? null
+  })
+  const isLinkedFromCard = $derived(
+    type === 'lorebook' && !!(item.metadata as Record<string, unknown>)?.linkedFromName,
+  )
+  const linkedFromName = $derived(
+    isLinkedFromCard ? ((item.metadata as Record<string, unknown>).linkedFromName as string) : null,
+  )
+
   // Helper for Lorebook Entry Icons
 
   const entryTypeIcons: Record<string, any> = {
@@ -57,6 +75,11 @@
     concept: Brain,
     event: Calendar,
   }
+
+  // Scenario tags with "imported" filtered out (source badge handles that)
+  const scenarioTags = $derived(
+    asScenario ? asScenario.tags.filter((t) => t.toLowerCase() !== 'imported') : [],
+  )
 
   // Helper for Lorebook Entry Counts
   const lorebookEntryCounts = $derived.by(() => {
@@ -106,35 +129,34 @@
   {/snippet}
 
   {#snippet badges()}
-    {#if asLorebook}
+    {#if asCharacter}
+      {#if hasLinkedLorebook}
+        <Badge variant="secondary" class="max-w-32 h-4 gap-1 px-1.5 text-[10px] font-normal">
+          <Link class="h-2.5 w-2.5 shrink-0" />
+          <span class="truncate">{linkedLorebookName ?? 'Lorebook'}</span>
+        </Badge>
+      {/if}
+    {:else if asLorebook}
       <span class="text-muted-foreground text-[10px] font-medium">
         {asLorebook.entries.length} entries
       </span>
-      {#if asLorebook.source === 'story' || asLorebook.source === 'import'}
+      {#if isLinkedFromCard}
+        <Badge variant="secondary" class="h-4 gap-1 px-1.5 text-[10px] font-normal">
+          <Link class="h-2.5 w-2.5" />
+          {linkedFromName}
+        </Badge>
+      {:else if asLorebook.source === 'story' || asLorebook.source === 'import'}
         <Badge variant="secondary" class="h-4 px-1.5 text-[10px] font-normal">
           {asLorebook.source === 'story' ? 'Story' : 'Imported'}
         </Badge>
       {/if}
     {:else if asScenario}
-      <div class="text-muted-foreground flex items-center gap-2">
-        {#if asScenario.npcs.length > 0}
-          <span class="flex items-center gap-1 text-[10px]">
-            <Users class="h-3 w-3" />
-            {asScenario.npcs.length} NPCs
-          </span>
-        {/if}
-        {#if asScenario.firstMessage}
-          <span class="flex items-center gap-1 text-[10px]">
-            <MessageSquare class="h-3 w-3" />
-            Opening
-          </span>
-        {/if}
-        {#if asScenario.source === 'wizard'}
-          <span class="text-[10px]">• Created</span>
-        {:else if asScenario.source === 'import'}
-          <span class="text-[10px]">• Imported</span>
-        {/if}
-      </div>
+      {#if hasLinkedLorebook}
+        <Badge variant="secondary" class="max-w-32 h-4 gap-1 px-1.5 text-[10px] font-normal">
+          <Link class="h-2.5 w-2.5 shrink-0" />
+          <span class="truncate">{linkedLorebookName ?? 'Lorebook'}</span>
+        </Badge>
+      {/if}
     {/if}
   {/snippet}
 
@@ -188,18 +210,42 @@
         </div>
       {/if}
     {:else if asScenario}
-      {#if asScenario.tags.length > 0}
-        <div class="flex flex-wrap gap-1">
-          {#each asScenario.tags.slice(0, 3) as tag, i (i)}
-            <TagBadge name={tag} color={tagStore.getColor(tag, 'scenario')} />
-          {/each}
-          {#if asScenario.tags.length > 3}
-            <span class="text-muted-foreground self-center text-[10px]">
-              +{asScenario.tags.length - 3}
-            </span>
-          {/if}
-        </div>
-      {/if}
+      <div class="flex flex-wrap gap-1">
+        {#if asScenario.npcs.length > 0}
+          <Badge
+            variant="outline"
+            class="text-muted-foreground/80 border-muted-foreground/20 h-4 gap-1 px-1.5 text-[10px] font-normal"
+          >
+            <Users class="h-2.5 w-2.5" />
+            {asScenario.npcs.length} NPCs
+          </Badge>
+        {/if}
+        {#if asScenario.firstMessage}
+          <Badge
+            variant="outline"
+            class="text-muted-foreground/80 border-muted-foreground/20 h-4 gap-1 px-1.5 text-[10px] font-normal"
+          >
+            <MessageSquare class="h-2.5 w-2.5" />
+            Opening
+          </Badge>
+        {/if}
+        {#if asScenario.source === 'wizard' || asScenario.source === 'import'}
+          <Badge
+            variant="outline"
+            class="text-muted-foreground/80 border-muted-foreground/20 h-4 px-1.5 text-[10px] font-normal"
+          >
+            {asScenario.source === 'wizard' ? 'Created' : 'Imported'}
+          </Badge>
+        {/if}
+        {#each scenarioTags.slice(0, 3) as tag, i (i)}
+          <TagBadge name={tag} color={tagStore.getColor(tag, 'scenario')} />
+        {/each}
+        {#if scenarioTags.length > 3}
+          <span class="text-muted-foreground self-center text-[10px]">
+            +{scenarioTags.length - 3}
+          </span>
+        {/if}
+      </div>
     {/if}
   {/snippet}
 </VaultCard>

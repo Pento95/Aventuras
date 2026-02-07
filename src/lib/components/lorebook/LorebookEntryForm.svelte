@@ -65,7 +65,7 @@
   const injectionModes: Array<{ value: EntryInjectionMode; label: string; description: string }> = [
     { value: 'always', label: 'Always Active', description: 'Always included in every response' },
     { value: 'keyword', label: 'Automatic', description: 'Matched by keywords or AI relevance' },
-    { value: 'never', label: 'Manual Only', description: 'Never included automatically' },
+    { value: 'never', label: 'Disabled', description: 'Not included in AI context' },
   ]
 
   function getDefaultState(entryType: EntryType): EntryState {
@@ -350,7 +350,7 @@
       {/each}
     </RadioGroup>
 
-    {#if injectionMode === 'keyword' || injectionMode === 'relevant'}
+    {#if injectionMode === 'keyword'}
       <p class="text-muted-foreground mt-2 text-xs">
         Entry will be included when keywords/aliases match the story, or when the AI determines it's
         contextually relevant.

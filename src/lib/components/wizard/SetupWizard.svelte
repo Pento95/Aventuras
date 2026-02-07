@@ -5,7 +5,10 @@
   import { Button } from '$lib/components/ui/button'
   import { ChevronLeft, ChevronRight, Sparkles, Play } from 'lucide-svelte'
   import { ui } from '$lib/stores/ui.svelte'
+  import { lorebookVault } from '$lib/stores/lorebookVault.svelte'
+  import { characterVault } from '$lib/stores/characterVault.svelte'
   import { hasRequiredCredentials } from '$lib/services/ai/image'
+  import type { VaultCharacter } from '$lib/types'
 
   // Step components
   import {
@@ -28,6 +31,26 @@
   // Initialize Wizard Store
   const wizard = new WizardStore(() => onClose())
 
+  // Auto-link embedded lorebook when selecting a vault character
+  function autoLinkCharacterLorebook(char: VaultCharacter, isProtagonist = false) {
+    const linkedId = (char.metadata as Record<string, unknown>)?.linkedLorebookId as string | undefined
+    if (!linkedId) return
+    if (isProtagonist) wizard.setProtagonistLinkedLorebook(linkedId)
+    const lorebook = lorebookVault.getById(linkedId)
+    if (!lorebook) return
+    const alreadyAdded = wizard.narrative.importedLorebooks.some((lb) => lb.vaultId === linkedId)
+    if (alreadyAdded) return
+    wizard.narrative.addLorebookFromVault(lorebook)
+    ui.showToast(`Added embedded lorebook: ${lorebook.name}`, 'info')
+  }
+
+  // Resolve linkedLorebookId from a vault character ID
+  function getLinkedLorebookIdFromVaultCharacter(vaultCharId: string): string | undefined {
+    const char = characterVault.getById(vaultCharId)
+    if (!char) return undefined
+    return (char.metadata as Record<string, unknown>)?.linkedLorebookId as string | undefined
+  }
+
   // Check if API key is configured
   const needsApiKey = $derived(settings.needsApiKey)
 
@@ -41,10 +64,10 @@
   // Step Titles
   const stepTitles = [
     'Choose Your Mode',
-    'Import Lorebook (Optional)',
     'World & Setting',
     'Create Your Character',
     'Supporting Cast (Optional)',
+    'Import Lorebook (Optional)',
     'Character Portraits (Optional)',
     'Writing Style',
     'Generate Opening',
@@ -108,20 +131,6 @@
           onModeChange={(mode) => (wizard.narrative.selectedMode = mode)}
         />
       {:else if wizard.currentStep === 2}
-        <Step2Lorebook
-          importedLorebooks={wizard.narrative.importedLorebooks}
-          importError={wizard.narrative.importError}
-          onSelectFromVault={(l) => wizard.narrative.addLorebookFromVault(l)}
-          onRemoveLorebook={(id) => wizard.narrative.removeLorebook(id)}
-          onToggleExpanded={(id) => wizard.narrative.toggleLorebookExpanded(id)}
-          onClearAll={() => wizard.narrative.clearAllLorebooks()}
-          onNavigateToVault={() => {
-            ui.setActivePanel('vault')
-            ui.setVaultTab('lorebooks')
-            onClose()
-          }}
-        />
-      {:else if wizard.currentStep === 3}
         <Step3Setting
           settingSeed={wizard.setting.settingSeed}
           expandedSetting={wizard.setting.expandedSettingDisplay}
@@ -156,7 +165,10 @@
           onEditSetting={() => wizard.setting.editSetting()}
           onCancelEdit={() => wizard.setting.cancelSettingEdit()}
           onSelectScenario={(id) => wizard.selectScenario(id)}
-          onClearCardImport={() => wizard.character.clearCardImport()}
+          onClearCardImport={() => {
+            wizard.clearScenarioLinkedLorebook()
+            wizard.character.clearCardImport()
+          }}
           onSaveToVault={() =>
             wizard.setting.saveScenarioToVault(
               wizard.narrative.storyTitle,
@@ -179,7 +191,7 @@
             onClose()
           }}
         />
-      {:else if wizard.currentStep === 4}
+      {:else if wizard.currentStep === 3}
         <Step4Characters
           selectedMode={wizard.narrative.selectedMode}
           expandedSetting={wizard.setting.expandedSettingDisplay}
@@ -227,19 +239,21 @@
               wizard.image.protagonistVisualDescriptors,
               wizard.image.protagonistPortrait,
             )}
-          onSelectProtagonistFromVault={(c) =>
+          onSelectProtagonistFromVault={(c) => {
             wizard.character.handleSelectProtagonistFromVault(
               c,
               (v) => (wizard.image.protagonistVisualDescriptors = v),
               (v) => (wizard.image.protagonistPortrait = v),
-            )}
+            )
+            autoLinkCharacterLorebook(c, true)
+          }}
           onNavigateToVault={() => {
             ui.setActivePanel('vault')
             ui.setVaultTab('characters')
             onClose()
           }}
         />
-      {:else if wizard.currentStep === 5}
+      {:else if wizard.currentStep === 4}
         <Step5SupportingCast
           protagonist={wizard.character.protagonistDisplay}
           supportingCharacters={wizard.character.supportingCharactersDisplay}
@@ -271,22 +285,45 @@
               wizard.narrative.selectedGenre,
               wizard.narrative.customGenre,
             )}
-          onDeleteSupportingCharacter={(i) => wizard.character.deleteSupportingCharacter(i)}
+          onDeleteSupportingCharacter={(i) => {
+            const char = wizard.character.supportingCharacters[i]
+            if (char?.vaultId) {
+              const linkedId = getLinkedLorebookIdFromVaultCharacter(char.vaultId)
+              if (linkedId) wizard._removeLinkedLorebook(linkedId)
+            }
+            wizard.character.deleteSupportingCharacter(i)
+          }}
           onGenerateCharacters={() =>
             wizard.character.generateCharacters(
               wizard.setting.expandedSetting!,
               wizard.narrative.selectedGenre,
               wizard.narrative.customGenre,
             )}
-          onSelectSupportingFromVault={(c) =>
+          onSelectSupportingFromVault={(c) => {
             wizard.character.handleSelectSupportingFromVault(
               c,
               (name, v) => (wizard.image.supportingCharacterVisualDescriptors[name] = v),
               (name, v) => (wizard.image.supportingCharacterPortraits[name] = v),
-            )}
+            )
+            autoLinkCharacterLorebook(c)
+          }}
           onNavigateToVault={() => {
             ui.setActivePanel('vault')
             ui.setVaultTab('characters')
+            onClose()
+          }}
+        />
+      {:else if wizard.currentStep === 5}
+        <Step2Lorebook
+          importedLorebooks={wizard.narrative.importedLorebooks}
+          importError={wizard.narrative.importError}
+          onSelectFromVault={(l) => wizard.narrative.addLorebookFromVault(l)}
+          onRemoveLorebook={(id) => wizard.narrative.removeLorebook(id)}
+          onToggleExpanded={(id) => wizard.narrative.toggleLorebookExpanded(id)}
+          onClearAll={() => wizard.narrative.clearAllLorebooks()}
+          onNavigateToVault={() => {
+            ui.setActivePanel('vault')
+            ui.setVaultTab('lorebooks')
             onClose()
           }}
         />
@@ -376,7 +413,10 @@
           onSaveEdit={() => wizard.narrative.saveOpeningEdit()}
           onDraftChange={(v) => (wizard.narrative.openingDraft = v)}
           onUseCardOpening={() => wizard.narrative.useCardOpening()}
-          onClearCardOpening={() => wizard.character.clearCardImport()}
+          onClearCardOpening={() => {
+            wizard.clearScenarioLinkedLorebook()
+            wizard.character.clearCardImport()
+          }}
           onManualOpeningChange={(v) => (wizard.narrative.manualOpeningText = v)}
           onClearGenerated={() => wizard.narrative.clearGeneratedOpening()}
         />

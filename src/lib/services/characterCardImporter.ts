@@ -164,6 +164,7 @@ export interface ParsedCard {
   creator_notes?: string
   tags?: string[]
   version: 'v1' | 'v2' | 'v3'
+  characterBook?: unknown // Raw SillyTavern character_book data
 }
 
 export interface CardImportResult {
@@ -214,6 +215,7 @@ export function parseCharacterCard(jsonString: string): ParsedCard | null {
         creator_notes: data.data.creator_notes || data.creator_notes,
         tags: data.data.tags || data.tags,
         version,
+        characterBook: data.data.character_book || undefined,
       }
     }
 

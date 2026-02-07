@@ -8,6 +8,7 @@
     RefreshCw,
     Star,
     AlertTriangle,
+    Brain,
   } from 'lucide-svelte'
   import VirtualList from '@tutorlatin/svelte-tiny-virtual-list'
   import * as Select from '$lib/components/ui/select'
@@ -57,6 +58,13 @@
 
   // Get available models for the selected profile (excluding hidden, favorites first)
   let availableModels = $derived(settings.getAvailableModels(effectiveProfileId))
+
+  // Set of models that support reasoning (for brain icon)
+  let reasoningSet = $derived.by(() => {
+    if (!effectiveProfileId) return new Set<string>()
+    const profile = settings.getProfile(effectiveProfileId)
+    return new Set(profile?.reasoningModels ?? [])
+  })
 
   // Number of favorite models (for separator)
   let favoriteCount = $derived.by(() => {
@@ -125,7 +133,7 @@
 <div class={cn('grid gap-4', className)}>
   {#if showProfileSelector}
     <div class="grid gap-2">
-      <Label>API Profile</Label>
+      <div class="flex h-4 items-center"><Label>API Profile</Label></div>
       <div class="flex gap-2">
         <Select.Root
           type="single"
@@ -157,20 +165,27 @@
   {/if}
 
   <div class="grid gap-2">
-    <div class="flex items-center justify-between">
+    <div class="flex h-4 items-center justify-between">
       <Label>{label}</Label>
-      {#if onRefreshModels}
-        <Button
-          variant="text"
-          size="sm"
-          class="text-muted-foreground hover:text-primary h-auto p-0 text-xs no-underline"
-          onclick={onRefreshModels}
-          disabled={isRefreshingModels}
-        >
-          <RefreshCw class={cn('mr-1 h-3 w-3', isRefreshingModels && 'animate-spin')} />
-          Refresh
-        </Button>
-      {/if}
+      <div class="flex items-center gap-2">
+        {#if isModelMissing}
+          <span class="hidden text-[0.7rem] text-yellow-500 md:inline">Not in profile list</span>
+        {:else if availableModels.length === 0}
+          <span class="text-muted-foreground hidden text-[0.7rem] md:inline">No models available</span>
+        {/if}
+        {#if onRefreshModels}
+          <Button
+            variant="text"
+            size="sm"
+            class="text-muted-foreground hover:text-primary h-auto p-0 text-xs no-underline"
+            onclick={onRefreshModels}
+            disabled={isRefreshingModels}
+          >
+            <RefreshCw class={cn('mr-1 h-3 w-3', isRefreshingModels && 'animate-spin')} />
+            Refresh
+          </Button>
+        {/if}
+      </div>
     </div>
     <Popover.Root bind:open>
       <Popover.Trigger>
@@ -235,7 +250,10 @@
                                 )}
                               />
                             {/if}
-                            {modelOption}
+                            <span class="truncate">{modelOption}</span>
+                            {#if reasoningSet.has(modelOption)}
+                              <Brain class="ml-auto h-3 w-3 shrink-0 text-emerald-500" />
+                            {/if}
                           </Command.Item>
                         </div>
                       {/if}
@@ -249,9 +267,11 @@
       </Popover.Content>
     </Popover.Root>
     {#if isModelMissing}
-      <p class="text-[0.8rem] text-yellow-500">Model not found in this profile's model list.</p>
+      <p class="mt-1 text-[0.8rem] text-yellow-500 md:hidden">
+        Model not found in this profile's model list.
+      </p>
     {:else if availableModels.length === 0}
-      <p class="text-muted-foreground text-[0.8rem]">
+      <p class="text-muted-foreground mt-1 text-[0.8rem] md:hidden">
         No models available. Add models to the profile.
       </p>
     {/if}

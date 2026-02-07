@@ -2,7 +2,9 @@ import type { VaultScenario, VaultScenarioNpc } from '$lib/types'
 import type { CardImportResult } from '$lib/services/characterCardImporter'
 import { database } from '$lib/services/database'
 import { discoveryService, type DiscoveryCard } from '$lib/services/discovery'
-import { readCharacterCardFile, convertCardToScenario } from '$lib/services/characterCardImporter'
+import { readCharacterCardFile, convertCardToScenario, parseCharacterCard } from '$lib/services/characterCardImporter'
+import { extractEmbeddedLorebook } from '$lib/services/lorebookImporter'
+import { lorebookVault } from './lorebookVault.svelte'
 import type { Genre } from '$lib/services/ai/wizard/ScenarioService'
 import { ui } from './ui.svelte'
 
@@ -281,7 +283,7 @@ class ScenarioVaultStore {
       traits: npc.traits || [],
     }))
 
-    const finalData: VaultScenario = {
+    let finalData: VaultScenario = {
       id: tempId,
       name: result.storyTitle || file.name.replace(/\.[^/.]+$/, ''),
       description:
@@ -303,6 +305,34 @@ class ScenarioVaultStore {
         npcCount: npcs.length,
         sourceUrl: options.sourceUrl,
       },
+    }
+
+    // Extract embedded lorebook if present
+    const parsed = parseCharacterCard(jsonString)
+    if (parsed?.characterBook) {
+      const extracted = extractEmbeddedLorebook(parsed.characterBook, parsed.name)
+      if (extracted) {
+        try {
+          if (!lorebookVault.isLoaded) await lorebookVault.load()
+          const savedLorebook = await lorebookVault.saveFromImport(
+            extracted.name,
+            extracted.entries,
+            extracted.result,
+            file.name,
+            { name: finalData.name, type: 'scenario' },
+          )
+          finalData = {
+            ...finalData,
+            metadata: {
+              ...finalData.metadata,
+              linkedLorebookId: savedLorebook.id,
+            },
+          }
+          ui.showToast(`Embedded lorebook extracted: ${extracted.name}`, 'info')
+        } catch (err) {
+          log('Failed to extract embedded lorebook:', err)
+        }
+      }
     }
 
     // Save to DB

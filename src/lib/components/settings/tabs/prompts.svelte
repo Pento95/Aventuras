@@ -24,7 +24,7 @@
   let { openImportModal }: Props = $props()
 
   // Prompts tab state
-  let promptsCategory = $state<'story' | 'service' | 'wizard'>('story')
+  let promptsCategory = $state<'story' | 'service' | 'wizard' | 'image-style'>('story')
   let isExporting = $state(false)
 
   // Macro Library State
@@ -38,12 +38,14 @@
   const storyTemplates = $derived(allTemplates.filter((t) => t.category === 'story'))
   const serviceTemplates = $derived(allTemplates.filter((t) => t.category === 'service'))
   const wizardTemplates = $derived(allTemplates.filter((t) => t.category === 'wizard'))
+  const imageStyleTemplates = $derived(allTemplates.filter((t) => t.category === 'image-style'))
   const allMacros = $derived(promptService.getAllMacros())
 
   // Get templates for current category
   function getTemplatesForCategory() {
     if (promptsCategory === 'story') return storyTemplates
     if (promptsCategory === 'service') return serviceTemplates
+    if (promptsCategory === 'image-style') return imageStyleTemplates
     return wizardTemplates
   }
 
@@ -223,12 +225,13 @@
   <!-- Category Tabs -->
   <Tabs.Root
     value={promptsCategory}
-    onValueChange={(v) => (promptsCategory = v as 'story' | 'service' | 'wizard')}
+    onValueChange={(v) => (promptsCategory = v as 'story' | 'service' | 'wizard' | 'image-style')}
   >
-    <Tabs.List class="grid w-full grid-cols-3">
+    <Tabs.List class="grid w-full grid-cols-4">
       <Tabs.Trigger value="story">Story</Tabs.Trigger>
       <Tabs.Trigger value="service">Services</Tabs.Trigger>
       <Tabs.Trigger value="wizard">Wizard</Tabs.Trigger>
+      <Tabs.Trigger value="image-style">Image Styles</Tabs.Trigger>
     </Tabs.List>
 
     <!-- Templates List (Accordion) -->

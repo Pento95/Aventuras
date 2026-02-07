@@ -27,8 +27,7 @@ export type EntryTypeSchema = z.infer<typeof entryTypeSchema>
 export const injectionModeSchema = z.enum([
   'always', // Always inject
   'keyword', // Inject when keywords match
-  'relevant', // Inject based on relevance scoring
-  'never', // Never auto-inject
+  'never', // Disabled - not included in AI context
 ])
 
 export type InjectionModeSchema = z.infer<typeof injectionModeSchema>
@@ -42,10 +41,9 @@ export const vaultLorebookEntrySchema = z.object({
   type: entryTypeSchema.describe('The category of this entry'),
   description: z.string().describe('Detailed description of the entry'),
   keywords: z.array(z.string()).describe('Keywords that trigger this entry'),
+  aliases: z.array(z.string()).describe('Alternative names for this entry'),
   injectionMode: injectionModeSchema.describe('When to inject this entry into context'),
   priority: z.number().describe('Injection priority (higher = more important)'),
-  disabled: z.boolean().describe('Whether this entry is currently disabled'),
-  group: z.string().nullable().describe('Optional group/category for organization'),
 })
 
 export type VaultLorebookEntrySchema = z.infer<typeof vaultLorebookEntrySchema>
@@ -93,7 +91,6 @@ export const entryListResultSchema = z.object({
       type: entryTypeSchema,
       description: z.string(),
       keywords: z.array(z.string()),
-      disabled: z.boolean(),
     }),
   ),
   total: z.number(),

@@ -85,7 +85,16 @@ class LorebookVaultStore {
     entries: VaultLorebookEntry[],
     result: LorebookImportResult,
     filename: string,
+    linkedFrom?: { name: string; type: 'character' | 'scenario' },
   ): Promise<VaultLorebook> {
+    // Dedup: if an embedded lorebook from the same file already exists, reuse it
+    if (linkedFrom) {
+      const existing = this.lorebooks.find(
+        (lb) => lb.originalFilename === filename && lb.name === name,
+      )
+      if (existing) return existing
+    }
+
     const entryBreakdown: Record<EntryType, number> = {
       character: 0,
       location: 0,
@@ -111,6 +120,7 @@ class LorebookVaultStore {
         format: result.metadata.format,
         totalEntries: entries.length,
         entryBreakdown,
+        ...(linkedFrom && { linkedFromName: linkedFrom.name, linkedFromType: linkedFrom.type }),
       },
     })
   }
@@ -202,10 +212,9 @@ class LorebookVaultStore {
         type,
         description: e.description,
         keywords: e.keywords,
+        aliases: [],
         injectionMode: 'keyword' as const,
         priority: 100,
-        disabled: false,
-        group: null,
       }
     })
 

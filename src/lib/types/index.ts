@@ -246,10 +246,9 @@ export interface VaultLorebookEntry {
   type: EntryType
   description: string
   keywords: string[]
+  aliases: string[]
   injectionMode: EntryInjectionMode
   priority: number
-  disabled: boolean
-  group: string | null
 }
 
 // ===== Scenario Vault Types =====
@@ -271,6 +270,7 @@ export interface VaultScenarioMetadata {
   hasFirstMessage?: boolean
   alternateGreetingsCount?: number
   npcCount?: number
+  linkedLorebookId?: string // ID of auto-imported lorebook from embedded character_book
   [key: string]: unknown
 }
 
@@ -432,7 +432,7 @@ export interface Branch {
 // ===== Entry/Lorebook System (per design doc section 3.2) =====
 
 export type EntryType = 'character' | 'location' | 'item' | 'faction' | 'concept' | 'event'
-export type EntryInjectionMode = 'always' | 'keyword' | 'relevant' | 'never'
+export type EntryInjectionMode = 'always' | 'keyword' | 'never'
 export type EntryCreator = 'user' | 'ai' | 'import'
 
 /**
@@ -667,6 +667,7 @@ export interface APIProfile {
   apiKey: string // API key for this endpoint
   customModels: string[] // Manually added models
   fetchedModels: string[] // Auto-fetched from /models endpoint
+  reasoningModels: string[] // Models that support reasoning (fetched from API capabilities)
   hiddenModels: string[] // Models hidden from selection lists
   favoriteModels: string[] // Models shown at the top of selection lists
   createdAt: number // Timestamp

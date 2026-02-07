@@ -9,7 +9,7 @@
  */
 
 import type { LanguageModelV3Middleware, LanguageModelV3Prompt } from '@ai-sdk/provider'
-import type { JSONSchema7 } from 'json-schema'
+import type { JSONSchema7, JSONSchema7Type } from 'json-schema'
 
 // ============================================================================
 // Schema to TypeScript Conversion
@@ -21,7 +21,7 @@ function jsonSchemaToTypeScript(schema: JSONSchema7, indent = 0): string {
 
   const nullable = Array.isArray(schema.type) && schema.type.includes('null')
   const primaryType = Array.isArray(schema.type)
-    ? schema.type.find((t) => t !== 'null')
+    ? schema.type.find((t: string) => t !== 'null')
     : schema.type
 
   function withNullable(type: string): string {
@@ -31,7 +31,7 @@ function jsonSchemaToTypeScript(schema: JSONSchema7, indent = 0): string {
   switch (primaryType) {
     case 'string':
       if (schema.enum) {
-        const enumValues = schema.enum.map((v) => `"${v}"`).join(' | ')
+        const enumValues = schema.enum.map((v: JSONSchema7Type) => `"${v}"`).join(' | ')
         return nullable ? `(${enumValues}) | null` : enumValues
       }
       return withNullable('string')

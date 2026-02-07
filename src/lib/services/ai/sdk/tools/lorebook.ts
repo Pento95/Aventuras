@@ -130,27 +130,12 @@ export function createLorebookTools(context: LorebookToolContext) {
         type: entryTypeSchema
           .optional()
           .describe('Filter entries by type (character, location, item, faction, concept, event)'),
-        includeDisabled: z
-          .boolean()
-          .optional()
-          .default(false)
-          .describe('Include disabled entries in the list'),
       }),
-      execute: async ({
-        type,
-        includeDisabled,
-      }: {
-        type?: z.infer<typeof entryTypeSchema>
-        includeDisabled?: boolean
-      }) => {
+      execute: async ({ type }: { type?: z.infer<typeof entryTypeSchema> }) => {
         let filtered = entries
 
         if (type) {
           filtered = filtered.filter((e) => e.type === type)
-        }
-
-        if (!includeDisabled) {
-          filtered = filtered.filter((e) => !e.disabled)
         }
 
         return {
@@ -163,7 +148,6 @@ export function createLorebookTools(context: LorebookToolContext) {
               type: e.type,
               description: e.description.slice(0, 200) + (e.description.length > 200 ? '...' : ''),
               keywords: e.keywords.slice(0, 5),
-              disabled: e.disabled,
             }
           }),
           total: filtered.length,
@@ -207,6 +191,11 @@ export function createLorebookTools(context: LorebookToolContext) {
         type: entryTypeSchema.describe('Type of entry'),
         description: z.string().describe('Full description of the entry'),
         keywords: z.array(z.string()).describe('Keywords that will trigger this entry'),
+        aliases: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe('Alternative names for this entry'),
         injectionMode: injectionModeSchema
           .optional()
           .default('keyword')
@@ -216,39 +205,32 @@ export function createLorebookTools(context: LorebookToolContext) {
           .optional()
           .default(50)
           .describe('Injection priority 0-100 (default: 50)'),
-        group: z
-          .string()
-          .nullable()
-          .optional()
-          .default(null)
-          .describe('Optional group for organization'),
       }),
       execute: async ({
         name,
         type,
         description,
         keywords,
+        aliases,
         injectionMode,
         priority,
-        group,
       }: {
         name: string
         type: z.infer<typeof entryTypeSchema>
         description: string
         keywords: string[]
+        aliases?: string[]
         injectionMode?: z.infer<typeof injectionModeSchema>
         priority?: number
-        group?: string | null
       }) => {
         const newEntry: VaultLorebookEntry = {
           name,
           type,
           description,
           keywords,
+          aliases: aliases ?? [],
           injectionMode: injectionMode ?? 'keyword',
           priority: priority ?? 50,
-          disabled: false,
-          group: group ?? null,
         }
 
         const changeId = generateId()
@@ -283,10 +265,9 @@ export function createLorebookTools(context: LorebookToolContext) {
         type: entryTypeSchema.optional().describe('New type'),
         description: z.string().optional().describe('New description'),
         keywords: z.array(z.string()).optional().describe('New keywords (replaces existing)'),
+        aliases: z.array(z.string()).optional().describe('New aliases (replaces existing)'),
         injectionMode: injectionModeSchema.optional().describe('New injection mode'),
         priority: z.number().optional().describe('New priority'),
-        disabled: z.boolean().optional().describe('Enable/disable the entry'),
-        group: z.string().nullable().optional().describe('New group'),
       }),
       execute: async ({
         index,
@@ -297,10 +278,9 @@ export function createLorebookTools(context: LorebookToolContext) {
         type?: z.infer<typeof entryTypeSchema>
         description?: string
         keywords?: string[]
+        aliases?: string[]
         injectionMode?: z.infer<typeof injectionModeSchema>
         priority?: number
-        disabled?: boolean
-        group?: string | null
       }) => {
         if (index < 0 || index >= entries.length) {
           return {

@@ -47,8 +47,7 @@
   const injectionLabels: Record<string, string> = {
     always: 'Always Active',
     keyword: 'Automatic (keywords + AI)',
-    relevant: 'Automatic (keywords + AI)', // Same behavior as keyword
-    never: 'Manual Only',
+    never: 'Disabled',
   }
 
   const Icon = $derived(typeIcons[entry.type] || BookOpen)

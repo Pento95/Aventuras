@@ -73,7 +73,11 @@
 
   // Type options
   const entryTypes: EntryType[] = ['character', 'location', 'item', 'faction', 'concept', 'event']
-  const injectionModes: EntryInjectionMode[] = ['always', 'keyword', 'relevant', 'never']
+  const injectionModes: Array<{ value: EntryInjectionMode; label: string; description: string }> = [
+    { value: 'always', label: 'Always Active', description: 'Always included in every response' },
+    { value: 'keyword', label: 'Automatic', description: 'Matched by keywords or AI relevance' },
+    { value: 'never', label: 'Disabled', description: 'Not included in AI context' },
+  ]
 
   const typeIcons: Record<EntryType, any> = {
     character: Users,
@@ -168,10 +172,9 @@
       type: 'character',
       description: '',
       keywords: [],
+      aliases: [],
       injectionMode: 'keyword',
       priority: 10,
-      disabled: false,
-      group: null,
     }
     entries.push(newEntry)
     entries = entries // Trigger update
@@ -323,7 +326,7 @@
                     </div>
                     <div class="bg-background flex justify-between rounded border p-2">
                       <span class="text-muted-foreground">Active Entries</span>
-                      <span>{entries.filter((e) => !e.disabled).length}</span>
+                      <span>{entries.filter((e) => e.injectionMode !== 'never').length}</span>
                     </div>
                   </div>
                 </div>
@@ -391,7 +394,7 @@
                         </div>
                         <div class="flex items-center gap-2 text-xs opacity-70">
                           <span class="capitalize">{entry.type}</span>
-                          {#if entry.disabled}
+                          {#if entry.injectionMode === 'never'}
                             <span class="ml-auto flex items-center gap-0.5">
                               <EyeOff class="h-3 w-3" />
                             </span>
@@ -449,37 +452,27 @@
 
                 <div class="flex-1 overflow-y-auto p-6">
                   <div class="mx-auto max-w-3xl space-y-6">
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      <div class="space-y-2">
-                        <Label>Entry Type</Label>
-                        <Select
-                          type="single"
-                          value={selectedEntry.type}
-                          onValueChange={(v) => (selectedEntry.type = v as EntryType)}
-                        >
-                          <SelectTrigger id="entry-type">
-                            {`${
-                              selectedEntry.type.charAt(0).toUpperCase() +
-                              selectedEntry.type.slice(1)
-                            }` || 'Select type'}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {#each entryTypes as option (option)}
-                              <SelectItem value={option}
-                                >{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem
-                              >
-                            {/each}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div class="space-y-2">
-                        <Label>Group (Optional)</Label>
-                        <Input
-                          bind:value={selectedEntry.group}
-                          placeholder="e.g. Main Cast, Kingdom A"
-                        />
-                      </div>
+                    <div class="space-y-2">
+                      <Label>Entry Type</Label>
+                      <Select
+                        type="single"
+                        value={selectedEntry.type}
+                        onValueChange={(v) => (selectedEntry.type = v as EntryType)}
+                      >
+                        <SelectTrigger id="entry-type">
+                          {`${
+                            selectedEntry.type.charAt(0).toUpperCase() +
+                            selectedEntry.type.slice(1)
+                          }` || 'Select type'}
+                        </SelectTrigger>
+                        <SelectContent>
+                          {#each entryTypes as option (option)}
+                            <SelectItem value={option}
+                              >{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem
+                            >
+                          {/each}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div class="space-y-2">
@@ -498,6 +491,22 @@
                       </p>
                     </div>
 
+                    <div class="space-y-2">
+                      <Label>Aliases</Label>
+                      <Input
+                        value={selectedEntry.aliases.join(', ')}
+                        oninput={(e) =>
+                          (selectedEntry!.aliases = e.currentTarget.value
+                            .split(',')
+                            .map((k) => k.trim())
+                            .filter(Boolean))}
+                        placeholder="Comma-separated alternative names..."
+                      />
+                      <p class="text-muted-foreground text-[0.8rem]">
+                        Alternative names or spellings for this entry.
+                      </p>
+                    </div>
+
                     <div class="flex flex-1 flex-col space-y-2">
                       <Label>Description / Content</Label>
                       <Textarea
@@ -510,7 +519,7 @@
                     <div class="bg-muted/30 space-y-4 rounded-lg border p-4">
                       <h4 class="text-sm font-medium">Injection Settings</h4>
 
-                      <div class="grid grid-cols-1 items-center gap-4 md:grid-cols-3">
+                      <div class="grid grid-cols-1 items-center gap-4 md:grid-cols-2">
                         <div class="space-y-2">
                           <Label class="text-xs">Injection Mode</Label>
                           <Select
@@ -520,41 +529,24 @@
                               (selectedEntry.injectionMode = v as EntryInjectionMode)}
                           >
                             <SelectTrigger id="injection-mode">
-                              {`${
-                                selectedEntry.injectionMode.charAt(0).toUpperCase() +
-                                selectedEntry.injectionMode.slice(1)
-                              }` || 'Select mode'}
+                              {injectionModes.find((m) => m.value === selectedEntry.injectionMode)
+                                ?.label || 'Select mode'}
                             </SelectTrigger>
                             <SelectContent>
-                              {#each injectionModes as option (option)}
-                                <SelectItem value={option}
-                                  >{option.charAt(0).toUpperCase() + option.slice(1)}</SelectItem
-                                >
+                              {#each injectionModes as mode (mode.value)}
+                                <SelectItem value={mode.value}>{mode.label}</SelectItem>
                               {/each}
                             </SelectContent>
                           </Select>
+                          <p class="text-muted-foreground text-[0.8rem]">
+                            {injectionModes.find((m) => m.value === selectedEntry.injectionMode)
+                              ?.description || ''}
+                          </p>
                         </div>
 
                         <div class="space-y-2">
                           <Label class="text-xs">Priority</Label>
                           <Input type="number" bind:value={selectedEntry.priority} />
-                        </div>
-
-                        <div class="h-4 pt-3">
-                          <div class="flex items-end pb-1">
-                            <label
-                              class="flex cursor-pointer items-center gap-2 text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={!selectedEntry.disabled}
-                                onchange={() =>
-                                  (selectedEntry!.disabled = !selectedEntry!.disabled)}
-                                class="border-primary text-primary focus:ring-ring h-4 w-4 rounded shadow focus:ring-1"
-                              />
-                              <span>Enabled</span>
-                            </label>
-                          </div>
                         </div>
                       </div>
                     </div>

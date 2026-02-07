@@ -20,10 +20,9 @@
       `Type: ${entry.type}`,
       `Description: ${entry.description}`,
       entry.keywords.length > 0 ? `Keywords: ${entry.keywords.join(', ')}` : null,
+      entry.aliases.length > 0 ? `Aliases: ${entry.aliases.join(', ')}` : null,
       `Injection: ${entry.injectionMode}`,
       `Priority: ${entry.priority}`,
-      entry.group ? `Group: ${entry.group}` : null,
-      entry.disabled ? `Status: Disabled` : null,
     ]
       .filter(Boolean)
       .join('\n')
@@ -37,11 +36,9 @@
     if (updates.type !== undefined) lines.push(`Type: ${updates.type}`)
     if (updates.description !== undefined) lines.push(`Description: ${updates.description}`)
     if (updates.keywords !== undefined) lines.push(`Keywords: ${updates.keywords.join(', ')}`)
+    if (updates.aliases !== undefined) lines.push(`Aliases: ${updates.aliases.join(', ')}`)
     if (updates.injectionMode !== undefined) lines.push(`Injection: ${updates.injectionMode}`)
     if (updates.priority !== undefined) lines.push(`Priority: ${updates.priority}`)
-    if (updates.group !== undefined) lines.push(`Group: ${updates.group ?? '(none)'}`)
-    if (updates.disabled !== undefined)
-      lines.push(`Status: ${updates.disabled ? 'Disabled' : 'Enabled'}`)
     return lines.join('\n')
   }
 

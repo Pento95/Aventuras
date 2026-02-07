@@ -6,6 +6,8 @@ import {
   parseCharacterCard,
   sanitizeCharacterCard,
 } from '$lib/services/characterCardImporter'
+import { extractEmbeddedLorebook } from '$lib/services/lorebookImporter'
+import { lorebookVault } from './lorebookVault.svelte'
 import { ui } from './ui.svelte'
 
 const DEBUG = true
@@ -350,7 +352,7 @@ class CharacterVaultStore {
       }
 
       // Prepare final data
-      const finalData: VaultCharacter = {
+      let finalData: VaultCharacter = {
         id: tempId,
         name: sanitized?.name || parsed.name,
         description: sanitized?.description || parsed.description || parsed.creator_notes || null,
@@ -376,6 +378,33 @@ class CharacterVaultStore {
           sanitized: !!sanitized,
           ...extraMetadata,
         },
+      }
+
+      // Extract embedded lorebook if present
+      if (parsed.characterBook) {
+        const extracted = extractEmbeddedLorebook(parsed.characterBook, parsed.name)
+        if (extracted) {
+          try {
+            if (!lorebookVault.isLoaded) await lorebookVault.load()
+            const savedLorebook = await lorebookVault.saveFromImport(
+              extracted.name,
+              extracted.entries,
+              extracted.result,
+              file.name,
+              { name: finalData.name, type: 'character' },
+            )
+            finalData = {
+              ...finalData,
+              metadata: {
+                ...(finalData.metadata as Record<string, unknown>),
+                linkedLorebookId: savedLorebook.id,
+              },
+            }
+            ui.showToast(`Embedded lorebook extracted: ${extracted.name}`, 'info')
+          } catch (err) {
+            log('Failed to extract embedded lorebook:', err)
+          }
+        }
       }
 
       // Save to DB

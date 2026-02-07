@@ -72,10 +72,9 @@ function entryToVaultEntry(entry: Entry): VaultLorebookEntry {
     type: entry.type,
     description: entry.description,
     keywords: entry.injection.keywords,
+    aliases: entry.aliases,
     injectionMode: entry.injection.mode,
     priority: entry.injection.priority,
-    disabled: false,
-    group: null,
   }
 }
 
