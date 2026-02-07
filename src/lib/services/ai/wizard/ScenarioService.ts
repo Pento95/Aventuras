@@ -176,6 +176,8 @@ export interface WizardData {
     visualProseMode?: boolean
     inlineImageMode?: boolean
     imageGenerationMode?: 'none' | 'auto' | 'inline'
+    backgroundImagesEnabled?: boolean
+    portraitMode?: boolean
   }
   title: string
   openingGuidance?: string
@@ -960,6 +962,8 @@ class ScenarioService {
       visualProseMode?: boolean
       inlineImageMode?: boolean
       imageGenerationMode?: 'none' | 'auto' | 'inline'
+      backgroundImagesEnabled?: boolean
+      portraitMode?: boolean
     }
     protagonist: Partial<Character>
     startingLocation: Partial<Location>
@@ -988,6 +992,8 @@ class ScenarioService {
         visualProseMode: writingStyle.visualProseMode,
         inlineImageMode: writingStyle.inlineImageMode,
         imageGenerationMode: writingStyle.imageGenerationMode,
+        backgroundImagesEnabled: writingStyle.backgroundImagesEnabled,
+        portraitMode: writingStyle.portraitMode,
       },
       protagonist: {
         name: protagonist?.name || (writingStyle.pov === 'second' ? 'You' : 'The Protagonist'),

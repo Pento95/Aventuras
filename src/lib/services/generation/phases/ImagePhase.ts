@@ -17,7 +17,7 @@ import type { Character } from '$lib/types'
 /** Dependencies for image phase - injected to avoid tight coupling */
 export interface ImageDependencies {
   generateImagesForNarrative: (context: ImageGenerationContext) => Promise<void>
-  isImageGenerationEnabled: () => boolean
+  isImageGenerationEnabled: (storySettings?: any) => boolean
 }
 
 /** Settings needed for image phase decision making */
@@ -26,6 +26,8 @@ export interface ImageSettings {
   autoGenerate: boolean
   /** When true, inline images are handled during streaming, not in this phase */
   inlineMode?: boolean
+  imageGenerationMode?: 'none' | 'auto' | 'inline'
+  portraitMode?: boolean
 }
 
 /** Input for the image phase */
@@ -80,22 +82,22 @@ export class ImagePhase {
       return result
     }
 
-    // Check if image generation is disabled
-    if (!imageSettings.enabled) {
+    // Check if image generation is disabled for this story
+    if (imageSettings.imageGenerationMode === 'none') {
       const result: ImageResult = { started: false, skippedReason: 'disabled' }
       yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
       return result
     }
 
     // Check if auto-generate is off (manual mode - context stored for later)
-    if (!imageSettings.autoGenerate) {
+    if (imageSettings.imageGenerationMode !== 'auto') {
       const result: ImageResult = { started: false, skippedReason: 'auto_generate_off' }
       yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
       return result
     }
 
     // Check if image generation is actually configured (profile exists)
-    if (!this.deps.isImageGenerationEnabled()) {
+    if (!this.deps.isImageGenerationEnabled(imageSettings)) {
       const result: ImageResult = { started: false, skippedReason: 'not_configured' }
       yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
       return result

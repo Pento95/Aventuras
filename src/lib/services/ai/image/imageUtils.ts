@@ -9,6 +9,7 @@ import { generateImage } from '$lib/services/ai/sdk/generate'
 import { PROVIDERS } from '$lib/services/ai/sdk/providers/config'
 import { database } from '$lib/services/database'
 import { settings } from '$lib/stores/settings.svelte'
+import type { StorySettings } from '$lib/types'
 import { emitImageReady, emitImageAnalysisFailed } from '$lib/services/events'
 import { createLogger } from '../core/config'
 
@@ -18,9 +19,18 @@ const log = createLogger('ImageUtils')
  * Check if image generation is enabled and has valid configuration.
  * Returns true if a valid image-capable profile is selected.
  */
-export function isImageGenerationEnabled(): boolean {
+export function isImageGenerationEnabled(storySettings?: StorySettings): boolean {
   const imageSettings = settings.systemServicesSettings.imageGeneration
-  if (!imageSettings?.enabled) return false
+
+  // If story settings are provided, use them to check if generation is enabled for this story
+  if (storySettings) {
+    if (storySettings.imageGenerationMode === 'none') return false
+  } else {
+    // Falls back to global enabled if no story context (e.g. initial setup or legacy check)
+    // NOTE: User wants overall toggle to not exist, so we might want to default this to true
+    // if a profile is configured.
+    if (!imageSettings?.enabled && !imageSettings?.profileId) return false
+  }
 
   const profileId = imageSettings.profileId
   if (!profileId) return false
@@ -170,22 +180,19 @@ export async function generatePortrait(
   const imageSettings = settings.systemServicesSettings.imageGeneration
 
   // Determine which profile/model to use
-  const profileId = options?.profileId || imageSettings.portraitProfileId || imageSettings.profileId
+  const profileId = options?.profileId || imageSettings.portraitProfileId
 
   if (!profileId) {
     throw new Error('No image generation profile configured')
   }
 
-  const model =
-    options?.model ||
-    (imageSettings.portraitMode ? imageSettings.portraitModel : imageSettings.model) ||
-    imageSettings.model
+  const model = options?.model || imageSettings.portraitModel
 
   if (!model) {
     throw new Error('No image model configured')
   }
 
-  const size = options?.size || '1024x1024'
+  const size = options?.size || imageSettings.portraitSize || '1024x1024'
 
   log('Generating portrait', {
     profileId,

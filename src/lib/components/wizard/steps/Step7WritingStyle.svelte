@@ -15,11 +15,15 @@
     visualProseMode: boolean
     imageGenerationEnabled: boolean
     imageGenerationMode: 'none' | 'auto' | 'inline'
+    backgroundImagesEnabled: boolean
+    portraitMode: boolean
     onPOVChange: (v: POV) => void
     onTenseChange: (v: Tense) => void
     onToneChange: (v: string) => void
     onVisualProseModeChange: (v: boolean) => void
     onImageGenerationModeChange: (v: 'none' | 'auto' | 'inline') => void
+    onBackgroundImagesEnabledChange: (v: boolean) => void
+    onPortraitModeChange: (v: boolean) => void
   }
 
   let {
@@ -29,11 +33,15 @@
     visualProseMode,
     imageGenerationEnabled,
     imageGenerationMode,
+    backgroundImagesEnabled,
+    portraitMode,
     onPOVChange,
     onTenseChange,
     onToneChange,
     onVisualProseModeChange,
     onImageGenerationModeChange,
+    onBackgroundImagesEnabledChange,
+    onPortraitModeChange,
   }: Props = $props()
 
   // Force "none" mode when image generation is disabled
@@ -202,6 +210,37 @@
               </Label>
             </div>
           </RadioGroup.Root>
+
+          <!-- Extra Image Toggles -->
+          <div class="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
+            <div class="flex items-center space-x-2">
+              <Switch
+                id="bg-images"
+                checked={backgroundImagesEnabled}
+                onCheckedChange={onBackgroundImagesEnabledChange}
+              />
+              <div class="grid gap-1.5 leading-none">
+                <Label for="bg-images">Background Images</Label>
+                <p class="text-muted-foreground text-xs">
+                  Generate immersive background images for scenes.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <Switch
+                id="portrait-mode"
+                checked={portraitMode}
+                onCheckedChange={onPortraitModeChange}
+              />
+              <div class="grid gap-1.5 leading-none">
+                <Label for="portrait-mode">Portrait References</Label>
+                <p class="text-muted-foreground text-xs">
+                  Use character portraits as visual references.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
       {/if}
 

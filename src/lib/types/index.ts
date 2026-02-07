@@ -113,6 +113,8 @@ export interface StorySettings {
   visualProseMode?: boolean // Enable HTML/CSS visual output mode
   inlineImageMode?: boolean // Enable <pic> tag inline image generation
   imageGenerationMode?: 'none' | 'auto' | 'inline' // Image generation strategy
+  backgroundImagesEnabled?: boolean
+  portraitMode?: boolean
 }
 
 export interface StoryEntry {
@@ -771,7 +773,10 @@ export interface ImageGenerationSettings {
   profileId: string | null // API profile to use for image generation
   model: string // Image model (default: 'z-image-turbo')
   styleId: string // Selected image style template
-  size: ImageSize // Image size
+  portraitStyleId?: string // Character portrait style template
+  size: ImageSize // Regular image size
+  referenceSize?: ImageSize // Reference image size
+  portraitSize?: ImageSize // Portrait image size
   maxImagesPerMessage: number // Max images to generate per narrative (default: 2)
   autoGenerate: boolean // Generate automatically after narration
 

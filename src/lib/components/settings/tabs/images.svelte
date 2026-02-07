@@ -5,7 +5,7 @@
   import { Button } from '$lib/components/ui/button'
   import * as Select from '$lib/components/ui/select'
   import { Slider } from '$lib/components/ui/slider'
-  import { RotateCcw } from 'lucide-svelte'
+  import { RotateCcw, Info } from 'lucide-svelte'
   import {
     listImageModels,
     clearModelsCache,
@@ -14,6 +14,8 @@
   import { PROVIDERS } from '$lib/services/ai/sdk/providers/config'
   import ImageModelSelect from '$lib/components/settings/ImageModelSelect.svelte'
   import type { APIProfile } from '$lib/types'
+  import * as Tabs from '$lib/components/ui/tabs'
+  import * as Alert from '$lib/components/ui/alert'
 
   const imageStyles = [
     { value: 'image-style-soft-anime', label: 'Soft Anime' },
@@ -31,6 +33,9 @@
     { value: '1280x720', label: '1280x720 (Widescreen)' },
     { value: '720x1280', label: '720x1280 (Portrait)' },
   ] as const
+
+  // Tab state
+  let activeTab = $state<'general' | 'characters' | 'backgrounds'>('general')
 
   // Get profiles that support image generation
   function getImageCapableProfiles(): APIProfile[] {
@@ -230,7 +235,9 @@
         ? settings.systemServicesSettings.imageGeneration.profileId
         : type === 'portrait'
           ? settings.systemServicesSettings.imageGeneration.portraitProfileId
-          : settings.systemServicesSettings.imageGeneration.referenceProfileId
+          : type === 'reference'
+            ? settings.systemServicesSettings.imageGeneration.referenceProfileId
+            : settings.systemServicesSettings.imageGeneration.backgroundProfileId
     return profileId ? settings.getProfile(profileId) : undefined
   }
 
@@ -238,204 +245,286 @@
 </script>
 
 <div class="space-y-4">
-  <!-- Enable Image Generation Toggle -->
-  <div class="flex items-center justify-between">
-    <div>
-      <Label>Enable Image Generation</Label>
-      <p class="text-muted-foreground text-xs">
-        Enable AI-powered image generation for stories and portraits.
-      </p>
-    </div>
-    <Switch
-      checked={settings.systemServicesSettings.imageGeneration.enabled}
-      onCheckedChange={(v) => {
-        settings.systemServicesSettings.imageGeneration.enabled = v
-        // Auto-select first image-capable profile when enabling if none selected
-        if (v && !settings.systemServicesSettings.imageGeneration.profileId) {
-          const profiles = getImageCapableProfiles()
-          if (profiles.length > 0) {
-            settings.systemServicesSettings.imageGeneration.profileId = profiles[0].id
-          }
-        }
-        settings.saveSystemServicesSettings()
-      }}
-    />
+  <div class="flex items-center justify-end">
+    <Button variant="ghost" size="sm" onclick={() => settings.resetImageGenerationSettings()}>
+      <RotateCcw class="mr-1 h-3 w-3" />
+      Reset to Defaults
+    </Button>
   </div>
 
-  {#if settings.systemServicesSettings.imageGeneration.enabled}
-    <!-- No profiles warning -->
-    {#if imageCapableProfiles.length === 0}
-      <div class="rounded-md border border-yellow-500/20 bg-yellow-500/10 p-4">
-        <p class="text-sm text-yellow-600 dark:text-yellow-400">
-          No API profiles with image generation support found. Create a profile for OpenAI, NanoGPT,
-          Chutes, Pollinations, or Google in the API Profiles tab.
-        </p>
-      </div>
-    {:else}
-      <!-- Standard Image Profile -->
-      <div>
-        <Label class="mb-2 block">Image Generation Profile</Label>
-        <Select.Root
-          type="single"
-          value={settings.systemServicesSettings.imageGeneration.profileId ?? ''}
-          onValueChange={(v) => onProfileChange(v, 'standard')}
-        >
-          <Select.Trigger class="h-10 w-full">
-            {#if getSelectedProfile('standard')}
-              {getSelectedProfile('standard')?.name} ({getSelectedProfile('standard')
-                ?.providerType})
-            {:else}
-              Select a profile
-            {/if}
-          </Select.Trigger>
-          <Select.Content>
-            {#each imageCapableProfiles as profile (profile.id)}
-              <Select.Item value={profile.id} label={`${profile.name} (${profile.providerType})`}>
-                {profile.name} <span class="text-muted-foreground">({profile.providerType})</span>
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-        <p class="text-muted-foreground mt-1 text-xs">
-          Select the API profile to use for image generation.
-        </p>
-      </div>
+  <Tabs.Root value={activeTab} onValueChange={(v) => (activeTab = v as any)}>
+    <Tabs.List class="grid w-full grid-cols-3">
+      <Tabs.Trigger value="general">Story Images</Tabs.Trigger>
+      <Tabs.Trigger value="characters">Characters</Tabs.Trigger>
+      <Tabs.Trigger value="backgrounds">Backgrounds</Tabs.Trigger>
+    </Tabs.List>
 
-      <!-- Image Model (only show when not in portrait mode) -->
-      {#if settings.systemServicesSettings.imageGeneration.profileId && !settings.systemServicesSettings.imageGeneration.portraitMode}
-        <div>
-          <Label class="mb-2 block">Image Model</Label>
-          <ImageModelSelect
-            models={standardModels}
-            selectedModelId={settings.systemServicesSettings.imageGeneration.model}
-            onModelChange={(id) => {
-              settings.systemServicesSettings.imageGeneration.model = id
-              settings.saveSystemServicesSettings()
-            }}
-            showCost={true}
-            showImg2ImgIndicator={true}
-            showDescription={false}
-            isLoading={isLoadingStandardModels}
-            errorMessage={standardModelsError}
-            showRefreshButton={true}
-            onRefresh={() =>
-              loadModelsForProfile(
-                settings.systemServicesSettings.imageGeneration.profileId,
-                (m) => (standardModels = m),
-                (l) => (isLoadingStandardModels = l),
-                (e) => (standardModelsError = e),
-                true,
-              )}
-          />
-          <p class="text-muted-foreground mt-1 text-xs">The image model to use for generation.</p>
-        </div>
-      {/if}
+    <div class="mt-4 min-h-[400px]">
+      <!-- General Tab -->
+      <Tabs.Content value="general" class="space-y-6">
+        <section class="space-y-6">
+          <div class="bg-muted/10 space-y-6 rounded-lg border p-4">
+            <div class="space-y-3">
+              <Alert.Root>
+                <Info class="h-4 w-4" />
+                <Alert.Title>Story Image Model Selection</Alert.Title>
+                <Alert.Description class="text-xs">
+                  <ul class="mt-2 list-inside list-disc space-y-1">
+                    <li>
+                      <strong>Reference Model</strong>: Used when "Portrait Mode" is enabled in your
+                      current story. Generates images based on the character portraits.
+                    </li>
+                    <li>
+                      <strong>Regular Image Model</strong>: Used when "Portrait Mode" is disabled in
+                      your current story.
+                    </li>
+                  </ul>
+                </Alert.Description>
+              </Alert.Root>
+            </div>
 
-      <!-- Image Style -->
-      <div>
-        <Label class="mb-2 block">Image Style</Label>
-        <Select.Root
-          type="single"
-          value={settings.systemServicesSettings.imageGeneration.styleId}
-          onValueChange={(v) => {
-            settings.systemServicesSettings.imageGeneration.styleId = v
-            settings.saveSystemServicesSettings()
-          }}
-        >
-          <Select.Trigger class="h-10 w-full">
-            {imageStyles.find(
-              (s) => s.value === settings.systemServicesSettings.imageGeneration.styleId,
-            )?.label ?? 'Select style'}
-          </Select.Trigger>
-          <Select.Content>
-            {#each imageStyles as style (style.value)}
-              <Select.Item value={style.value} label={style.label}>
-                {style.label}
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-        <p class="text-muted-foreground mt-1 text-xs">
-          Visual style for generated images. Edit styles in the Prompts tab.
-        </p>
-      </div>
+            <div class="grid gap-6 md:grid-cols-2">
+              <!-- Standard Image Configuration -->
+              <div class="space-y-4">
+                <div class="space-y-2">
+                  <Label>Regular Image Profile</Label>
+                  <Select.Root
+                    type="single"
+                    value={settings.systemServicesSettings.imageGeneration.profileId ?? ''}
+                    onValueChange={(v) => onProfileChange(v, 'standard')}
+                  >
+                    <Select.Trigger class="h-10 w-full">
+                      {#if getSelectedProfile('standard')}
+                        {getSelectedProfile('standard')?.name} ({getSelectedProfile('standard')
+                          ?.providerType})
+                      {:else}
+                        Select a profile
+                      {/if}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each imageCapableProfiles as profile (profile.id)}
+                        <Select.Item
+                          value={profile.id}
+                          label={`${profile.name} (${profile.providerType})`}
+                        >
+                          {profile.name}
+                          <span class="text-muted-foreground">({profile.providerType})</span>
+                        </Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                </div>
 
-      <!-- Image Size -->
-      <div>
-        <Label class="mb-2 block">Image Size</Label>
-        <Select.Root
-          type="single"
-          value={settings.systemServicesSettings.imageGeneration.size}
-          onValueChange={(v) => {
-            settings.systemServicesSettings.imageGeneration.size = v as
-              | '512x512'
-              | '1024x1024'
-              | '2048x2048'
-            settings.saveSystemServicesSettings()
-          }}
-        >
-          <Select.Trigger class="h-10 w-full">
-            {imageSizes.find(
-              (s) => s.value === settings.systemServicesSettings.imageGeneration.size,
-            )?.label ?? 'Select size'}
-          </Select.Trigger>
-          <Select.Content>
-            {#each imageSizes as size (size.value)}
-              <Select.Item value={size.value} label={size.label}>
-                {size.label}
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-      </div>
+                {#if settings.systemServicesSettings.imageGeneration.profileId}
+                  <div class="space-y-2">
+                    <Label>Regular Image Model</Label>
+                    <ImageModelSelect
+                      models={standardModels}
+                      selectedModelId={settings.systemServicesSettings.imageGeneration.model}
+                      onModelChange={(id) => {
+                        settings.systemServicesSettings.imageGeneration.model = id
+                        settings.saveSystemServicesSettings()
+                      }}
+                      showCost={true}
+                      showImg2ImgIndicator={true}
+                      showDescription={false}
+                      isLoading={isLoadingStandardModels}
+                      errorMessage={standardModelsError}
+                      showRefreshButton={true}
+                      onRefresh={() =>
+                        loadModelsForProfile(
+                          settings.systemServicesSettings.imageGeneration.profileId,
+                          (m) => (standardModels = m),
+                          (l) => (isLoadingStandardModels = l),
+                          (e) => (standardModelsError = e),
+                          true,
+                        )}
+                    />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>Regular Image Size</Label>
+                    <Select.Root
+                      type="single"
+                      value={settings.systemServicesSettings.imageGeneration.size}
+                      onValueChange={(v) => {
+                        settings.systemServicesSettings.imageGeneration.size = v as any
+                        settings.saveSystemServicesSettings()
+                      }}
+                    >
+                      <Select.Trigger class="h-10 w-full">
+                        {imageSizes.find(
+                          (s) => s.value === settings.systemServicesSettings.imageGeneration.size,
+                        )?.label ?? 'Select size'}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each imageSizes as size (size.value)}
+                          <Select.Item value={size.value} label={size.label}>
+                            {size.label}
+                          </Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  </div>
+                {/if}
+              </div>
 
-      <!-- Max Images Per Message -->
-      <div>
-        <Label class="mb-2 block">
-          Max Images Per Message: {settings.systemServicesSettings.imageGeneration
-            .maxImagesPerMessage === 0
-            ? 'Unlimited'
-            : settings.systemServicesSettings.imageGeneration.maxImagesPerMessage}
-        </Label>
-        <Slider
-          type="multiple"
-          value={[settings.systemServicesSettings.imageGeneration.maxImagesPerMessage]}
-          onValueChange={(v: number[]) => {
-            settings.systemServicesSettings.imageGeneration.maxImagesPerMessage = v[0]
-            settings.saveSystemServicesSettings()
-          }}
-          min={0}
-          max={5}
-          step={1}
-          class="w-full"
-        />
-        <p class="text-muted-foreground mt-1 text-xs">
-          Maximum images per narrative (0 = unlimited).
-        </p>
-      </div>
+              <!-- Reference Image Configuration -->
+              <div class="space-y-4">
+                <div class="space-y-2">
+                  <Label>Reference (Img2Img) Profile</Label>
+                  <Select.Root
+                    type="single"
+                    value={settings.systemServicesSettings.imageGeneration.referenceProfileId ??
+                      settings.systemServicesSettings.imageGeneration.profileId ??
+                      ''}
+                    onValueChange={(v) => onProfileChange(v, 'reference')}
+                  >
+                    <Select.Trigger class="h-10 w-full">
+                      {#if getSelectedProfile('reference') || getSelectedProfile('standard')}
+                        {(getSelectedProfile('reference') || getSelectedProfile('standard'))?.name}
+                        ({(getSelectedProfile('reference') || getSelectedProfile('standard'))
+                          ?.providerType})
+                      {:else}
+                        Select a profile
+                      {/if}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each imageCapableProfiles as profile (profile.id)}
+                        <Select.Item
+                          value={profile.id}
+                          label={`${profile.name} (${profile.providerType})`}
+                        >
+                          {profile.name}
+                          <span class="text-muted-foreground">({profile.providerType})</span>
+                        </Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                </div>
 
-      <div class="border-border bg-muted/20 space-y-4 rounded-lg border p-4">
-        <!-- Portrait Reference Mode -->
-        <div class="flex items-center justify-between">
-          <div>
-            <Label>Portrait Reference Mode</Label>
-            <p class="text-muted-foreground text-xs">
-              Use character portraits as reference images when generating story images.
+                {#if settings.systemServicesSettings.imageGeneration.referenceProfileId || settings.systemServicesSettings.imageGeneration.profileId}
+                  <div class="space-y-2">
+                    <Label>Reference Model</Label>
+                    <ImageModelSelect
+                      models={referenceImg2ImgModels.length > 0
+                        ? referenceImg2ImgModels
+                        : referenceModels.length > 0
+                          ? referenceModels
+                          : standardModels.filter((m) => m.supportsImg2Img)}
+                      selectedModelId={settings.systemServicesSettings.imageGeneration
+                        .referenceModel}
+                      onModelChange={(id) => {
+                        settings.systemServicesSettings.imageGeneration.referenceModel = id
+                        settings.saveSystemServicesSettings()
+                      }}
+                      showCost={true}
+                      showImg2ImgIndicator={false}
+                      isLoading={isLoadingReferenceModels || isLoadingStandardModels}
+                      errorMessage={referenceModelsError || standardModelsError}
+                      showRefreshButton={true}
+                      onRefresh={() => {
+                        const profileId =
+                          settings.systemServicesSettings.imageGeneration.referenceProfileId ||
+                          settings.systemServicesSettings.imageGeneration.profileId
+                        loadModelsForProfile(
+                          profileId,
+                          (m) => (referenceModels = m),
+                          (l) => (isLoadingReferenceModels = l),
+                          (e) => (referenceModelsError = e),
+                          true,
+                        )
+                      }}
+                    />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>Reference Image Size</Label>
+                    <Select.Root
+                      type="single"
+                      value={settings.systemServicesSettings.imageGeneration.referenceSize}
+                      onValueChange={(v) => {
+                        settings.systemServicesSettings.imageGeneration.referenceSize = v as any
+                        settings.saveSystemServicesSettings()
+                      }}
+                    >
+                      <Select.Trigger class="h-10 w-full">
+                        {imageSizes.find(
+                          (s) =>
+                            s.value ===
+                            settings.systemServicesSettings.imageGeneration.referenceSize,
+                        )?.label ?? 'Select size'}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each imageSizes as size (size.value)}
+                          <Select.Item value={size.value} label={size.label}>
+                            {size.label}
+                          </Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          </div>
+
+          <!-- Image Style -->
+          <div class="space-y-2">
+            <Label>Story Image Style</Label>
+            <Select.Root
+              type="single"
+              value={settings.systemServicesSettings.imageGeneration.styleId}
+              onValueChange={(v) => {
+                settings.systemServicesSettings.imageGeneration.styleId = v
+                settings.saveSystemServicesSettings()
+              }}
+            >
+              <Select.Trigger class="h-10 w-full">
+                {imageStyles.find(
+                  (s) => s.value === settings.systemServicesSettings.imageGeneration.styleId,
+                )?.label ?? 'Select style'}
+              </Select.Trigger>
+              <Select.Content>
+                {#each imageStyles as style (style.value)}
+                  <Select.Item value={style.value} label={style.label}>
+                    {style.label}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+            <p class="text-muted-foreground mt-1 text-xs">
+              Visual style for generated story images. Edit styles in the Prompts tab.
             </p>
           </div>
-          <Switch
-            checked={settings.systemServicesSettings.imageGeneration.portraitMode}
-            onCheckedChange={(v) => {
-              settings.systemServicesSettings.imageGeneration.portraitMode = v
-              settings.saveSystemServicesSettings()
-            }}
-          />
-        </div>
 
-        {#if settings.systemServicesSettings.imageGeneration.portraitMode}
-          <!-- Portrait Generation Profile -->
-          <div>
-            <Label class="mb-2 block">Portrait Generation Profile</Label>
+          <!-- Max Images Per Message -->
+          <div class="space-y-2">
+            <Label>
+              Max Images Per Message: {settings.systemServicesSettings.imageGeneration
+                .maxImagesPerMessage === 0
+                ? 'Unlimited'
+                : settings.systemServicesSettings.imageGeneration.maxImagesPerMessage}
+            </Label>
+            <Slider
+              type="multiple"
+              value={[settings.systemServicesSettings.imageGeneration.maxImagesPerMessage]}
+              onValueChange={(v) => {
+                settings.systemServicesSettings.imageGeneration.maxImagesPerMessage = v[0]
+                settings.saveSystemServicesSettings()
+              }}
+              min={0}
+              max={5}
+              step={1}
+            />
+          </div>
+        </section>
+      </Tabs.Content>
+
+      <!-- Characters Tab -->
+      <Tabs.Content value="characters" class="space-y-6">
+        <section class="space-y-4">
+          <!-- Portrait Profile -->
+          <div class="space-y-2">
+            <Label>Character Portrait Profile</Label>
             <Select.Root
               type="single"
               value={settings.systemServicesSettings.imageGeneration.portraitProfileId ??
@@ -471,8 +560,8 @@
 
           <!-- Portrait Model -->
           {#if settings.systemServicesSettings.imageGeneration.portraitProfileId || settings.systemServicesSettings.imageGeneration.profileId}
-            <div>
-              <Label class="mb-2 block">Portrait Generation Model</Label>
+            <div class="space-y-2">
+              <Label>Character Portrait Model</Label>
               <ImageModelSelect
                 models={portraitModels.length > 0 ? portraitModels : standardModels}
                 selectedModelId={settings.systemServicesSettings.imageGeneration.portraitModel}
@@ -502,106 +591,70 @@
                 Model used when generating character portraits from visual descriptors.
               </p>
             </div>
+            <div class="space-y-2">
+              <Label>Character Portrait Size</Label>
+              <Select.Root
+                type="single"
+                value={settings.systemServicesSettings.imageGeneration.portraitSize}
+                onValueChange={(v) => {
+                  settings.systemServicesSettings.imageGeneration.portraitSize = v as any
+                  settings.saveSystemServicesSettings()
+                }}
+              >
+                <Select.Trigger class="h-10 w-full">
+                  {imageSizes.find(
+                    (s) => s.value === settings.systemServicesSettings.imageGeneration.portraitSize,
+                  )?.label ?? 'Select size'}
+                </Select.Trigger>
+                <Select.Content>
+                  {#each imageSizes as size (size.value)}
+                    <Select.Item value={size.value} label={size.label}>
+                      {size.label}
+                    </Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </div>
           {/if}
 
-          <!-- Reference Image Profile -->
-          <div>
-            <Label class="mb-2 block">Reference Image Profile</Label>
+          <!-- Portrait Style -->
+          <div class="space-y-2">
+            <Label>Character Portrait Style</Label>
             <Select.Root
               type="single"
-              value={settings.systemServicesSettings.imageGeneration.referenceProfileId ??
-                settings.systemServicesSettings.imageGeneration.profileId ??
-                ''}
-              onValueChange={(v) => onProfileChange(v, 'reference')}
+              value={settings.systemServicesSettings.imageGeneration.portraitStyleId}
+              onValueChange={(v) => {
+                settings.systemServicesSettings.imageGeneration.portraitStyleId = v
+                settings.saveSystemServicesSettings()
+              }}
             >
               <Select.Trigger class="h-10 w-full">
-                {#if getSelectedProfile('reference') || getSelectedProfile('standard')}
-                  {(getSelectedProfile('reference') || getSelectedProfile('standard'))?.name}
-                  ({(getSelectedProfile('reference') || getSelectedProfile('standard'))
-                    ?.providerType})
-                {:else}
-                  Select a profile
-                {/if}
+                {imageStyles.find(
+                  (s) =>
+                    s.value === settings.systemServicesSettings.imageGeneration.portraitStyleId,
+                )?.label ?? 'Select style'}
               </Select.Trigger>
               <Select.Content>
-                {#each imageCapableProfiles as profile (profile.id)}
-                  <Select.Item
-                    value={profile.id}
-                    label={`${profile.name} (${profile.providerType})`}
-                  >
-                    {profile.name}
-                    <span class="text-muted-foreground">({profile.providerType})</span>
+                {#each imageStyles as style (style.value)}
+                  <Select.Item value={style.value} label={style.label}>
+                    {style.label}
                   </Select.Item>
                 {/each}
               </Select.Content>
             </Select.Root>
             <p class="text-muted-foreground mt-1 text-xs">
-              Profile used for image-to-image generation with portrait references.
+              Visual style for character portraits. Edit styles in the Prompts tab.
             </p>
           </div>
+        </section>
+      </Tabs.Content>
 
-          <!-- Reference Model -->
-          {#if settings.systemServicesSettings.imageGeneration.referenceProfileId || settings.systemServicesSettings.imageGeneration.profileId}
-            <div>
-              <Label class="mb-2 block">Reference Image Model</Label>
-              <ImageModelSelect
-                models={referenceImg2ImgModels.length > 0
-                  ? referenceImg2ImgModels
-                  : referenceModels.length > 0
-                    ? referenceModels
-                    : standardModels.filter((m) => m.supportsImg2Img)}
-                selectedModelId={settings.systemServicesSettings.imageGeneration.referenceModel}
-                onModelChange={(id) => {
-                  settings.systemServicesSettings.imageGeneration.referenceModel = id
-                  settings.saveSystemServicesSettings()
-                }}
-                showCost={true}
-                showImg2ImgIndicator={false}
-                isLoading={isLoadingReferenceModels || isLoadingStandardModels}
-                errorMessage={referenceModelsError || standardModelsError}
-                showRefreshButton={true}
-                onRefresh={() => {
-                  const profileId =
-                    settings.systemServicesSettings.imageGeneration.referenceProfileId ||
-                    settings.systemServicesSettings.imageGeneration.profileId
-                  loadModelsForProfile(
-                    profileId,
-                    (m) => (referenceModels = m),
-                    (l) => (isLoadingReferenceModels = l),
-                    (e) => (referenceModelsError = e),
-                    true,
-                  )
-                }}
-              />
-              <p class="text-muted-foreground mt-1 text-xs">
-                Model used for story images when a character portrait is attached as reference.
-              </p>
-            </div>
-          {/if}
-        {/if}
-      </div>
-      <div class="border-border bg-muted/20 space-y-4 rounded-lg border p-4">
-        <!-- Background image generation enabled -->
-        <div class="flex items-center justify-between">
-          <div>
-            <Label>Background image generation</Label>
-            <p class="text-muted-foreground text-xs">
-              Generate background images on location changes.
-            </p>
-          </div>
-          <Switch
-            checked={settings.systemServicesSettings.imageGeneration.backgroundImagesEnabled}
-            onCheckedChange={(v) => {
-              settings.systemServicesSettings.imageGeneration.backgroundImagesEnabled = v
-              settings.saveSystemServicesSettings()
-            }}
-          />
-        </div>
-
-        {#if settings.systemServicesSettings.imageGeneration.backgroundImagesEnabled}
-          <!-- Background image generation profile -->
-          <div>
-            <Label class="mb-2 block">Background Image Generation Profile</Label>
+      <!-- Backgrounds Tab -->
+      <Tabs.Content value="backgrounds" class="space-y-6">
+        <section class="space-y-4">
+          <!-- Background Profile -->
+          <div class="space-y-2">
+            <Label>Background Profile</Label>
             <Select.Root
               type="single"
               value={settings.systemServicesSettings.imageGeneration.backgroundProfileId ??
@@ -631,23 +684,23 @@
               </Select.Content>
             </Select.Root>
             <p class="text-muted-foreground mt-1 text-xs">
-              Profile used for generating character portraits.
+              Profile used for generating background scenes.
             </p>
           </div>
 
           <!-- Background Model -->
           {#if settings.systemServicesSettings.imageGeneration.backgroundProfileId || settings.systemServicesSettings.imageGeneration.profileId}
-            <div>
-              <Label class="mb-2 block">Background Generation Model</Label>
+            <div class="space-y-2">
+              <Label>Background Model</Label>
               <ImageModelSelect
                 models={backgroundModels.length > 0 ? backgroundModels : standardModels}
-                selectedModelId={settings.systemServicesSettings.imageGeneration.portraitModel}
+                selectedModelId={settings.systemServicesSettings.imageGeneration.backgroundModel}
                 onModelChange={(id) => {
-                  settings.systemServicesSettings.imageGeneration.portraitModel = id
+                  settings.systemServicesSettings.imageGeneration.backgroundModel = id
                   settings.saveSystemServicesSettings()
                 }}
                 showCost={true}
-                showImg2ImgIndicator={true}
+                showImg2ImgIndicator={false}
                 isLoading={isLoadingBackgroundModels || isLoadingStandardModels}
                 errorMessage={backgroundModelsError || standardModelsError}
                 showRefreshButton={true}
@@ -665,19 +718,19 @@
                 }}
               />
               <p class="text-muted-foreground mt-1 text-xs">
-                Model used when generating character portraits from visual descriptors.
+                Model used for generating background scenes.
               </p>
             </div>
           {/if}
-          <div>
-            <Label class="mb-2 block">Background Image Size</Label>
+
+          <!-- Background Size -->
+          <div class="space-y-2">
+            <Label>Background Size</Label>
             <Select.Root
               type="single"
               value={settings.systemServicesSettings.imageGeneration.backgroundSize}
               onValueChange={(v) => {
-                settings.systemServicesSettings.imageGeneration.backgroundSize = v as
-                  | '1280x720'
-                  | '720x1280'
+                settings.systemServicesSettings.imageGeneration.backgroundSize = v as any
                 settings.saveSystemServicesSettings()
               }}
             >
@@ -695,32 +748,27 @@
               </Select.Content>
             </Select.Root>
           </div>
-          <div>
-            <Label class="mb-2 block">
+
+          <!-- Background Blur -->
+          <div class="space-y-2">
+            <Label>
               Background Blur: {settings.systemServicesSettings.imageGeneration.backgroundBlur}px
             </Label>
             <Slider
-              type="single"
-              value={settings.systemServicesSettings.imageGeneration.backgroundBlur}
-              onValueChange={(v) => {
-                settings.systemServicesSettings.imageGeneration.backgroundBlur = v
+              type="multiple"
+              value={[settings.systemServicesSettings.imageGeneration.backgroundBlur]}
+              onValueChange={(v: number[]) => {
+                settings.systemServicesSettings.imageGeneration.backgroundBlur = v[0]
                 settings.saveSystemServicesSettings()
               }}
               min={0}
               max={20}
               step={1}
-              class="w-full"
             />
             <p class="text-muted-foreground mt-1 text-xs">Blur amount for the background image.</p>
           </div>
-        {/if}
-      </div>
-
-      <!-- Reset Button -->
-      <Button variant="outline" size="sm" onclick={() => settings.resetImageGenerationSettings()}>
-        <RotateCcw class="mr-1 h-3 w-3" />
-        Reset to Defaults
-      </Button>
-    {/if}
-  {/if}
+        </section>
+      </Tabs.Content>
+    </div>
+  </Tabs.Root>
 </div>

@@ -29,6 +29,8 @@ export class NarrativeStore {
   tone = $state('immersive and engaging')
   visualProseMode = $state(false)
   imageGenerationMode = $state<'none' | 'auto' | 'inline'>('auto')
+  backgroundImagesEnabled = $state(false)
+  portraitMode = $state(false)
 
   // Step 9: Opening
   storyTitle = $state('')

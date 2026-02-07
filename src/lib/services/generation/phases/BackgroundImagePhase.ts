@@ -19,12 +19,13 @@ export interface BackgroundImageDependencies {
     storyId: string,
     visibleEntries: StoryEntry[],
   ) => Promise<void>
-  isImageGenerationEnabled: () => boolean
+  isImageGenerationEnabled: (storySettings?: any) => boolean
 }
 
 /** Settings needed for image phase decision making */
 export interface BackgroundImageSettings {
   enabled: boolean
+  backgroundImagesEnabled?: boolean
 }
 
 /** Input for the image phase */
@@ -53,15 +54,15 @@ export class BackgroundImagePhase {
 
     const { storyId, storyEntries, imageSettings, abortSignal } = input
 
-    // Check if image generation is disabled
-    if (!imageSettings.enabled) {
+    // Check if background image generation is disabled
+    if (imageSettings.backgroundImagesEnabled === false) {
       const result: BackgroundImageResult = { started: false, skippedReason: 'disabled' }
       yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
       return result
     }
 
     // Check if image generation is actually configured (profile exists)
-    if (!this.deps.isImageGenerationEnabled()) {
+    if (!this.deps.isImageGenerationEnabled(imageSettings)) {
       const result: BackgroundImageResult = { started: false, skippedReason: 'not_configured' }
       yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
       return result

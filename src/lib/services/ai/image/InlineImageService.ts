@@ -116,6 +116,7 @@ export class InlineImageGenerationService {
     // Determine which profile and model to use
     let profileId = imageSettings.profileId
     let modelToUse = imageSettings.model
+    let sizeToUse = imageSettings.size
     let referenceImageUrls: string[] | undefined
 
     // If portrait mode is enabled and tag specifies characters, look for their portraits
@@ -142,6 +143,7 @@ export class InlineImageGenerationService {
         // Use reference profile and model for img2img
         profileId = imageSettings.referenceProfileId || imageSettings.profileId
         modelToUse = imageSettings.referenceModel || imageSettings.model
+        sizeToUse = imageSettings.referenceSize
         referenceImageUrls = portraitUrls
         log('Using character portraits as reference', {
           characters: charactersWithPortraits,
@@ -179,10 +181,8 @@ export class InlineImageGenerationService {
       styleId: imageSettings.styleId,
       model: modelToUse,
       imageData: '',
-      width:
-        imageSettings.size === '1024x1024' ? 1024 : imageSettings.size === '2048x2048' ? 2048 : 512,
-      height:
-        imageSettings.size === '1024x1024' ? 1024 : imageSettings.size === '2048x2048' ? 2048 : 512,
+      width: sizeToUse === '1024x1024' ? 1024 : sizeToUse === '2048x2048' ? 2048 : 512,
+      height: sizeToUse === '1024x1024' ? 1024 : sizeToUse === '2048x2048' ? 2048 : 512,
       status: 'pending',
       generationMode: 'inline',
     }
@@ -204,7 +204,7 @@ export class InlineImageGenerationService {
       fullPrompt,
       profileId,
       modelToUse,
-      imageSettings.size,
+      sizeToUse,
       context.entryId,
       referenceImageUrls,
     ).catch((error) => {

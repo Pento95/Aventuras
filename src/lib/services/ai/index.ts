@@ -52,7 +52,7 @@ import {
 import {
   inlineImageService,
   type InlineImageContext,
-  isImageGenerationEnabled,
+  isImageGenerationEnabled as isImageGenerationEnabledUtil,
   type ImageAnalysisContext,
 } from './image'
 import {
@@ -96,6 +96,7 @@ import type {
   LoreManagementResult,
   LoreChange,
   TimeTracker,
+  StorySettings,
 } from '$lib/types'
 import { createLogger } from './core/config'
 import { serviceFactory } from './core/factory'
@@ -767,10 +768,10 @@ class AIService {
   }
 
   /**
-   * Check if image generation is enabled and configured.
+   * Check if image generation is enabled for a story.
    */
-  isImageGenerationEnabled(): boolean {
-    return isImageGenerationEnabled()
+  isImageGenerationEnabled(storySettings?: StorySettings): boolean {
+    return isImageGenerationEnabledUtil(storySettings)
   }
 
   /**
@@ -914,11 +915,13 @@ class AIService {
     presentCharacters: Character[],
   ): Promise<void> {
     const imageId = crypto.randomUUID()
-    const portraitMode = imageSettings.portraitMode ?? false
+    const portraitMode =
+      story.currentStory?.settings?.portraitMode ?? imageSettings.portraitMode ?? false
 
     // Determine profile and model
     let profileId = imageSettings.profileId
     let modelToUse = imageSettings.model
+    let sizeToUse = imageSettings.size
     let referenceImageUrls: string[] | undefined
 
     // If portrait mode and scene has characters, look for reference images
@@ -939,6 +942,7 @@ class AIService {
         // Use reference profile and model for img2img
         profileId = imageSettings.referenceProfileId || imageSettings.profileId
         modelToUse = imageSettings.referenceModel || imageSettings.model
+        sizeToUse = imageSettings.referenceSize
         referenceImageUrls = portraitUrls
         log('Using character portraits as reference', {
           characters: scene.characters,
@@ -951,6 +955,7 @@ class AIService {
     if (scene.generatePortrait) {
       profileId = imageSettings.portraitProfileId || imageSettings.profileId
       modelToUse = imageSettings.portraitModel || imageSettings.model
+      sizeToUse = imageSettings.portraitSize
     }
 
     if (!profileId) {
@@ -972,10 +977,8 @@ class AIService {
       styleId: imageSettings.styleId,
       model: modelToUse,
       imageData: '',
-      width:
-        imageSettings.size === '1024x1024' ? 1024 : imageSettings.size === '2048x2048' ? 2048 : 512,
-      height:
-        imageSettings.size === '1024x1024' ? 1024 : imageSettings.size === '2048x2048' ? 2048 : 512,
+      width: sizeToUse === '1024x1024' ? 1024 : sizeToUse === '2048x2048' ? 2048 : 512,
+      height: sizeToUse === '1024x1024' ? 1024 : sizeToUse === '2048x2048' ? 2048 : 512,
       status: 'pending',
       generationMode: 'analyzed',
     }
@@ -997,7 +1000,7 @@ class AIService {
       fullPrompt,
       profileId!,
       modelToUse!,
-      imageSettings.size,
+      sizeToUse,
       entryId,
       scene,
       presentCharacters,

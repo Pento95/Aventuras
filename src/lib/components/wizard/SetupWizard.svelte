@@ -339,6 +339,10 @@
           onVisualProseModeChange={(v) => (wizard.narrative.visualProseMode = v)}
           imageGenerationMode={wizard.narrative.imageGenerationMode}
           onImageGenerationModeChange={(v) => (wizard.narrative.imageGenerationMode = v)}
+          backgroundImagesEnabled={wizard.narrative.backgroundImagesEnabled}
+          portraitMode={wizard.narrative.portraitMode}
+          onBackgroundImagesEnabledChange={(v) => (wizard.narrative.backgroundImagesEnabled = v)}
+          onPortraitModeChange={(v) => (wizard.narrative.portraitMode = v)}
         />
       {:else if wizard.currentStep === 8}
         <Step8Opening

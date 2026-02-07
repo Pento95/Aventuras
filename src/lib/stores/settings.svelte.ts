@@ -511,7 +511,10 @@ export interface ImageGenerationServiceSettings {
   profileId: string | null // API profile for standard image generation
   model: string // Image model for the selected profile
   styleId: string // Selected image style template
-  size: '512x512' | '1024x1024' | '2048x2048' // Image size
+  portraitStyleId: string // Selected character portrait style template
+  size: '512x512' | '1024x1024' | '2048x2048' // Regular image size
+  referenceSize: '512x512' | '1024x1024' | '2048x2048' // Reference image size
+  portraitSize: '512x512' | '1024x1024' | '2048x2048' // Portrait image size
   maxImagesPerMessage: number // Max images per narrative (0 = unlimited, default: 3)
   autoGenerate: boolean // Generate automatically after narration
 
@@ -544,7 +547,10 @@ export function getDefaultImageGenerationSettings(): ImageGenerationServiceSetti
     profileId: null, // User must select an image-capable profile
     model: 'flux', // Common default across providers
     styleId: 'image-style-soft-anime',
+    portraitStyleId: 'image-style-soft-anime',
     size: '1024x1024',
+    referenceSize: '1024x1024',
+    portraitSize: '512x512',
     maxImagesPerMessage: 3,
     autoGenerate: true,
     portraitMode: false,

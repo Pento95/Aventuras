@@ -41,6 +41,7 @@ import {
   BackgroundImagePhase,
   type BackgroundImageDependencies,
   type BackgroundImageResult,
+  type BackgroundImageSettings,
 } from './phases/BackgroundImagePhase'
 import { mergeGenerators } from '$lib/utils/async'
 
@@ -66,7 +67,7 @@ export interface PipelineConfig {
   styleReview: StyleReviewResult | null
   activationTracker?: ActivationTracker
   translationSettings: TranslationSettings
-  imageSettings: ImageSettings
+  imageSettings: ImageSettings & BackgroundImageSettings
   promptContext: PromptContext
   disableSuggestions: boolean
   activeThreads: StoryBeat[]

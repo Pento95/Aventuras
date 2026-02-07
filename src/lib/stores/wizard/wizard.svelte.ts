@@ -324,6 +324,8 @@ export class WizardStore {
         visualProseMode: this.narrative.visualProseMode,
         inlineImageMode: this.narrative.imageGenerationMode === 'inline',
         imageGenerationMode: this.narrative.imageGenerationMode,
+        backgroundImagesEnabled: this.narrative.backgroundImagesEnabled,
+        portraitMode: this.narrative.portraitMode,
       },
       title: this.narrative.storyTitle,
       openingGuidance:

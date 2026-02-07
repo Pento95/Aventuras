@@ -235,7 +235,7 @@
       classifyResponse: aiService.classifyResponse.bind(aiService),
       translateNarration: aiService.translateNarration.bind(aiService),
       generateImagesForNarrative: aiService.generateImagesForNarrative.bind(aiService),
-      isImageGenerationEnabled: aiService.isImageGenerationEnabled.bind(aiService),
+      isImageGenerationEnabled: (settings) => aiService.isImageGenerationEnabled(settings),
       generateSuggestions: aiService.generateSuggestions.bind(aiService),
       translateSuggestions: aiService.translateSuggestions.bind(aiService),
       generateActionChoices: aiService.generateActionChoices.bind(aiService),
@@ -417,7 +417,10 @@
         translationSettings: settings.translationSettings,
         imageSettings: {
           enabled: settings.systemServicesSettings.imageGeneration.enabled,
-          autoGenerate: settings.systemServicesSettings.imageGeneration.autoGenerate,
+          autoGenerate: currentStoryRef.settings?.imageGenerationMode === 'auto',
+          imageGenerationMode: currentStoryRef.settings?.imageGenerationMode ?? 'auto',
+          backgroundImagesEnabled: currentStoryRef.settings?.backgroundImagesEnabled ?? false,
+          portraitMode: currentStoryRef.settings?.portraitMode ?? false,
           inlineMode: inlineImageMode,
         },
         promptContext: {
@@ -504,7 +507,7 @@
           await story.applyClassificationResult(event.result)
           await story.updateEntryTimeEnd(narrationEntry.id)
 
-          if (settings.systemServicesSettings.imageGeneration.enabled) {
+          if (currentStoryRef.settings?.imageGenerationMode !== 'none') {
             const presentCharacters = story.characters.filter(
               (c) =>
                 event.result.scene.presentCharacterNames.includes(c.name) ||
@@ -681,7 +684,8 @@
 
   async function handleManualImageGeneration() {
     if (!lastImageGenContext || manualImageGenDisabled) return
-    if (!settings.systemServicesSettings.imageGeneration.enabled) return
+    const storySettings = story.currentStory?.settings
+    if (!storySettings || storySettings.imageGenerationMode === 'none') return
     isManualImageGenRunning = true
     try {
       await aiService.generateImagesForNarrative(lastImageGenContext)
