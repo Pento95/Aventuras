@@ -2326,7 +2326,7 @@ class SettingsStore {
     }
 
     // Map from "apiProfileId:model" → new Image Profile ID
-    const newProfileIds = new Map<string, string>()
+    const newProfileIds = new SvelteMap<string, string>()
     let changed = false
 
     for (const [profileField, modelField] of Object.entries(profileFieldMap)) {
