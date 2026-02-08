@@ -9,7 +9,7 @@
 import type { ImageProvider, ImageProviderConfig, ImageGenerateOptions, ImageGenerateResult, ImageModelInfo } from './types'
 import { imageFetch } from './fetchAdapter'
 
-const DEFAULT_BASE_URL = 'https://nano-gpt.com/api'
+const DEFAULT_BASE_URL = 'https://nano-gpt.com/api/v1'
 const MODELS_ENDPOINT = 'https://nano-gpt.com/api/models'
 
 // Known img2img capable models/tags
