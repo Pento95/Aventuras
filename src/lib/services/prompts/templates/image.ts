@@ -170,7 +170,7 @@ Image models don't know who "Elena" or "Marcus" are. Character names are ONLY fo
 - **sourceText:** Exact phrase from narrative (3-15 words, VERBATIM)
 - **sceneType:** action|item|character|environment
 - **priority:** 1-10
-- **characters:** Array of character names (first character is primary)
+- **characters:** Array of character names (first character is primary). ALWAYS include the **exact** names of characters you were given.
 - **generatePortrait:** true for portrait generation, false otherwise
 
 ## Prompt Structure
