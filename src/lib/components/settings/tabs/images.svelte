@@ -139,24 +139,17 @@
     }
   })
 
-  // Auto-save when editing an existing profile (not a new one)
-  $effect(() => {
-    if (!editingProfileId || isNewProfile) return
-    // Read all reactive fields to track them
-    const name = profileName
-    const provider = profileProviderType
-    const apiKey = profileApiKey
-    const baseUrl = profileBaseUrl
-    const model = profileModel
-    if (!name.trim()) return
+  // Save current profile edits (called when collapsible closes)
+  function saveEditingProfile() {
+    if (isNewProfile || !editingProfileId || !profileName.trim()) return
     settings.updateImageProfile(editingProfileId, {
-      name: name.trim(),
-      providerType: provider,
-      apiKey,
-      baseUrl: baseUrl || undefined,
-      model,
+      name: profileName.trim(),
+      providerType: profileProviderType,
+      apiKey: profileApiKey,
+      baseUrl: profileBaseUrl || undefined,
+      model: profileModel,
     })
-  })
+  }
 
   function startNewProfile() {
     editingProfileId = crypto.randomUUID()
@@ -186,7 +179,7 @@
     openProfileIds = new SvelteSet(openProfileIds)
   }
 
-  function cancelEdit() {
+  function resetEditState() {
     editingProfileId = null
     isNewProfile = false
     showCopyDropdown = false
@@ -204,12 +197,12 @@
       providerOptions: {},
     })
 
-    cancelEdit()
+    resetEditState()
   }
 
   async function deleteProfile(id: string) {
     await settings.deleteImageProfile(id)
-    if (editingProfileId === id) cancelEdit()
+    if (editingProfileId === id) resetEditState()
   }
 
   function copyApiKeyFromProfile(apiProfile: APIProfile) {
@@ -221,11 +214,12 @@
     if (open) {
       startEditProfile(profile)
     } else {
+      if (editingProfileId === profile.id) {
+        saveEditingProfile()
+        resetEditState()
+      }
       openProfileIds.delete(profile.id)
       openProfileIds = new SvelteSet(openProfileIds)
-      if (editingProfileId === profile.id) {
-        cancelEdit()
-      }
     }
   }
 </script>
@@ -265,7 +259,7 @@
             <CardContent>
               {@render profileForm()}
               <div class="flex gap-2 pt-4">
-                <Button variant="outline" onclick={cancelEdit} class="flex-1">Cancel</Button>
+                <Button variant="outline" onclick={resetEditState} class="flex-1">Cancel</Button>
                 <Button
                   onclick={handleSaveProfile}
                   disabled={!profileName.trim()}
