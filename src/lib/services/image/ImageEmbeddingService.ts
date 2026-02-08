@@ -15,6 +15,24 @@ interface ImageMarker {
   status: string
 }
 
+const uncommonCharacters: Record<string, string> = {
+  // Quotes
+  '’': "'",
+  '‘': "'",
+  '“': '"',
+  '”': '"',
+  '‟': '"',
+  '„': '"',
+  '‚': "'",
+  // Dashes
+  '–': '-',
+  '—': '-',
+  '−': '-',
+  // Others
+  '…': '...',
+  '\u00A0': ' ', // Non-breaking space
+}
+
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -25,15 +43,22 @@ function getDisplayableImages(images: EmbeddedImage[]): EmbeddedImage[] {
   )
 }
 
+function replaceUncommonCharacters(content: string): string {
+  for (const [uncommon, common] of Object.entries(uncommonCharacters)) {
+    content = content.replaceAll(uncommon, common)
+  }
+  return content
+}
+
 /** Find and mark all source text matches, sorted longest-first to avoid partial matches. */
 function buildMarkers(content: string, images: EmbeddedImage[]): ImageMarker[] {
   const sortedImages = [...images].sort((a, b) => b.sourceText.length - a.sourceText.length)
   const markers: ImageMarker[] = []
 
   for (const img of sortedImages) {
-    const regex = new RegExp(escapeRegex(img.sourceText.replaceAll('’', "'")), 'gi')
+    const regex = new RegExp(escapeRegex(replaceUncommonCharacters(img.sourceText)), 'gi')
     let match
-    while ((match = regex.exec(content.replaceAll('’', "'"))) !== null) {
+    while ((match = regex.exec(replaceUncommonCharacters(content))) !== null) {
       const start = match.index
       const end = start + match[0].length
       const overlaps = markers.some(
