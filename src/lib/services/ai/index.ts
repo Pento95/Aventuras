@@ -108,6 +108,7 @@ import { createLogger } from './core/config'
 import { serviceFactory } from './core/factory'
 import { NarrativeService } from './generation/NarrativeService'
 import type { WorldStateContext } from './prompts/systemBuilder'
+import { parseImageSize } from './image/imageUtils'
 
 const log = createLogger('AIService')
 
@@ -987,6 +988,7 @@ class AIService {
     const stylePrompt = this.getStylePrompt(styleId)
     const fullPrompt = `${scene.prompt}. ${stylePrompt}`
 
+    const { width, height } = parseImageSize(sizeToUse)
     // Create pending record in database
     const embeddedImage: Omit<EmbeddedImage, 'createdAt'> = {
       id: imageId,
@@ -997,8 +999,8 @@ class AIService {
       styleId: styleId,
       model: modelToUse,
       imageData: '',
-      width: sizeToUse === '1024x1024' ? 1024 : sizeToUse === '2048x2048' ? 2048 : 512,
-      height: sizeToUse === '1024x1024' ? 1024 : sizeToUse === '2048x2048' ? 2048 : 512,
+      width,
+      height,
       status: 'pending',
       generationMode: 'analyzed',
     }
