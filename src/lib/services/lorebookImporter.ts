@@ -16,6 +16,7 @@ import { promptService, type PromptContext } from '$lib/services/prompts'
 import { generateStructured } from './ai/sdk/generate'
 import { lorebookClassificationResultSchema } from './ai/sdk/schemas/lorebook'
 import { createLogger } from './ai/core/config'
+import { settings } from '$lib/stores/settings.svelte'
 
 const log = createLogger('LorebookImporter')
 
@@ -247,7 +248,10 @@ export async function classifyEntriesWithLLM(
 ): Promise<ImportedEntry[]> {
   if (entries.length === 0) return entries
 
-  const BATCH_SIZE = 20 // Process in batches to avoid token limits
+  const lorebookSettings = settings.serviceSpecificSettings?.lorebookClassifier
+  const BATCH_SIZE = lorebookSettings?.batchSize ?? 50
+  const MAX_CONCURRENT = lorebookSettings?.maxConcurrent ?? 5
+
   const result = [...entries]
   let classified = 0
 
@@ -261,53 +265,75 @@ export async function classifyEntriesWithLLM(
 
   const system = promptService.renderPrompt('lorebook-classifier', promptContext)
 
-  // Process in batches
+  // Build all batch indices
+  const batchStarts: number[] = []
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    const batch = entries.slice(i, i + BATCH_SIZE)
+    batchStarts.push(i)
+  }
 
-    // Build entries JSON for the prompt
-    const entriesJson = JSON.stringify(
-      batch.map((entry, batchIndex) => ({
-        index: batchIndex,
-        name: entry.name,
-        content: entry.description.slice(0, 500), // Limit content length
-        keywords: entry.keywords.slice(0, 10),
-      })),
-      null,
-      2,
-    )
+  // Process batches with concurrency limit
+  for (let ci = 0; ci < batchStarts.length; ci += MAX_CONCURRENT) {
+    const concurrentStarts = batchStarts.slice(ci, ci + MAX_CONCURRENT)
 
-    const prompt = promptService.renderUserPrompt('lorebook-classifier', promptContext, {
-      entriesJson,
+    const batchPromises = concurrentStarts.map(async (startIndex) => {
+      const batch = entries.slice(startIndex, startIndex + BATCH_SIZE)
+
+      // Build entries JSON for the prompt
+      const entriesJson = JSON.stringify(
+        batch.map((entry, batchIndex) => ({
+          index: batchIndex,
+          name: entry.name,
+          content: entry.description.slice(0, 500), // Limit content length
+          keywords: entry.keywords.slice(0, 10),
+        })),
+        null,
+        2,
+      )
+
+      const prompt = promptService.renderUserPrompt('lorebook-classifier', promptContext, {
+        entriesJson,
+      })
+
+      const classifications = await generateStructured(
+        {
+          presetId: 'classification',
+          schema: lorebookClassificationResultSchema,
+          system,
+          prompt,
+        },
+        'lorebook-classifier',
+      )
+
+      return { startIndex, batch, classifications }
     })
 
-    const classifications = await generateStructured(
-      {
-        presetId: 'classification',
-        schema: lorebookClassificationResultSchema,
-        system,
-        prompt,
-      },
-      'lorebook-classifier',
-    )
+    const batchResults = await Promise.all(batchPromises)
 
-    // Apply classifications to batch
-    for (const classification of classifications) {
-      const globalIndex = i + classification.index
-      if (globalIndex < result.length) {
-        result[globalIndex] = {
-          ...result[globalIndex],
-          type: classification.type as EntryType,
+    // Apply classifications from all concurrent batches
+    for (const { startIndex, batch, classifications } of batchResults) {
+      for (const classification of classifications) {
+        const globalIndex = startIndex + classification.index
+        if (globalIndex < result.length) {
+          result[globalIndex] = {
+            ...result[globalIndex],
+            type: classification.type as EntryType,
+          }
         }
       }
-    }
 
-    classified += batch.length
-    if (onProgress) {
-      onProgress(classified, entries.length)
-    }
+      classified += batch.length
+      if (onProgress) {
+        onProgress(classified, entries.length)
+      }
 
-    log('Classified batch', { batch: i / BATCH_SIZE + 1, classified, total: entries.length })
+      log('Classified batch', {
+        batchStart: startIndex,
+        batchSize: BATCH_SIZE,
+        maxConcurrent: MAX_CONCURRENT,
+        classified,
+        total: entries.length,
+      })
+    }
   }
 
   return result
