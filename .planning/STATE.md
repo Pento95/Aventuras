@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 3 of 6 (Context System & Service Integration)
-Plan: 5 of 6 in current phase
+Plan: 6 of 6 in current phase
 Status: Ready to execute
-Last activity: 2026-02-09 — Completed plan 03-04 (Support services & retrieval migration)
+Last activity: 2026-02-09 — Completed plan 03-05 (Wizard, translation, and image service migration)
 
-Progress: [██████░░░░] 63%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: 11.7 minutes
-- Total execution time: 1.76 hours
+- Total plans completed: 10
+- Average duration: 11.2 minutes
+- Total execution time: 1.83 hours
 
 **By Phase:**
 
@@ -29,17 +29,17 @@ Progress: [██████░░░░] 63%
 |-------|-------|-------|----------|
 | 01 | 2 | 436s | 218s |
 | 02 | 3 | 525s | 175s |
-| 03 | 4 | 8559s | 2140s |
+| 03 | 5 | 8979s | 1796s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 03 | 05 | 420s | 2 | 8 |
 | 03 | 04 | 3498s | 2 | 9 |
 | 03 | 03 | 3554s | 2 | 5 |
 | 03 | 02 | 725s | 2 | 8 |
 | 03 | 01 | 782s | 2 | 4 |
-| 02 | 03 | 152s | 2 | 3 |
 
 ## Accumulated Context
 
@@ -83,6 +83,10 @@ Recent decisions affecting current work:
 - Priming message moved to NarrativeService private methods (no macro engine dependency)
 - buildChapterSummariesBlock kept in systemBuilder as pure utility import
 - AIService orchestrator bridges old PromptContext API to new storyId-based ContextBuilder API
+- Wizard uses new ContextBuilder() not forWizard() -- progressive context via sequential .add() calls
+- TranslationService uses ContextBuilder without story context -- translation settings are global runtime variables
+- External image style templates fetched from database.getPackTemplate not ContextBuilder -- raw text without Liquid variables
+- prepareStoryData made async because buildSystemPrompt now uses async ContextBuilder.render()
 
 ### Pending Todos
 
@@ -105,5 +109,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09 (phase execution)
-Stopped at: Completed 03-04-PLAN.md (Support services & retrieval migration)
-Resume file: .planning/phases/03-context-system-service-integration/03-04-SUMMARY.md
+Stopped at: Completed 03-05-PLAN.md (Wizard, translation, and image service migration)
+Resume file: .planning/phases/03-context-system-service-integration/03-05-SUMMARY.md
