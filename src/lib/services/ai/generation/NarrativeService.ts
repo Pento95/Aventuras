@@ -7,14 +7,17 @@
  *
  * Unlike other services that use the preset system, NarrativeService uses
  * the main narrative profile directly (apiSettings.defaultModel, temperature, maxTokens).
+ *
+ * Uses ContextBuilder for prompt generation through the unified Liquid template pipeline.
  */
 
 import { streamNarrative, generateNarrative } from '../sdk/generate'
 import {
-  buildSystemPrompt,
-  buildPrimingMessage,
+  buildChapterSummariesBlock,
   type WorldStateContext,
 } from '../prompts/systemBuilder'
+import { ContextBuilder } from '$lib/services/context'
+import { StyleReviewerService } from './StyleReviewerService'
 import { createLogger } from '../core/config'
 import type { StreamChunk } from '../core/types'
 import type { Story, StoryEntry, Entry } from '$lib/types'
@@ -53,6 +56,8 @@ export interface NarrativeOptions {
  * This service uses the main narrative profile from apiSettings directly,
  * rather than going through the preset system. This ensures narrative
  * generation uses the user's primary model and settings.
+ *
+ * Prompt generation flows through ContextBuilder + Liquid templates.
  */
 export class NarrativeService {
   /**
@@ -86,35 +91,19 @@ export class NarrativeService {
       hasTimelineFill: !!timelineFillResult,
     })
 
-    // Extract story settings with defaults
-    const mode = story?.mode ?? 'adventure'
-    const pov = story?.settings?.pov ?? 'second'
-    const tense = story?.settings?.tense ?? 'present'
-
-    // Build system prompt using the centralized builder
-    const systemPrompt = buildSystemPrompt(worldState, {
-      mode,
-      pov,
-      tense,
+    // Build system prompt via ContextBuilder pipeline
+    const { systemPrompt, primingMessage } = await this.buildPrompts(
+      story,
+      worldState,
       tieredContextBlock,
-      retrievedContext: retrievedChapterContext ?? undefined,
-      timeTracker: story?.timeTracker,
-      genre: story?.genre,
-      settingDescription: story?.description,
-      tone: story?.settings?.tone,
-      themes: story?.settings?.themes,
-      visualProseMode: story?.settings?.visualProseMode ?? false,
       styleReview,
-      chapters: worldState.chapters,
+      retrievedChapterContext,
       timelineFillResult,
-    })
+    )
 
     // Build the user prompt from entries
+    const mode = story?.mode ?? 'adventure'
     const userPrompt = this.buildUserPrompt(entries, mode)
-
-    // Build priming message for models that need it
-    const protagonist = worldState.characters.find((c) => c.relationship === 'self')
-    const primingMessage = buildPrimingMessage(mode, pov, tense, protagonist?.name)
 
     try {
       // Stream using the main narrative profile
@@ -161,35 +150,110 @@ export class NarrativeService {
 
     log('generate', { entriesCount: entries.length })
 
-    const mode = story?.mode ?? 'adventure'
-    const pov = story?.settings?.pov ?? 'second'
-    const tense = story?.settings?.tense ?? 'present'
-
-    const systemPrompt = buildSystemPrompt(worldState, {
-      mode,
-      pov,
-      tense,
+    // Build system prompt via ContextBuilder pipeline
+    const { systemPrompt, primingMessage } = await this.buildPrompts(
+      story,
+      worldState,
       tieredContextBlock,
-      retrievedContext: retrievedChapterContext ?? undefined,
-      timeTracker: story?.timeTracker,
-      genre: story?.genre,
-      settingDescription: story?.description,
-      tone: story?.settings?.tone,
-      themes: story?.settings?.themes,
-      visualProseMode: story?.settings?.visualProseMode ?? false,
       styleReview,
-      chapters: worldState.chapters,
-    })
+      retrievedChapterContext,
+    )
 
+    const mode = story?.mode ?? 'adventure'
     const userPrompt = this.buildUserPrompt(entries, mode)
-    const protagonist = worldState.characters.find((c) => c.relationship === 'self')
-    const primingMessage = buildPrimingMessage(mode, pov, tense, protagonist?.name)
 
     return generateNarrative({
       system: systemPrompt,
       prompt: `${primingMessage}\n\n${userPrompt}`,
       signal,
     })
+  }
+
+  /**
+   * Build system and priming prompts through the ContextBuilder pipeline.
+   *
+   * Creates a ContextBuilder from the story, adds runtime variables
+   * (tiered context, chapter summaries, style guidance), then renders
+   * through the Liquid template for the story's mode.
+   */
+  private async buildPrompts(
+    story: Story | null | undefined,
+    worldState: NarrativeWorldState,
+    tieredContextBlock?: string,
+    styleReview?: StyleReviewResult | null,
+    retrievedChapterContext?: string | null,
+    timelineFillResult?: TimelineFillResult | null,
+  ): Promise<{ systemPrompt: string; primingMessage: string }> {
+    const mode = story?.mode ?? 'adventure'
+
+    // Create ContextBuilder -- forStory auto-populates mode, pov, tense, genre,
+    // protagonistName, protagonistDescription, currentLocation, storyTime, etc.
+    let ctx: ContextBuilder
+
+    if (story?.id) {
+      ctx = await ContextBuilder.forStory(story.id)
+    } else {
+      // Fallback for edge cases where story doesn't exist yet
+      ctx = new ContextBuilder()
+      ctx.add({
+        mode,
+        pov: story?.settings?.pov ?? 'second',
+        tense: story?.settings?.tense ?? 'present',
+        protagonistName: 'the protagonist',
+      })
+    }
+
+    // Add runtime variables for template rendering
+    // These are pre-formatted blocks that templates inject via {{ variable }}
+
+    if (tieredContextBlock) {
+      ctx.add({ tieredContextBlock })
+    }
+
+    if (retrievedChapterContext) {
+      ctx.add({ retrievedChapterContext })
+    }
+
+    // Build chapter summaries block
+    if (worldState.chapters && worldState.chapters.length > 0) {
+      const chapterSummaries = buildChapterSummariesBlock(
+        worldState.chapters,
+        timelineFillResult,
+      )
+      if (chapterSummaries) {
+        ctx.add({ chapterSummaries })
+      }
+    }
+
+    // Build style guidance block
+    if (styleReview && styleReview.phrases.length > 0) {
+      const styleGuidance = StyleReviewerService.formatForPromptInjection(styleReview)
+      if (styleGuidance) {
+        ctx.add({ styleGuidance })
+      }
+    }
+
+    // Render through the mode-specific template
+    const templateId = mode === 'creative-writing' ? 'creative-writing' : 'adventure'
+    const { system: systemPrompt } = await ctx.render(templateId)
+
+    // Build priming message based on mode/pov/tense
+    const context = ctx.getContext()
+    const primingMessage = this.buildPrimingMessage(
+      mode,
+      (context.pov as string) ?? 'second',
+      (context.tense as string) ?? 'present',
+      (context.protagonistName as string) ?? 'the protagonist',
+    )
+
+    log('buildPrompts complete', {
+      mode,
+      templateId,
+      systemPromptLength: systemPrompt.length,
+      primingMessageLength: primingMessage.length,
+    })
+
+    return { systemPrompt, primingMessage }
   }
 
   /**
@@ -232,5 +296,88 @@ export class NarrativeService {
     prompt += 'Continue the narrative:'
 
     return prompt
+  }
+
+  /**
+   * Build a priming user message to establish the narrator role.
+   * This helps models that expect user-first conversation format.
+   */
+  private buildPrimingMessage(
+    mode: string,
+    pov: string,
+    tense: string,
+    protagonistName: string,
+  ): string {
+    if (mode === 'creative-writing') {
+      return this.buildCreativeWritingPriming(pov, tense, protagonistName)
+    }
+    return this.buildAdventurePriming(pov, tense, protagonistName)
+  }
+
+  private buildAdventurePriming(pov: string, tense: string, protagonistName: string): string {
+    const tenseWord = tense === 'past' ? 'past' : 'present'
+    const actionExample = tense === 'past' ? 'pushed open the heavy door' : 'pushes open the heavy door'
+    const descWords = tense === 'past' ? 'saw, heard, and experienced as I explored' : 'see, hear, and experience as I explore'
+
+    if (pov === 'third') {
+      return `You are the narrator of this interactive adventure. Write in ${tenseWord} tense, third person (they/the character name).
+
+Your role:
+- Describe ${protagonistName}'s experiences and the world around them
+- Control all NPCs and the environment
+- NEVER write ${protagonistName}'s dialogue, decisions, or inner thoughts - I decide those
+- When I say "I do X", describe the results in third person (e.g., "I open the door" -> "${protagonistName} ${actionExample}...")
+
+I am the player controlling ${protagonistName}. You narrate what happens. Begin when I take my first action.`
+    }
+
+    return `You are the narrator of this interactive adventure. Write in ${tenseWord} tense, second person (you/your).
+
+Your role:
+- Describe what I ${descWords}
+- Control all NPCs and the environment
+- NEVER write my dialogue, decisions, or inner thoughts
+- When I say "I do X", describe the results using "you" (e.g., "I open the door" -> "You ${actionExample}...")
+
+I am the player. You narrate the world around me. Begin when I take my first action.`
+  }
+
+  private buildCreativeWritingPriming(pov: string, tense: string, protagonistName: string): string {
+    const tenseWord = tense === 'past' ? 'past' : 'present'
+
+    if (pov === 'first') {
+      return `You are a skilled fiction writer. Write in ${tenseWord} tense, first person (I/me/my).
+
+Your role:
+- Write prose based on my directions from ${protagonistName}'s internal perspective
+- Bring scenes to life with vivid detail and internal monologue
+- Write for any character I direct you to, including dialogue, actions, and thoughts
+- Maintain consistent characterization throughout
+
+I am the author directing the story. Write what I ask for.`
+    }
+
+    if (pov === 'second') {
+      return `You are a skilled fiction writer. Write in ${tenseWord} tense, second person (you/your).
+
+Your role:
+- Write prose based on my directions, addressing ${protagonistName} directly
+- Bring scenes to life with vivid detail
+- Write for any character I direct you to, including dialogue, actions, and thoughts
+- Maintain consistent characterization throughout
+
+I am the author directing the story. Write what I ask for.`
+    }
+
+    // Third person (default for creative-writing)
+    return `You are a skilled fiction writer. Write in ${tenseWord} tense, third person (they/the character name).
+
+Your role:
+- Write prose based on my directions
+- Bring scenes to life with vivid detail
+- Write for any character I direct you to, including dialogue, actions, and thoughts
+- Maintain consistent characterization throughout
+
+I am the author directing the story. Write what I ask for.`
   }
 }
