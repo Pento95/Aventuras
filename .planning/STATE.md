@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 3 of 6 (Context System & Service Integration)
-Plan: 3 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: Ready to execute
-Last activity: 2026-02-09 — Completed plan 03-02 (Liquid template conversion)
+Last activity: 2026-02-09 — Completed plan 03-04 (Support services & retrieval migration)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 63%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 6.5 minutes
-- Total execution time: 0.49 hours
+- Total plans completed: 9
+- Average duration: 11.7 minutes
+- Total execution time: 1.76 hours
 
 **By Phase:**
 
@@ -29,17 +29,17 @@ Progress: [█████░░░░░] 50%
 |-------|-------|-------|----------|
 | 01 | 2 | 436s | 218s |
 | 02 | 3 | 525s | 175s |
-| 03 | 2 | 1507s | 754s |
+| 03 | 4 | 8559s | 2140s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 03 | 04 | 3498s | 2 | 9 |
+| 03 | 03 | 3554s | 2 | 5 |
 | 03 | 02 | 725s | 2 | 8 |
 | 03 | 01 | 782s | 2 | 4 |
 | 02 | 03 | 152s | 2 | 3 |
-| 02 | 02 | 201s | 2 | 1 |
-| 02 | 01 | 172s | 2 | 3 |
 
 ## Accumulated Context
 
@@ -76,6 +76,9 @@ Recent decisions affecting current work:
 - Narrative templates include full system prompt instruction text (POV/tense/mode conditionals, story context, chapter summaries, style guidance)
 - 7 external templates identified: 3 image-style (raw text), interactive-lorebook, lorebook-classifier, character-card-import, vault-character-import (service-injected)
 - Complex macro variants inlined as Liquid {% if/elsif/else %} conditionals -- eliminates MacroEngine scoring-based resolution
+- External templates (interactive-lorebook) fetched via database.getPackTemplate() with manual placeholder injection
+- Generation ContextBuilder imports new pipeline as ContextPipeline to avoid class name collision
+- Services without storyId use new ContextBuilder() with add() for mode/pov/tense as flat variables
 
 ### Pending Todos
 
@@ -98,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09 (phase execution)
-Stopped at: Completed 03-02-PLAN.md (Liquid template conversion)
-Resume file: .planning/phases/03-context-system-service-integration/03-02-SUMMARY.md
+Stopped at: Completed 03-04-PLAN.md (Support services & retrieval migration)
+Resume file: .planning/phases/03-context-system-service-integration/03-04-SUMMARY.md
