@@ -256,7 +256,7 @@ class AIService {
       entries,
       activeThreads,
       lorebookEntries,
-      promptContext,
+      story.currentStory?.id,
     )
   }
 
@@ -296,6 +296,7 @@ class AIService {
 
     // Build context for the service
     const context = {
+      storyId: story.currentStory?.id,
       narrativeResponse,
       userAction: lastUserAction?.content ?? '',
       recentEntries: entries.slice(-10),
