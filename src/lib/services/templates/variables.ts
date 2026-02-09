@@ -13,7 +13,7 @@ import type { VariableDefinition, VariableCategory } from './types'
  * System variables - auto-filled by the application
  * These variables are always available in templates and are populated from story context.
  */
-const SYSTEM_VARIABLES: VariableDefinition[] = [
+export const SYSTEM_VARIABLES: VariableDefinition[] = [
   {
     name: 'protagonistName',
     type: 'text',
