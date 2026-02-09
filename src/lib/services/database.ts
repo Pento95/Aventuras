@@ -110,6 +110,8 @@ class DatabaseService {
   async init(): Promise<void> {
     if (this.db) return
     this.db = await Database.load('sqlite:aventura.db')
+    // Enable foreign key enforcement (SQLite disables by default)
+    await this.db.execute('PRAGMA foreign_keys = ON')
   }
 
   private async getDb(): Promise<Database> {
