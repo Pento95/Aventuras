@@ -3,8 +3,8 @@
  */
 
 /**
- * Result from ContextBuilder.render().
- * Single render call returns both system and user prompts.
+ * Render result from ContextBuilder.render()
+ * A single render call returns both system and user prompts.
  */
 export interface RenderResult {
   system: string
@@ -12,20 +12,9 @@ export interface RenderResult {
 }
 
 /**
- * Configuration options for ContextBuilder.
- */
-export interface ContextBuilderConfig {
-  /** Override the pack ID (defaults to story's active pack or default pack) */
-  packId?: string
-  /** Skip loading custom variables from the pack */
-  skipCustomVariables?: boolean
-}
-
-/**
- * Wizard steps in order. Used by services (ScenarioService) and
- * for editor validation to know which variables are available at each step.
- * Not used by ContextBuilder itself — progressive context is managed by
- * the wizard service via add().
+ * Wizard steps in order.
+ * Used by wizard services to track progressive context building.
+ * Integer values allow comparison: step >= WizardStep.CharacterCreation
  */
 export enum WizardStep {
   PackSelection = 1,
@@ -37,23 +26,9 @@ export enum WizardStep {
 }
 
 /**
- * Runtime variable definition.
- * Describes a variable that services inject at render time.
- * Registered once at module load for editor validation and autocomplete.
- */
-export interface RuntimeVariableDefinition {
-  name: string
-  description: string
-  category: 'runtime'
-  /** For wizard context: earliest step where this variable is available */
-  availableFrom?: WizardStep
-}
-
-/**
  * External template IDs.
- * These templates contain raw text only — no Liquid syntax.
- * Services load them directly from the database and concatenate data
- * programmatically. They do NOT go through ContextBuilder.render().
+ * These templates bypass Liquid rendering -- they contain raw text only,
+ * and services append data programmatically outside the template.
  */
 export const EXTERNAL_TEMPLATE_IDS = [
   'image-style-soft-anime',

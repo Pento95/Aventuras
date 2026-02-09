@@ -1,29 +1,27 @@
 /**
  * ContextBuilder
  *
- * Unified context building and template rendering for all AI services.
- * Replaces the two-phase expansion (MacroEngine + placeholder injection)
- * with a single LiquidJS render pass over a flat context object.
- *
- * One system for both wizard and story contexts. The wizard is just an
- * early stage — services call add() to progressively build context.
+ * Simple flat variable store + template renderer. Services add variables
+ * via .add(), then render templates via .render(). No distinction between
+ * variable types -- everything lives in one flat namespace.
  *
  * Usage:
- *   // Story (loads context from database)
+ *   // With story (auto-loads story data + pack custom vars)
  *   const ctx = await ContextBuilder.forStory(storyId)
  *   ctx.add({ recentContent, activeQuests })
  *   const { system, user } = await ctx.render('suggestions')
  *
- *   // Wizard (progressive — service adds data at each step)
- *   const ctx = ContextBuilder.create(packId)
- *   ctx.add({ genre, settingDescription })
+ *   // Without story (wizard, standalone)
+ *   const ctx = new ContextBuilder(packId)
+ *   ctx.add({ genre, mode, seed })
  *   const { system, user } = await ctx.render('setting-expansion')
  */
 
 import { database } from '$lib/services/database'
 import { templateEngine } from '$lib/services/templates/engine'
 import { createLogger } from '$lib/services/ai/core/config'
-import type { RenderResult, ContextBuilderConfig } from './types'
+import { EXTERNAL_TEMPLATE_IDS } from './types'
+import type { RenderResult } from './types'
 
 const log = createLogger('ContextBuilder')
 
@@ -31,88 +29,65 @@ export class ContextBuilder {
   private context: Record<string, any> = {}
   private packId: string = 'default-pack'
 
-  /**
-   * Create an empty ContextBuilder with an optional pack ID.
-   * Use this for wizard contexts or any case where story doesn't exist yet.
-   * Call add() to progressively build context.
-   */
-  static create(packId?: string): ContextBuilder {
-    const builder = new ContextBuilder()
-    if (packId) {
-      builder.packId = packId
-    }
-    return builder
+  constructor(packId?: string) {
+    if (packId) this.packId = packId
   }
 
   /**
-   * Create a ContextBuilder pre-populated with story context from the database.
-   * Auto-fills system variables (mode, pov, tense, genre, etc.) and loads
-   * custom variable defaults from the active pack.
+   * Convenience factory: create a ContextBuilder pre-populated from a story.
+   * Loads story settings, protagonist, location, time, and pack custom variables.
    */
-  static async forStory(storyId: string, config?: ContextBuilderConfig): Promise<ContextBuilder> {
-    const builder = new ContextBuilder()
-
-    log('forStory', { storyId, hasConfig: !!config })
-
+  static async forStory(storyId: string, packIdOverride?: string): Promise<ContextBuilder> {
     const story = await database.getStory(storyId)
     if (!story) {
       log('forStory: story not found', { storyId })
-      return builder
+      return new ContextBuilder()
     }
 
-    // Auto-populate system variables from story
-    builder.context.mode = story.mode || 'adventure'
-    builder.context.pov = story.settings?.pov || 'second'
-    builder.context.tense = story.settings?.tense || 'present'
-    builder.context.genre = story.genre || ''
-    builder.context.tone = story.settings?.tone || ''
-    builder.context.themes = story.settings?.themes?.join(', ') || ''
-    builder.context.settingDescription = story.description || ''
+    const packId = packIdOverride || await database.getStoryPackId(storyId) || 'default-pack'
+    const builder = new ContextBuilder(packId)
+
+    // Load story data into context
+    builder.add({
+      mode: story.mode || 'adventure',
+      pov: story.settings?.pov || 'second',
+      tense: story.settings?.tense || 'present',
+      genre: story.genre || '',
+      tone: story.settings?.tone || '',
+      themes: story.settings?.themes?.join(', ') || '',
+      settingDescription: story.description || '',
+      visualProseMode: story.settings?.visualProseMode || false,
+      inlineImageMode: story.settings?.imageGenerationMode === 'inline',
+    })
 
     // Protagonist
     const characters = await database.getCharacters(storyId)
     const protagonist = characters.find((c) => c.relationship === 'self')
-    builder.context.protagonistName = protagonist?.name || 'the protagonist'
-    builder.context.protagonistDescription = protagonist?.description || ''
+    builder.add({
+      protagonistName: protagonist?.name || 'the protagonist',
+      protagonistDescription: protagonist?.description || '',
+    })
 
     // Current location
     const locations = await database.getLocations(storyId)
     const currentLocation = locations.find((l) => l.current)
-    builder.context.currentLocation = currentLocation?.name || ''
+    builder.add({ currentLocation: currentLocation?.name || '' })
 
     // Story time
     if (story.timeTracker) {
       const t = story.timeTracker
-      builder.context.storyTime = `Year ${t.years + 1}, Day ${t.days + 1}, ${t.hours} hours ${t.minutes} minutes`
-    } else {
-      builder.context.storyTime = ''
+      builder.add({ storyTime: `Year ${t.years + 1}, Day ${t.days + 1}, ${t.hours} hours ${t.minutes} minutes` })
     }
 
-    // Visual mode flags
-    builder.context.visualProseMode = story.settings?.visualProseMode || false
-    builder.context.inlineImageMode = story.settings?.imageGenerationMode === 'inline'
+    // Pack custom variable defaults
+    await builder.loadCustomVariables()
 
-    // Pack
-    const packId = config?.packId || await database.getStoryPackId(storyId) || 'default-pack'
-    builder.packId = packId
-
-    // Custom variable defaults from pack
-    if (!config?.skipCustomVariables) {
-      await builder.loadCustomVariables(packId)
-    }
-
-    log('forStory complete', {
-      storyId,
-      packId: builder.packId,
-      contextKeys: Object.keys(builder.context).length,
-    })
-
+    log('forStory complete', { storyId, packId, contextKeys: Object.keys(builder.context).length })
     return builder
   }
 
   /**
-   * Merge data into the flat context. Services call this to inject
-   * runtime variables before rendering. Returns this for chaining.
+   * Merge variables into context. Returns this for chaining.
    */
   add(data: Record<string, any>): this {
     Object.assign(this.context, data)
@@ -120,53 +95,55 @@ export class ContextBuilder {
   }
 
   /**
-   * Render a template from the active pack through LiquidJS.
-   * Loads system content (templateId) and user content (templateId-user),
-   * renders both with the flat context, returns { system, user }.
+   * Render a template from the active pack.
+   * Loads system + user content, renders both through LiquidJS.
+   * External templates bypass Liquid and return raw content.
    */
   async render(templateId: string): Promise<RenderResult> {
-    log('render', { templateId, packId: this.packId, contextKeys: Object.keys(this.context).length })
+    log('render', { templateId, packId: this.packId })
 
-    // Load system template content
-    const systemTemplate = await database.getPackTemplate(this.packId, templateId)
-    const systemContent = systemTemplate?.content || ''
-
-    // Load user template content (convention: templateId-user)
-    const userTemplate = await database.getPackTemplate(this.packId, `${templateId}-user`)
-    const userContent = userTemplate?.content || ''
-
-    // Render both through LiquidJS with the flat context
-    const system = systemContent ? templateEngine.render(systemContent, this.context) : ''
-    const user = userContent ? templateEngine.render(userContent, this.context) : ''
-
-    if (!systemContent && !userContent) {
-      log('render: no template content found', { templateId, packId: this.packId })
+    if ((EXTERNAL_TEMPLATE_IDS as readonly string[]).includes(templateId)) {
+      const template = await database.getPackTemplate(this.packId, templateId)
+      return { system: template?.content || '', user: '' }
     }
+
+    const systemTemplate = await database.getPackTemplate(this.packId, templateId)
+    const userTemplate = await database.getPackTemplate(this.packId, `${templateId}-user`)
+
+    const system = systemTemplate?.content ? templateEngine.render(systemTemplate.content, this.context) : ''
+    const user = userTemplate?.content ? templateEngine.render(userTemplate.content, this.context) : ''
 
     return { system, user }
   }
 
-  /** Get the current context (for debugging) */
+  /**
+   * Get a copy of the current context. Useful for debugging.
+   */
   getContext(): Record<string, any> {
     return { ...this.context }
   }
 
-  /** Get the active pack ID */
+  /**
+   * Get the active pack ID.
+   */
   getPackId(): string {
     return this.packId
   }
 
-  private async loadCustomVariables(packId: string): Promise<void> {
+  /**
+   * Load custom variable defaults from the active pack.
+   * Only sets variables not already in context.
+   */
+  private async loadCustomVariables(): Promise<void> {
     try {
-      const variables = await database.getPackVariables(packId)
-      for (const variable of variables) {
-        if (!(variable.variableName in this.context)) {
-          this.context[variable.variableName] = variable.defaultValue ?? ''
+      const variables = await database.getPackVariables(this.packId)
+      for (const v of variables) {
+        if (!(v.variableName in this.context)) {
+          this.context[v.variableName] = v.defaultValue ?? ''
         }
       }
-      log('loadCustomVariables', { packId, count: variables.length })
     } catch (error) {
-      log('loadCustomVariables failed', { packId, error })
+      log('loadCustomVariables failed', { packId: this.packId, error })
     }
   }
 }
