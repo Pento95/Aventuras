@@ -1,29 +1,31 @@
 /**
  * Context System - Type Definitions
- *
- * Types for the ContextBuilder and its supporting infrastructure.
- * The ContextBuilder replaces the old two-phase prompt expansion
- * (MacroEngine + placeholder injection) with a single LiquidJS render pass
- * over a flat context object.
  */
 
 /**
- * Render result from ContextBuilder.render()
- * A single render call returns both system and user prompts.
+ * Result from ContextBuilder.render().
+ * Single render call returns both system and user prompts.
  */
 export interface RenderResult {
-  /** Rendered system prompt */
   system: string
-  /** Rendered user prompt */
   user: string
 }
 
 /**
- * Wizard steps in order.
- * Used to determine which system variables are available at each step
- * during progressive wizard context building.
- *
- * Integer values allow comparison: step >= WizardStep.CharacterCreation
+ * Configuration options for ContextBuilder.
+ */
+export interface ContextBuilderConfig {
+  /** Override the pack ID (defaults to story's active pack or default pack) */
+  packId?: string
+  /** Skip loading custom variables from the pack */
+  skipCustomVariables?: boolean
+}
+
+/**
+ * Wizard steps in order. Used by services (ScenarioService) and
+ * for editor validation to know which variables are available at each step.
+ * Not used by ContextBuilder itself — progressive context is managed by
+ * the wizard service via add().
  */
 export enum WizardStep {
   PackSelection = 1,
@@ -35,26 +37,13 @@ export enum WizardStep {
 }
 
 /**
- * Configuration options for ContextBuilder instances.
- */
-export interface ContextBuilderConfig {
-  /** Override the pack ID (defaults to story's active pack or default pack) */
-  packId?: string
-  /** Skip loading custom variables from the pack */
-  skipCustomVariables?: boolean
-}
-
-/**
  * Runtime variable definition.
  * Describes a variable that services inject at render time.
- * These are registered once at module load, not per-request.
+ * Registered once at module load for editor validation and autocomplete.
  */
 export interface RuntimeVariableDefinition {
-  /** Variable name used in templates (e.g., 'recentContent') */
   name: string
-  /** Human-readable description */
   description: string
-  /** Always 'runtime' for runtime variables */
   category: 'runtime'
   /** For wizard context: earliest step where this variable is available */
   availableFrom?: WizardStep
@@ -62,8 +51,9 @@ export interface RuntimeVariableDefinition {
 
 /**
  * External template IDs.
- * These templates bypass Liquid rendering -- they contain raw text only,
- * and services append data programmatically outside the template.
+ * These templates contain raw text only — no Liquid syntax.
+ * Services load them directly from the database and concatenate data
+ * programmatically. They do NOT go through ContextBuilder.render().
  */
 export const EXTERNAL_TEMPLATE_IDS = [
   'image-style-soft-anime',
@@ -74,5 +64,4 @@ export const EXTERNAL_TEMPLATE_IDS = [
   'vault-character-import',
 ] as const
 
-/** Type for external template ID values */
 export type ExternalTemplateId = typeof EXTERNAL_TEMPLATE_IDS[number]

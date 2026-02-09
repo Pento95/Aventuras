@@ -1,39 +1,27 @@
 /**
- * Context System Module
+ * Context System
  *
  * Unified context building and template rendering for all AI services.
- * The ContextBuilder replaces the old two-phase prompt expansion with a
- * single LiquidJS render pass over a flat context object.
+ * One system for both wizard and story — wizard is just an early stage
+ * where services call add() to progressively build context.
  *
  * @example
  * import { ContextBuilder } from '$lib/services/context'
  *
- * // Story context (async - loads from database)
+ * // Story (auto-loads context from database)
  * const ctx = await ContextBuilder.forStory(storyId)
  * ctx.add({ recentContent, activeQuests })
  * const { system, user } = await ctx.render('suggestions')
  *
- * // Wizard context (sync - data already in memory)
- * const wizCtx = ContextBuilder.forWizard(wizardData, WizardStep.SettingCreation)
- * wizCtx.add({ seed, genreLabel })
- * const { system, user } = await wizCtx.render('setting-expansion')
+ * // Wizard (progressive — service adds data at each step)
+ * const ctx = ContextBuilder.create(packId)
+ * ctx.add({ genre, settingDescription })
+ * const { system, user } = await ctx.render('setting-expansion')
  */
-
-// ============================================================================
-// Core Builder
-// ============================================================================
 
 export { ContextBuilder } from './context-builder'
 
-// ============================================================================
-// Runtime Variable Registry
-// ============================================================================
-
 export { RUNTIME_VARIABLES, getAvailableVariables } from './runtime-variables'
-
-// ============================================================================
-// Type Exports
-// ============================================================================
 
 export type {
   RenderResult,
