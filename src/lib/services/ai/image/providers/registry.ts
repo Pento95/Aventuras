@@ -182,5 +182,24 @@ export async function listImageModelsByProvider(
   }
 }
 
+/**
+ * Get sampler info for a ComfyUI provider.
+ */
+export async function getComfySamplerInfo(
+  baseUrl?: string,
+): Promise<{ samplers: string[]; schedulers: string[] }> {
+  try {
+    const config: ImageProviderConfig = { apiKey: '', baseUrl }
+    const provider = createComfyProvider(config)
+    if (provider.getSamplerInfo) {
+      return await provider.getSamplerInfo()
+    }
+    return { samplers: [], schedulers: [] }
+  } catch (error) {
+    log('Error getting sampler info', { error })
+    return { samplers: [], schedulers: [] }
+  }
+}
+
 // Re-export types for convenience
 export type { ImageModelInfo, ImageGenerateResult } from './types'

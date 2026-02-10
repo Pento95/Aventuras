@@ -6,6 +6,11 @@
  */
 
 import type { ImageProviderType } from '$lib/types'
+// Provider specific types
+export type ComfySamplerInfo = {
+  samplers: string[]
+  schedulers: string[]
+}
 
 export interface ImageGenerateOptions {
   model: string
@@ -40,6 +45,8 @@ export interface ImageProvider {
   generate(options: ImageGenerateOptions): Promise<ImageGenerateResult>
   listModels(apiKey?: string): Promise<ImageModelInfo[]>
   supportsImg2Img(modelId: string): boolean
+  // ComfyUI specific
+  getSamplerInfo?(): Promise<ComfySamplerInfo>
 }
 
 export interface ImageProviderConfig {

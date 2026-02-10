@@ -25,6 +25,7 @@ export {
   generateImage,
   listImageModels,
   listImageModelsByProvider,
+  getComfySamplerInfo,
   clearModelsCache,
   supportsImageGeneration,
   type ImageModelInfo,
@@ -46,3 +47,5 @@ export {
   POLLINATIONS_REFERENCE_MODEL_ID,
   IMAGE_STUCK_THRESHOLD_MS,
 } from './constants'
+// Provider types
+export { ComfyMode } from './providers/comfy'

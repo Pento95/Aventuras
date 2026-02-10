@@ -17,7 +17,14 @@
     ChevronRight,
     Check,
   } from 'lucide-svelte'
-  import { listImageModelsByProvider, type ImageModelInfo } from '$lib/services/ai/image'
+  import { Textarea } from '$lib/components/ui/textarea'
+  import {
+    listImageModelsByProvider,
+    getComfySamplerInfo,
+    generateImage,
+    ComfyMode,
+    type ImageModelInfo,
+  } from '$lib/services/ai/image'
   import ImageModelSelect from '$lib/components/settings/ImageModelSelect.svelte'
   import type { ImageProfile, ImageProviderType, APIProfile } from '$lib/types'
   import * as Tabs from '$lib/components/ui/tabs'
@@ -52,9 +59,12 @@
     { value: 'zhipu', label: 'Zhipu CogView' },
     { value: 'comfyui', label: 'ComfyUI' },
   ]
+  const profileModes = [{ value: ComfyMode.BasicTxt2Img, label: 'Basic Text to Image' }] as const
 
   // Tab state
-  let activeTab = $state<'profiles' | 'general' | 'characters' | 'backgrounds'>('profiles')
+  let activeTab = $state<'profiles' | 'general' | 'characters' | 'backgrounds' | 'testing'>(
+    'profiles',
+  )
 
   // Handle profile change
   function onProfileChange(
@@ -118,6 +128,26 @@
   let isLoadingProfileModels = $state(false)
   let profileModelsError = $state<string | null>(null)
 
+  // ComfyUI specific state
+  let profileSampler = $state('dpmpp_2m_sde_gpu')
+  let profileScheduler = $state('sgm_uniform')
+  let profileMode = $state<string>(ComfyMode.BasicTxt2Img)
+  let profileCfg = $state(1)
+  let profileSteps = $state(6)
+  let profilePositivePrompt = $state('')
+  let profileNegativePrompt = $state('')
+  let profileSamplers = $state<{ value: string; label: string }[]>([])
+  let profileSchedulers = $state<{ value: string; label: string }[]>([])
+  let showsaveSuccess = $state(false)
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null
+
+  // Testing state
+  let testProfileId = $state<string | null>(null)
+  let testPrompt = $state('')
+  let isGeneratingTestImage = $state(false)
+  let testImageResult = $state<string | null>(null)
+  let testError = $state<string | null>(null)
+
   // Load models for the profile form when provider/apiKey change
   async function loadProfileFormModels(providerType: ImageProviderType, apiKey: string) {
     isLoadingProfileModels = true
@@ -136,22 +166,120 @@
   $effect(() => {
     if (editingProfileId && profileProviderType) {
       loadProfileFormModels(profileProviderType, profileApiKey)
+      if (profileProviderType === 'comfyui') {
+        loadSamplerInfo(profileBaseUrl)
+      }
     }
   })
 
+  async function loadSamplerInfo(baseUrl?: string) {
+    const info = await getComfySamplerInfo(baseUrl)
+    profileSamplers = info.samplers.map((s) => ({ value: s, label: s }))
+    profileSchedulers = info.schedulers.map((s) => ({ value: s, label: s }))
+  }
+
+  async function handleTestGenerate() {
+    if (!testProfileId || !testPrompt.trim()) return
+
+    const profile = settings.getImageProfile(testProfileId)
+    if (!profile) return
+
+    isGeneratingTestImage = true
+    testError = null
+    testImageResult = null
+
+    try {
+      const result = await generateImage({
+        prompt: testPrompt.trim(),
+        model: profile.model || '',
+        size: '1024x1024', // Default for testing
+        profileId: profile.id,
+      })
+
+      if (result.base64) {
+        testImageResult = result.base64
+      } else {
+        testError = 'No image data returned'
+      }
+    } catch (e) {
+      testError = e instanceof Error ? e.message : 'Unknown error'
+    } finally {
+      isGeneratingTestImage = false
+    }
+  }
+
   // Save current profile edits (called when collapsible closes)
-  function saveEditingProfile() {
+  async function autoSaveProfile() {
     if (isNewProfile || !editingProfileId || !profileName.trim()) return
-    settings.updateImageProfile(editingProfileId, {
+
+    const providerOptions: Record<string, any> = {}
+    if (profileProviderType === 'comfyui') {
+      providerOptions.sampler = profileSampler
+      providerOptions.scheduler = profileScheduler
+      providerOptions.mode = profileMode
+      providerOptions.cfg = parseFloat(profileCfg.toString()) || 1
+      providerOptions.step = parseInt(profileSteps.toString()) || 6
+      providerOptions.positivePrompt = profilePositivePrompt
+      providerOptions.negativePrompt = profileNegativePrompt
+    }
+
+    await settings.updateImageProfile(editingProfileId, {
       name: profileName.trim(),
       providerType: profileProviderType,
       apiKey: profileApiKey,
       baseUrl: profileBaseUrl || undefined,
       model: profileModel,
+      providerOptions,
     })
+
+    showsaveSuccess = true
+    setTimeout(() => {
+      showsaveSuccess = false
+    }, 2000)
+  }
+
+  function triggerAutoSave() {
+    if (saveTimeout) clearTimeout(saveTimeout)
+    saveTimeout = setTimeout(() => {
+      autoSaveProfile()
+      saveTimeout = null
+    }, 500)
+  }
+
+  $effect(() => {
+    if (editingProfileId && !isNewProfile) {
+      // Monitor all relevant form fields for auto-save
+      const _ = [
+        profileName,
+        profileProviderType,
+        profileApiKey,
+        profileBaseUrl,
+        profileModel,
+        profileSampler,
+        profileScheduler,
+        profileMode,
+        profileCfg,
+        profileSteps,
+        profilePositivePrompt,
+        profileNegativePrompt,
+      ]
+      triggerAutoSave()
+    }
+  })
+
+  // Aliased for clarity in UI but uses the same logic
+  function saveEditingProfile() {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+      saveTimeout = null
+    }
+    autoSaveProfile()
   }
 
   function startNewProfile() {
+    if (editingProfileId) {
+      saveEditingProfile()
+    }
     editingProfileId = crypto.randomUUID()
     isNewProfile = true
     profileName = ''
@@ -160,12 +288,22 @@
     profileBaseUrl = ''
     profileModel = ''
     profileModels = []
+    profileSampler = 'dpmpp_2m_sde_gpu'
+    profileScheduler = 'sgm_uniform'
+    profileMode = ComfyMode.BasicTxt2Img
+    profileCfg = 1
+    profileSteps = 6
+    profilePositivePrompt = ''
+    profileNegativePrompt = ''
     showApiKey = false
     showCopyDropdown = false
     openProfileIds.clear()
   }
 
   function startEditProfile(profile: ImageProfile) {
+    if (editingProfileId && editingProfileId !== profile.id) {
+      saveEditingProfile()
+    }
     editingProfileId = profile.id
     isNewProfile = false
     profileName = profile.name
@@ -174,6 +312,18 @@
     profileBaseUrl = profile.baseUrl || ''
     profileModel = profile.model || ''
     profileModels = []
+
+    if (profile.providerType === 'comfyui') {
+      const opts = profile.providerOptions || {}
+      profileSampler = (opts.sampler as string) || 'dpmpp_2m_sde_gpu'
+      profileScheduler = (opts.scheduler as string) || 'sgm_uniform'
+      profileMode = (opts.mode as string) || ComfyMode.BasicTxt2Img
+      profileCfg = Number(opts.cfg) || 1
+      profileSteps = Number(opts.step) || 6
+      profilePositivePrompt = (opts.positivePrompt as string) || ''
+      profileNegativePrompt = (opts.negativePrompt as string) || ''
+    }
+
     showApiKey = false
     showCopyDropdown = false
     openProfileIds.add(profile.id)
@@ -183,10 +333,22 @@
     editingProfileId = null
     isNewProfile = false
     showCopyDropdown = false
+    showsaveSuccess = false
   }
 
   async function handleSaveProfile() {
     if (!profileName.trim()) return
+
+    const providerOptions: Record<string, any> = {}
+    if (profileProviderType === 'comfyui') {
+      providerOptions.sampler = profileSampler
+      providerOptions.scheduler = profileScheduler
+      providerOptions.mode = profileMode
+      providerOptions.cfg = parseFloat(profileCfg.toString()) || 1
+      providerOptions.step = parseInt(profileSteps.toString()) || 6
+      providerOptions.positivePrompt = profilePositivePrompt
+      providerOptions.negativePrompt = profileNegativePrompt
+    }
 
     await settings.addImageProfile({
       name: profileName.trim(),
@@ -194,7 +356,7 @@
       apiKey: profileApiKey,
       baseUrl: profileBaseUrl || undefined,
       model: profileModel,
-      providerOptions: {},
+      providerOptions,
     })
 
     resetEditState()
@@ -232,11 +394,14 @@
   </div>
 
   <Tabs.Root value={activeTab} onValueChange={(v) => (activeTab = v as typeof activeTab)}>
-    <Tabs.List class="grid w-full grid-cols-4">
+    <Tabs.List class="grid w-full {settings.uiSettings.debugMode ? 'grid-cols-5' : 'grid-cols-4'}">
       <Tabs.Trigger value="profiles">Profiles</Tabs.Trigger>
       <Tabs.Trigger value="general">Story Images</Tabs.Trigger>
       <Tabs.Trigger value="characters">Characters</Tabs.Trigger>
       <Tabs.Trigger value="backgrounds">Backgrounds</Tabs.Trigger>
+      {#if settings.uiSettings.debugMode}
+        <Tabs.Trigger value="testing">Testing</Tabs.Trigger>
+      {/if}
     </Tabs.List>
 
     <div class="mt-4 min-h-[400px]">
@@ -303,19 +468,6 @@
                       </div>
                     </Collapsible.Trigger>
                     <div class="flex shrink-0 gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-7 w-7"
-                        onclick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          startEditProfile(profile)
-                        }}
-                        title="Edit profile"
-                      >
-                        <Pencil class="h-3 w-3" />
-                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -655,6 +807,63 @@
           </div>
         </section>
       </Tabs.Content>
+
+      {#if settings.uiSettings.debugMode}
+        <Tabs.Content value="testing" class="space-y-6">
+          <section class="space-y-4">
+            <div class="space-y-2">
+              <Label>Test Profile</Label>
+              <Autocomplete
+                items={settings.imageProfiles}
+                selected={settings.imageProfiles.find((p) => p.id === testProfileId)}
+                onSelect={(v) => (testProfileId = (v as ImageProfile).id)}
+                itemLabel={(p: ImageProfile) =>
+                  `${p.name} (${providerTypes.find((t) => t.value === p.providerType)?.label || p.providerType}${p.model ? ` · ${p.model}` : ''})`}
+                itemValue={(p: ImageProfile) => p.id}
+                placeholder="Select a profile to test"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <Label>Prompt</Label>
+              <Textarea bind:value={testPrompt} placeholder="Enter a test prompt..." rows={4} />
+            </div>
+
+            <Button
+              onclick={handleTestGenerate}
+              disabled={isGeneratingTestImage || !testProfileId || !testPrompt.trim()}
+              class="w-full"
+            >
+              {#if isGeneratingTestImage}
+                <RotateCcw class="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              {:else}
+                Generate Test Image
+              {/if}
+            </Button>
+
+            {#if testError}
+              <Alert.Root variant="destructive">
+                <Alert.Title>Generation Error</Alert.Title>
+                <Alert.Description>{testError}</Alert.Description>
+              </Alert.Root>
+            {/if}
+
+            {#if testImageResult}
+              <div class="mt-4 space-y-2">
+                <Label>Result Image</Label>
+                <div class="overflow-hidden rounded-lg border bg-black/5">
+                  <img
+                    src="data:image/png;base64,{testImageResult}"
+                    alt="Generated test"
+                    class="mx-auto block h-auto max-w-full"
+                  />
+                </div>
+              </div>
+            {/if}
+          </section>
+        </Tabs.Content>
+      {/if}
     </div>
   </Tabs.Root>
 </div>
@@ -761,5 +970,64 @@
         The image model this profile will use for generation.
       </p>
     </div>
+    {#if profileProviderType === 'comfyui'}
+      <div class="grid grid-cols-2 gap-4 pt-2">
+        <div class="col-span-2 space-y-2">
+          <Label>Mode</Label>
+          <Autocomplete
+            items={profileModes}
+            selected={profileModes.find((s) => s.value === profileMode)}
+            onSelect={(v) => {
+              profileMode = (v as { value: string }).value
+            }}
+            itemLabel={(s: { label: string }) => s.label}
+            itemValue={(s: { value: string }) => s.value}
+            placeholder="Select mode"
+          />
+        </div>
+        <div class="space-y-2">
+          <Label>Sampler</Label>
+          <Autocomplete
+            items={profileSamplers}
+            selected={profileSamplers.find((s) => s.value === profileSampler)}
+            onSelect={(v) => {
+              profileSampler = (v as { value: string }).value
+            }}
+            itemLabel={(s: { label: string }) => s.label}
+            itemValue={(s: { value: string }) => s.value}
+            placeholder="Select sampler"
+          />
+        </div>
+        <div class="space-y-2">
+          <Label>Scheduler</Label>
+          <Autocomplete
+            items={profileSchedulers}
+            selected={profileSchedulers.find((s) => s.value === profileScheduler)}
+            onSelect={(v) => {
+              profileScheduler = (v as { value: string }).value
+            }}
+            itemLabel={(s: { label: string }) => s.label}
+            itemValue={(s: { value: string }) => s.value}
+            placeholder="Select scheduler"
+          />
+        </div>
+        <div class="space-y-2">
+          <Label>CFG</Label>
+          <Input type="number" bind:value={profileCfg} placeholder="Enter CFG" step="0.1" />
+        </div>
+        <div class="space-y-2">
+          <Label>Steps</Label>
+          <Input type="number" bind:value={profileSteps} placeholder="Enter Steps" />
+        </div>
+        <div class="col-span-2 space-y-2">
+          <Label>Positive Prompt Base</Label>
+          <Textarea bind:value={profilePositivePrompt} placeholder="Base positive prompt..." />
+        </div>
+        <div class="col-span-2 space-y-2">
+          <Label>Negative Prompt</Label>
+          <Textarea bind:value={profileNegativePrompt} placeholder="Negative prompt..." />
+        </div>
+      </div>
+    {/if}
   </div>
 {/snippet}

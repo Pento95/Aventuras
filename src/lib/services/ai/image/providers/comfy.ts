@@ -11,94 +11,141 @@ import type {
   ImageGenerateOptions,
   ImageGenerateResult,
   ImageModelInfo,
+  ComfySamplerInfo,
 } from './types'
-import { imageFetch } from './fetchAdapter'
-import { fetch as tauriHttpFetch } from '@tauri-apps/plugin-http'
-import { ComfyApi } from '@saintno/comfyui-sdk'
+import { ComfyApi, PromptBuilder, CallWrapper } from '@saintno/comfyui-sdk'
+import BasicTxt2ImgWorkflow from './comfyWorkflows/basic-txt2img-workflow.json'
+import { parseImageSize } from '../imageUtils'
 
 const DEFAULT_BASE_URL = 'http://localhost:8188'
 
-/**
- * Custom ComfyApi that uses Tauri's HTTP plugin to bypass CORS.
- */
-class TauriComfyApi extends ComfyApi {
-  private config: ImageProviderConfig
+export enum ComfyMode {
+  BasicTxt2Img = 'basic-txt2img',
+}
 
-  constructor(host: string, config: ImageProviderConfig) {
-    super(host)
-    this.config = config
-  }
-
-  // Override fetchApi to use our CORS-compliant fetch
-  async fetchApi(route: string, options: any = {}): Promise<Response> {
-    const url = `${this.apiHost}${route}`
-
-    return tauriHttpFetch(url, {
-      method: options.method || 'GET',
-      body: options.body,
-      signal: options.signal,
-    })
-  }
+export const ComfyModes: Record<ComfyMode, any> = {
+  [ComfyMode.BasicTxt2Img]: BasicTxt2ImgWorkflow,
 }
 
 export function createComfyProvider(config: ImageProviderConfig): ImageProvider {
   const baseUrl = config.baseUrl || DEFAULT_BASE_URL
 
-  const api = new TauriComfyApi(baseUrl, config).init()
+  const api = new ComfyApi(baseUrl).init()
 
   return {
     id: 'comfyui',
     name: 'Comfy UI',
 
     async generate(options: ImageGenerateOptions): Promise<ImageGenerateResult> {
-      const { model, prompt, size, referenceImages, signal } = options
-      const [width, height] = size.split('x').map(Number)
-
-      const body: Record<string, unknown> = {
-        model,
-        prompt,
-        width: width || 1024,
-        height: height || 1024,
+      const { model, prompt, size, providerOptions } = options
+      if (!model) {
+        throw new Error('No ComfyUI model selected.')
       }
 
-      // img2img: pass reference as imageDataUrl
-      if (referenceImages?.length) {
-        body.imageDataUrl = `data:image/png;base64,${referenceImages[0]}`
-      }
+      const step = providerOptions?.step ?? 6
+      const cfg = providerOptions?.cfg ?? 1
+      const sampler = (providerOptions?.sampler as string) ?? 'dpmpp_2m_sde_gpu'
+      const scheduler = (providerOptions?.scheduler as string) ?? 'sgm_uniform'
+      const sizeToUse = parseImageSize(size)
+      const seed = Number(
+        crypto.getRandomValues(new BigUint64Array(1))[0] % BigInt(Number.MAX_SAFE_INTEGER),
+      )
+      const modeToUse = (providerOptions?.mode as ComfyMode) || ComfyMode.BasicTxt2Img
+      const workflowBase = ComfyModes[modeToUse]
+      const positiveTags = (providerOptions?.positivePrompt as string) || ''
+      const negativeTags = (providerOptions?.negativePrompt as string) || ''
 
-      const response = await imageFetch({
-        url: `${baseUrl}/images/generations`,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal,
-        serviceId: 'nanogpt-image',
+      const finalPositivePrompt = positiveTags ? `${prompt}, ${positiveTags}` : prompt
+      const finalNegativePrompt = negativeTags
+
+      const workflow = new PromptBuilder(
+        workflowBase,
+        [
+          'positive',
+          'negative',
+          'checkpoint',
+          'seed',
+          'batch',
+          'step',
+          'cfg',
+          'sampler',
+          'scheduler',
+          'width',
+          'height',
+        ],
+        ['images'],
+      )
+        .setInputNode('checkpoint', '4.inputs.ckpt_name')
+        .setInputNode('seed', '3.inputs.seed')
+        .setInputNode('batch', '5.inputs.batch_size')
+        .setInputNode('negative', '7.inputs.text')
+        .setInputNode('positive', '6.inputs.text')
+        .setInputNode('cfg', '3.inputs.cfg')
+        .setInputNode('sampler', '3.inputs.sampler_name')
+        .setInputNode('scheduler', '3.inputs.scheduler')
+        .setInputNode('step', '3.inputs.steps')
+        .setInputNode('width', '5.inputs.width')
+        .setInputNode('height', '5.inputs.height')
+        .setOutputNode('images', '9')
+        .input('checkpoint', model, api.osType)
+        .input('seed', seed)
+        .input('step', step)
+        .input('cfg', cfg)
+        .input<string>('sampler', sampler)
+        .input<string>('scheduler', scheduler)
+        .input('width', sizeToUse.width)
+        .input('height', sizeToUse.height)
+        .input('batch', 1)
+        .input('positive', finalPositivePrompt)
+        .input('negative', finalNegativePrompt)
+
+      return new Promise((resolve, reject) => {
+        console.log('workflow :>> ', workflow)
+        new CallWrapper(api, workflow)
+          .onFinished(async (data) => {
+            try {
+              const imageInfos = data.images?.images || []
+              if (imageInfos.length === 0) {
+                return reject(new Error('ComfyUI produced no images'))
+              }
+
+              // Retrieve the first image as a Blob
+              const blob = await api.getImage(imageInfos[0])
+              const base64 = await blobToBase64(blob)
+
+              resolve({
+                base64,
+              })
+            } catch (error) {
+              console.error('Failed to process ComfyUI output:', error)
+              reject(new Error(`Failed to process image output: ${error}`))
+            }
+          })
+          .onFailed((error) => {
+            console.error('ComfyUI Generation Failed:', error)
+            let message = error.message || 'Failed to queue prompt'
+            if ((error as any).node_errors) {
+              const nodeErrors = (error as any).node_errors
+              const details = Object.entries(nodeErrors)
+                .map(([node, err]: [string, any]) => {
+                  const nodeMsgs = err.errors.map((e: any) => e.message).join(', ')
+                  return `Node ${node}: ${nodeMsgs}`
+                })
+                .join('; ')
+              message = `ComfyUI Validation Error: ${details}`
+            }
+            reject(new Error(message))
+          })
+          .run()
       })
-
-      const data = await response.json()
-      const imageData = data?.data?.[0]
-
-      if (imageData?.b64_json) {
-        return { base64: imageData.b64_json, revisedPrompt: imageData.revised_prompt }
-      }
-      if (imageData?.url) {
-        // Fetch the image URL and convert to base64
-        const imgResponse = await fetch(imageData.url)
-        const blob = await imgResponse.blob()
-        const buffer = await blob.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
-        return { base64, revisedPrompt: imageData.revised_prompt }
-      }
-
-      throw new Error('No image data in NanoGPT response')
     },
 
     async listModels(): Promise<ImageModelInfo[]> {
       console.log('listModels')
       try {
         const imageModels = await api.getCheckpoints()
+        const sampler = await api.getSamplerInfo()
+        console.log('sampler :>> ', sampler)
         console.log(imageModels)
 
         return imageModels.map((m) => {
@@ -116,8 +163,44 @@ export function createComfyProvider(config: ImageProviderConfig): ImageProvider 
       }
     },
 
+    async getSamplerInfo(): Promise<ComfySamplerInfo> {
+      const sampler = await api.getSamplerInfo()
+      const samplerList = sampler.sampler?.[0]
+      const schedulerList = sampler.scheduler?.[0]
+
+      return {
+        samplers: Array.isArray(samplerList)
+          ? samplerList
+          : typeof samplerList === 'string'
+            ? [samplerList]
+            : [],
+        schedulers: Array.isArray(schedulerList)
+          ? schedulerList
+          : typeof schedulerList === 'string'
+            ? [schedulerList]
+            : [],
+      }
+    },
+
     supportsImg2Img(_modelId: string): boolean {
       return true
     },
   }
+}
+
+/**
+ * Converts a Blob to a base64 string (raw, no data URL prefix).
+ */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result as string
+      // Remove data:image/png;base64, prefix
+      const base64 = result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
