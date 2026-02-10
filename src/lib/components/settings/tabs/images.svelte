@@ -5,17 +5,7 @@
   import { Input } from '$lib/components/ui/input'
   import { Autocomplete } from '$lib/components/ui/autocomplete'
   import { Slider } from '$lib/components/ui/slider'
-  import {
-    RotateCcw,
-    Info,
-    Plus,
-    Trash2,
-    Copy,
-    Eye,
-    EyeOff,
-    ChevronRight,
-    Check,
-  } from 'lucide-svelte'
+  import { RotateCcw, Info, Plus, Copy, Eye, EyeOff, ChevronRight, Check } from 'lucide-svelte'
   import { Textarea } from '$lib/components/ui/textarea'
   import {
     listImageModels,
