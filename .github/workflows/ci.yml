@@ -88,6 +88,7 @@ jobs:
           releaseDraft: false
           prerelease: true
           includeUpdaterJson: false
+          assetNamePattern: '[name]_${{ github.ref_name }}_[arch][setup][ext]'
           args: --target ${{ matrix.target }} --config '{"version":"${{ steps.get_version.outputs.clean_version }}"}'
 
   build-android:
