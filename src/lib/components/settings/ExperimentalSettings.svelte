@@ -38,6 +38,7 @@
   let hasEverBackedUp = $state(false)
   let isRestoring = $state(false)
   let restoreError = $state<string | null>(null)
+  let showBackupConfirm = $state(false)
   let showRestoreConfirm = $state(false)
 
   // SQL Query Box state — initialized from module-level persisted values
@@ -98,7 +99,12 @@
     }
   }
 
-  async function handleBackup() {
+  function handleBackup() {
+    showBackupConfirm = true
+  }
+
+  async function handleBackupConfirmed() {
+    showBackupConfirm = false
     isBackingUp = true
     backupResult = null
     try {
@@ -505,9 +511,38 @@
   {/if}
 </div>
 
+<!-- Backup Warning Dialog -->
+<Dialog.Root bind:open={showBackupConfirm}>
+  <Dialog.Content class="sm:max-w-md">
+    <Dialog.Header>
+      <Dialog.Title class="flex items-center gap-2">
+        <AlertTriangle class="h-5 w-5 text-amber-500" />
+        Backup Contains Sensitive Data
+      </Dialog.Title>
+      <Dialog.Description class="space-y-3 pt-2">
+        <p>
+          The backup includes your <strong>full settings</strong>, which contain your
+          <strong class="text-destructive">API keys</strong> and
+          <strong class="text-destructive">API provider profiles</strong>.
+        </p>
+        <p class="font-medium text-amber-500">
+          Do not share this file with others — anyone with the backup can access your API keys.
+        </p>
+      </Dialog.Description>
+    </Dialog.Header>
+    <Dialog.Footer class="gap-2 sm:gap-0">
+      <Button variant="outline" onclick={() => (showBackupConfirm = false)}>Cancel</Button>
+      <Button onclick={handleBackupConfirmed} class="gap-2">
+        <Download class="h-4 w-4" />
+        Continue
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
+
 <!-- Restore Confirmation Dialog -->
 <Dialog.Root bind:open={showRestoreConfirm}>
-  <Dialog.Content class="sm:max-w-md">
+  <Dialog.Content class="p-6 sm:max-w-md">
     <Dialog.Header>
       <Dialog.Title class="flex items-center gap-2">
         <AlertTriangle class="h-5 w-5 text-amber-500" />
@@ -527,9 +562,9 @@
         </p>
       </Dialog.Description>
     </Dialog.Header>
-    <Dialog.Footer class="gap-2 sm:gap-0">
+    <Dialog.Footer class="mt-4 justify-between sm:justify-between">
       <Button variant="outline" onclick={() => (showRestoreConfirm = false)}>Cancel</Button>
-      <Button variant="destructive" onclick={handleRestoreConfirmed} class="gap-2">
+      <Button variant="outline" onclick={handleRestoreConfirmed} class="gap-2 border-destructive text-destructive hover:bg-destructive/10">
         <Upload class="h-4 w-4" />
         Restore & Close App
       </Button>
