@@ -3,9 +3,11 @@
   import { packService } from '$lib/services/packs/pack-service'
   import { createIsMobile } from '$lib/hooks/is-mobile.svelte'
   import TemplateGroupList from './TemplateGroupList.svelte'
+  import TemplateEditor from './TemplateEditor.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Badge } from '$lib/components/ui/badge'
   import { Skeleton } from '$lib/components/ui/skeleton'
+  import * as Dialog from '$lib/components/ui/dialog'
   import * as Drawer from '$lib/components/ui/drawer'
   import { ChevronLeft, Menu } from 'lucide-svelte'
 
@@ -21,6 +23,12 @@
   let fullPack = $state<FullPack | null>(null)
   let loading = $state(true)
   let drawerOpen = $state(false)
+
+  // Dirty guard state
+  let isEditorDirty = $state(false)
+  let showDirtyDialog = $state(false)
+  let pendingAction = $state<(() => void) | null>(null)
+  let editorRef = $state<TemplateEditor | null>(null)
 
   const isMobile = createIsMobile()
 
@@ -39,18 +47,74 @@
     }
   }
 
+  /**
+   * Guard wrapper: if editor is dirty, show dialog instead of executing action.
+   * If clean, execute immediately.
+   */
+  function guardDirty(action: () => void) {
+    if (isEditorDirty) {
+      pendingAction = action
+      showDirtyDialog = true
+    } else {
+      action()
+    }
+  }
+
   function handleSelectTemplate(templateId: string) {
-    showVariables = false
-    selectedTemplateId = templateId
-    drawerOpen = false
+    if (templateId === selectedTemplateId) return
+    guardDirty(() => {
+      showVariables = false
+      selectedTemplateId = templateId
+      isEditorDirty = false
+      drawerOpen = false
+    })
   }
 
   function handleToggleVariables() {
-    showVariables = !showVariables
-    if (showVariables) {
-      selectedTemplateId = null
+    guardDirty(() => {
+      showVariables = !showVariables
+      if (showVariables) {
+        selectedTemplateId = null
+      }
+      isEditorDirty = false
+      drawerOpen = false
+    })
+  }
+
+  function handleBack() {
+    guardDirty(() => {
+      onClose()
+    })
+  }
+
+  function handleDirtyChange(dirty: boolean) {
+    isEditorDirty = dirty
+  }
+
+  // Dirty dialog actions
+  async function handleSaveAndSwitch() {
+    if (editorRef) {
+      await editorRef.save()
     }
-    drawerOpen = false
+    isEditorDirty = false
+    showDirtyDialog = false
+    pendingAction?.()
+    pendingAction = null
+  }
+
+  function handleDiscardAndSwitch() {
+    if (editorRef) {
+      editorRef.discard()
+    }
+    isEditorDirty = false
+    showDirtyDialog = false
+    pendingAction?.()
+    pendingAction = null
+  }
+
+  function handleCancelSwitch() {
+    showDirtyDialog = false
+    pendingAction = null
   }
 </script>
 
@@ -61,7 +125,7 @@
       variant="ghost"
       size="sm"
       class="text-muted-foreground hover:text-foreground -ml-2 gap-1"
-      onclick={onClose}
+      onclick={handleBack}
     >
       <ChevronLeft class="h-4 w-4" />
       <span class="hidden sm:inline">Back to Packs</span>
@@ -116,18 +180,28 @@
       {/if}
 
       <!-- Right Panel -->
-      <div class="flex flex-1 items-center justify-center overflow-hidden">
+      <div class="flex flex-1 overflow-hidden">
         {#if showVariables}
-          <div class="text-muted-foreground text-center">
-            <p class="text-sm">Variable Manager -- coming in Plan 05</p>
+          <div class="flex flex-1 items-center justify-center">
+            <div class="text-muted-foreground text-center">
+              <p class="text-sm">Variable Manager -- coming in Plan 05</p>
+            </div>
           </div>
         {:else if selectedTemplateId}
-          <div class="text-muted-foreground text-center">
-            <p class="text-sm">Editor for {selectedTemplateId} -- coming in Plan 04</p>
+          <div class="flex-1 overflow-hidden">
+            <TemplateEditor
+              bind:this={editorRef}
+              {packId}
+              templateId={selectedTemplateId}
+              customVariables={fullPack.variables}
+              onDirtyChange={handleDirtyChange}
+            />
           </div>
         {:else}
-          <div class="text-muted-foreground text-center">
-            <p class="text-sm">Select a template to edit</p>
+          <div class="flex flex-1 items-center justify-center">
+            <div class="text-muted-foreground text-center">
+              <p class="text-sm">Select a template to edit</p>
+            </div>
           </div>
         {/if}
       </div>
@@ -158,3 +232,20 @@
     </Drawer.Content>
   </Drawer.Root>
 {/if}
+
+<!-- Dirty guard dialog -->
+<Dialog.Root bind:open={showDirtyDialog}>
+  <Dialog.Content class="sm:max-w-md">
+    <Dialog.Header>
+      <Dialog.Title>Unsaved Changes</Dialog.Title>
+      <Dialog.Description>
+        You have unsaved changes. What would you like to do?
+      </Dialog.Description>
+    </Dialog.Header>
+    <Dialog.Footer class="flex gap-2 sm:justify-end">
+      <Button variant="outline" onclick={handleCancelSwitch}>Cancel</Button>
+      <Button variant="secondary" onclick={handleDiscardAndSwitch}>Discard</Button>
+      <Button onclick={handleSaveAndSwitch}>Save & Continue</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
