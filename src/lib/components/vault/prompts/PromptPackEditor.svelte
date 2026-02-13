@@ -4,6 +4,7 @@
   import { createIsMobile } from '$lib/hooks/is-mobile.svelte'
   import TemplateGroupList from './TemplateGroupList.svelte'
   import TemplateEditor from './TemplateEditor.svelte'
+  import VariableManager from './VariableManager.svelte'
   import { Button } from '$lib/components/ui/button'
   import { Badge } from '$lib/components/ui/badge'
   import { Skeleton } from '$lib/components/ui/skeleton'
@@ -44,6 +45,14 @@
       console.error('[PromptPackEditor] Failed to load pack:', error)
     } finally {
       loading = false
+    }
+  }
+
+  async function refreshPack() {
+    try {
+      fullPack = await packService.getFullPack(packId)
+    } catch (error) {
+      console.error('[PromptPackEditor] Failed to refresh pack:', error)
     }
   }
 
@@ -182,10 +191,12 @@
       <!-- Right Panel -->
       <div class="flex flex-1 overflow-hidden">
         {#if showVariables}
-          <div class="flex flex-1 items-center justify-center">
-            <div class="text-muted-foreground text-center">
-              <p class="text-sm">Variable Manager -- coming in Plan 05</p>
-            </div>
+          <div class="flex-1 overflow-hidden">
+            <VariableManager
+              {packId}
+              variables={fullPack?.variables ?? []}
+              onVariablesChanged={refreshPack}
+            />
           </div>
         {:else if selectedTemplateId}
           <div class="flex-1 overflow-hidden">
