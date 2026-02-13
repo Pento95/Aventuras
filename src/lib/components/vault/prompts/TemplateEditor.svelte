@@ -1,0 +1,341 @@
+<script lang="ts">
+  import CodeMirror from 'svelte-codemirror-editor'
+  import { liquid } from '@codemirror/lang-liquid'
+  import { EditorView } from '@codemirror/view'
+  import type { Extension } from '@codemirror/state'
+  import { database } from '$lib/services/database'
+  import { packService } from '$lib/services/packs/pack-service'
+  import { validateTemplate } from '$lib/services/templates/validator'
+  import { variableRegistry } from '$lib/services/templates/variables'
+  import type { ValidationError } from '$lib/services/templates/types'
+  import type { CustomVariable } from '$lib/services/packs/types'
+  import type { Completion } from '@codemirror/autocomplete'
+  import VariablePalette from './VariablePalette.svelte'
+  import * as Tabs from '$lib/components/ui/tabs'
+  import { Button } from '$lib/components/ui/button'
+  import { Badge } from '$lib/components/ui/badge'
+  import { PROMPT_TEMPLATES } from '$lib/services/prompts/templates'
+  import { Save, Undo2, RotateCcw, AlertTriangle, CircleCheck } from 'lucide-svelte'
+
+  interface Props {
+    packId: string
+    templateId: string
+    customVariables: CustomVariable[]
+    onDirtyChange?: (dirty: boolean) => void
+  }
+
+  let { packId, templateId, customVariables, onDirtyChange }: Props = $props()
+
+  // Editor content state
+  let systemContent = $state('')
+  let userContent = $state('')
+  let originalSystem = $state('')
+  let originalUser = $state('')
+  let activeTab = $state<'system' | 'user'>('system')
+  let hasUserContent = $state(false)
+  let validationErrors = $state<ValidationError[]>([])
+  let editorView = $state<EditorView | null>(null)
+  let loading = $state(true)
+
+  // Dirty tracking
+  let isSystemDirty = $derived(systemContent !== originalSystem)
+  let isUserDirty = $derived(userContent !== originalUser)
+  let isDirty = $derived(isSystemDirty || isUserDirty)
+
+  // Template display name
+  let templateName = $derived(
+    PROMPT_TEMPLATES.find((t) => t.id === templateId)?.name ?? templateId,
+  )
+
+  // Notify parent of dirty state changes
+  $effect(() => {
+    onDirtyChange?.(isDirty)
+  })
+
+  // Build variable completions for CodeMirror autocomplete
+  let completions: Completion[] = $derived.by(() => {
+    const result: Completion[] = []
+    for (const v of variableRegistry.getAll()) {
+      result.push({
+        label: v.name,
+        type: 'variable',
+        detail: v.category,
+        info: v.description,
+      })
+    }
+    for (const v of customVariables) {
+      result.push({
+        label: v.variableName,
+        type: 'variable',
+        detail: 'custom',
+        info: v.displayName,
+      })
+    }
+    return result
+  })
+
+  // Build liquid language extension
+  let liquidLang = $derived(liquid({ variables: completions }))
+
+  // Custom theme using app CSS variables
+  const editorTheme: Extension = EditorView.theme({
+    '&': {
+      fontSize: '14px',
+      height: '100%',
+    },
+    '.cm-content': {
+      fontFamily:
+        'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+      padding: '12px 0',
+    },
+    '.cm-gutters': {
+      backgroundColor: 'var(--surface-100, hsl(var(--muted)))',
+      borderRight: '1px solid hsl(var(--border))',
+      color: 'hsl(var(--muted-foreground))',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'var(--surface-200, hsl(var(--accent)))',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'hsl(var(--accent) / 0.3)',
+    },
+    '.cm-selectionBackground': {
+      backgroundColor: 'hsl(var(--accent) / 0.5) !important',
+    },
+    '&.cm-focused .cm-selectionBackground': {
+      backgroundColor: 'hsl(var(--accent) / 0.5) !important',
+    },
+    '.cm-cursor': {
+      borderLeftColor: 'hsl(var(--foreground))',
+    },
+    '.cm-scroller': {
+      overflow: 'auto',
+    },
+  })
+
+  // Debounced validation
+  let validationTimer: ReturnType<typeof setTimeout> | undefined
+
+  function validateContent(content: string) {
+    clearTimeout(validationTimer)
+    validationTimer = setTimeout(() => {
+      const additionalVarNames = customVariables.map((v) => v.variableName)
+      const result = validateTemplate(content, additionalVarNames)
+      validationErrors = result.errors
+    }, 500)
+  }
+
+  // Load template content when templateId changes
+  $effect(() => {
+    const tId = templateId
+    const pId = packId
+    loadTemplate(pId, tId)
+  })
+
+  async function loadTemplate(pId: string, tId: string) {
+    loading = true
+    validationErrors = []
+    editorView = null
+
+    try {
+      // Load system prompt
+      const systemTemplate = await database.getPackTemplate(pId, tId)
+      const sysContent = systemTemplate?.content ?? ''
+      systemContent = sysContent
+      originalSystem = sysContent
+
+      // Load user message (if exists)
+      const userTemplate = await database.getPackTemplate(pId, `${tId}-user`)
+      if (userTemplate) {
+        userContent = userTemplate.content
+        originalUser = userTemplate.content
+        hasUserContent = true
+      } else {
+        userContent = ''
+        originalUser = ''
+        hasUserContent = false
+      }
+
+      activeTab = 'system'
+      // Run initial validation
+      validateContent(sysContent)
+    } catch (error) {
+      console.error('[TemplateEditor] Failed to load template:', error)
+    } finally {
+      loading = false
+    }
+  }
+
+  function handleContentChange(newValue: string) {
+    if (activeTab === 'system') {
+      systemContent = newValue
+    } else {
+      userContent = newValue
+    }
+    validateContent(newValue)
+  }
+
+  function handleEditorReady(view: EditorView) {
+    editorView = view
+  }
+
+  function handleInsertVariable(variableName: string) {
+    if (!editorView) return
+    const insertion = `{{ ${variableName} }}`
+    const cursor = editorView.state.selection.main.head
+    editorView.dispatch({
+      changes: { from: cursor, insert: insertion },
+      selection: { anchor: cursor + insertion.length },
+    })
+    editorView.focus()
+  }
+
+  // Current content for the active tab
+  let currentContent = $derived(activeTab === 'system' ? systemContent : userContent)
+
+  // Public methods for parent component
+  export async function save(): Promise<boolean> {
+    try {
+      await database.setPackTemplateContent(packId, templateId, systemContent)
+      originalSystem = systemContent
+
+      if (hasUserContent) {
+        await database.setPackTemplateContent(packId, `${templateId}-user`, userContent)
+        originalUser = userContent
+      }
+      return true
+    } catch (error) {
+      console.error('[TemplateEditor] Failed to save:', error)
+      return false
+    }
+  }
+
+  export function discard(): void {
+    systemContent = originalSystem
+    userContent = originalUser
+    validateContent(activeTab === 'system' ? systemContent : userContent)
+  }
+
+  export async function reset(): Promise<boolean> {
+    const resetSystem = await packService.resetTemplate(packId, templateId)
+    if (!resetSystem) return false
+
+    if (hasUserContent) {
+      await packService.resetTemplate(packId, `${templateId}-user`)
+    }
+
+    // Reload from database
+    await loadTemplate(packId, templateId)
+    return true
+  }
+</script>
+
+{#if loading}
+  <div class="flex h-full items-center justify-center">
+    <p class="text-muted-foreground text-sm">Loading template...</p>
+  </div>
+{:else}
+  <div class="flex h-full flex-col overflow-hidden">
+    <!-- Header: Template name + dirty indicator -->
+    <div class="flex items-center justify-between border-b px-4 py-2">
+      <div class="flex items-center gap-2">
+        <h3 class="text-sm font-semibold">{templateName}</h3>
+        {#if isDirty}
+          <Badge variant="outline" class="border-yellow-500/50 text-yellow-500 text-xs"
+            >Unsaved</Badge
+          >
+        {/if}
+      </div>
+    </div>
+
+    <!-- Tabs (if user content exists) + Toolbar -->
+    <div class="flex flex-wrap items-center gap-1 border-b px-2 py-1.5">
+      {#if hasUserContent}
+        <Tabs.Root
+          value={activeTab}
+          onValueChange={(v) => {
+            if (v) activeTab = v as 'system' | 'user'
+          }}
+        >
+          <Tabs.List class="h-8">
+            <Tabs.Trigger value="system" class="text-xs">System Prompt</Tabs.Trigger>
+            <Tabs.Trigger value="user" class="text-xs">User Message</Tabs.Trigger>
+          </Tabs.List>
+        </Tabs.Root>
+      {/if}
+
+      <div class="ml-auto flex items-center gap-1">
+        <VariablePalette {customVariables} onInsert={handleInsertVariable} />
+
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 gap-1 text-xs"
+          disabled={!isDirty}
+          onclick={save}
+        >
+          <Save class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Save</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 gap-1 text-xs"
+          disabled={!isDirty}
+          onclick={discard}
+        >
+          <Undo2 class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Discard</span>
+        </Button>
+
+        <Button variant="ghost" size="sm" class="h-8 gap-1 text-xs" onclick={reset}>
+          <RotateCcw class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Reset</span>
+        </Button>
+      </div>
+    </div>
+
+    <!-- CodeMirror Editor -->
+    <div class="flex-1 overflow-hidden">
+      {#key `${templateId}-${activeTab}`}
+        <CodeMirror
+          value={currentContent}
+          onchange={handleContentChange}
+          lang={liquidLang}
+          theme={editorTheme}
+          lineWrapping
+          lineNumbers
+          onready={handleEditorReady}
+          styles={{
+            '&': { height: '100%' },
+          }}
+        />
+      {/key}
+    </div>
+
+    <!-- Validation bar -->
+    <div class="border-t px-4 py-2">
+      {#if validationErrors.length > 0}
+        <div class="flex flex-col gap-1">
+          {#each validationErrors as error (error.message)}
+            <div class="flex items-start gap-2 text-xs">
+              <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-500" />
+              <span class="text-muted-foreground">
+                {error.message}
+                {#if error.line}
+                  <span class="text-muted-foreground/70">(line {error.line})</span>
+                {/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="flex items-center gap-2 text-xs">
+          <CircleCheck class="h-3.5 w-3.5 text-green-500" />
+          <span class="text-muted-foreground">Template is valid</span>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
