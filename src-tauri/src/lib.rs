@@ -171,6 +171,18 @@ pub fn run() {
             description: "entry_suggested_actions",
             sql: include_str!("../migrations/027_entry_suggested_actions.sql"),
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 28,
+            description: "cow_tombstones",
+            sql: include_str!("../migrations/028_cow_tombstones.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 29,
+            description: "branch_entity_snapshots",
+            sql: include_str!("../migrations/029_branch_entity_snapshots.sql"),
+            kind: MigrationKind::Up,
         }
     ];
 

@@ -165,6 +165,7 @@ export interface Character {
   metadata: Record<string, unknown> | null
   branchId: string | null // Branch this character belongs to (null = main/inherited)
   overridesId?: string | null // COW: ID of the parent entity this row overrides (null = original)
+  deleted?: boolean // COD: tombstone — entity is deleted on this branch (COW only)
   // Translation fields
   translatedName?: string | null
   translatedDescription?: string | null
@@ -325,6 +326,7 @@ export interface Location {
   metadata: Record<string, unknown> | null
   branchId: string | null // Branch this location belongs to (null = main/inherited)
   overridesId?: string | null // COW: ID of the parent entity this row overrides (null = original)
+  deleted?: boolean // COD: tombstone — entity is deleted on this branch (COW only)
   // Translation fields
   translatedName?: string | null
   translatedDescription?: string | null
@@ -342,6 +344,7 @@ export interface Item {
   metadata: Record<string, unknown> | null
   branchId: string | null // Branch this item belongs to (null = main/inherited)
   overridesId?: string | null // COW: ID of the parent entity this row overrides (null = original)
+  deleted?: boolean // COD: tombstone — entity is deleted on this branch (COW only)
   // Translation fields
   translatedName?: string | null
   translatedDescription?: string | null
@@ -360,6 +363,7 @@ export interface StoryBeat {
   metadata: Record<string, unknown> | null
   branchId: string | null // Branch this beat belongs to (null = main/inherited)
   overridesId?: string | null // COW: ID of the parent entity this row overrides (null = original)
+  deleted?: boolean // COD: tombstone — entity is deleted on this branch (COW only)
   // Translation fields
   translatedTitle?: string | null
   translatedDescription?: string | null
@@ -437,6 +441,7 @@ export interface Branch {
   forkEntryId: string // Entry where this branch diverges from parent
   checkpointId: string | null // Checkpoint for world state restoration
   createdAt: number
+  snapshotComplete?: boolean // When true, branch has its own complete entity set (no lineage resolution needed)
 }
 
 // ===== Entry/Lorebook System (per design doc section 3.2) =====
@@ -485,6 +490,7 @@ export interface Entry {
   // Branch support
   branchId: string | null // Branch this entry belongs to (null = main/inherited)
   overridesId?: string | null // COW: ID of the parent entity this row overrides (null = original)
+  deleted?: boolean // COD: tombstone — entity is deleted on this branch (COW only)
 }
 
 export interface EntryInjection {

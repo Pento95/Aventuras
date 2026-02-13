@@ -855,14 +855,25 @@ class StoryStore {
     let storyBeats: StoryBeat[]
 
     if (branchId && settings.experimentalFeatures.lightweightBranches) {
-      // COW: resolve through lineage
-      const lineage = this.buildBranchLineage(branchId)
-      ;[characters, locations, items, storyBeats] = await Promise.all([
-        database.getCharactersResolved(storyId, lineage),
-        database.getLocationsResolved(storyId, lineage),
-        database.getItemsResolved(storyId, lineage),
-        database.getStoryBeatsResolved(storyId, lineage),
-      ])
+      const currentBranch = this.branches.find((b) => b.id === branchId)
+      if (currentBranch?.snapshotComplete) {
+        // Snapshot isolation: branch has its own complete entity set
+        ;[characters, locations, items, storyBeats] = await Promise.all([
+          database.getCharactersForBranch(storyId, branchId),
+          database.getLocationsForBranch(storyId, branchId),
+          database.getItemsForBranch(storyId, branchId),
+          database.getStoryBeatsForBranch(storyId, branchId),
+        ])
+      } else {
+        // Legacy COW: resolve through lineage (pre-snapshot branches)
+        const lineage = this.buildBranchLineage(branchId)
+        ;[characters, locations, items, storyBeats] = await Promise.all([
+          database.getCharactersResolved(storyId, lineage),
+          database.getLocationsResolved(storyId, lineage),
+          database.getItemsResolved(storyId, lineage),
+          database.getStoryBeatsResolved(storyId, lineage),
+        ])
+      }
     } else if (branchId) {
       // Legacy branch: direct loading
       ;[characters, locations, items, storyBeats] = await Promise.all([
@@ -872,12 +883,12 @@ class StoryStore {
         database.getStoryBeatsForBranch(storyId, branchId),
       ])
     } else {
-      // Main branch
+      // Main branch — only load entities with null branch_id
       ;[characters, locations, items, storyBeats] = await Promise.all([
-        database.getCharacters(storyId),
-        database.getLocations(storyId),
-        database.getItems(storyId),
-        database.getStoryBeats(storyId),
+        database.getCharactersForBranch(storyId, null),
+        database.getLocationsForBranch(storyId, null),
+        database.getItemsForBranch(storyId, null),
+        database.getStoryBeatsForBranch(storyId, null),
       ])
     }
 
@@ -885,6 +896,15 @@ class StoryStore {
     this.locations = locations
     this.items = items
     this.storyBeats = storyBeats
+
+    // Filter out tombstoned entities when COW is enabled
+    // (COW resolution already handles this for branch paths, but main branch loads raw data)
+    if (settings.experimentalFeatures.lightweightBranches) {
+      this.characters = this.characters.filter((c) => !c.deleted)
+      this.locations = this.locations.filter((l) => !l.deleted)
+      this.items = this.items.filter((i) => !i.deleted)
+      this.storyBeats = this.storyBeats.filter((b) => !b.deleted)
+    }
 
     log('World state refreshed', {
       characters: characters.length,
@@ -1277,7 +1297,19 @@ class StoryStore {
       throw new Error('Swap protagonists before deleting the current one')
     }
 
-    await database.deleteCharacter(id)
+    if (settings.experimentalFeatures.lightweightBranches) {
+      // COD: tombstone instead of hard-deleting to preserve row for sibling/child branches
+      if (existing.branchId === this.currentStory.currentBranchId) {
+        // Entity is owned by current branch (or main) — mark deleted in place
+        await database.markCharacterDeleted(id)
+      } else {
+        // Entity is inherited from another branch — create tombstone override
+        const { entity: owned } = await this.cowCharacter(existing)
+        await database.markCharacterDeleted(owned.id)
+      }
+    } else {
+      await database.deleteCharacter(id)
+    }
     this.characters = this.characters.filter((c) => c.id !== id)
   }
 
@@ -1402,7 +1434,16 @@ class StoryStore {
     const location = this.locations.find((l) => l.id === locationId)
     if (!location) throw new Error('Location not found')
 
-    await database.deleteLocation(locationId)
+    if (settings.experimentalFeatures.lightweightBranches) {
+      if (location.branchId === this.currentStory.currentBranchId) {
+        await database.markLocationDeleted(locationId)
+      } else {
+        const { entity: owned } = await this.cowLocation(location)
+        await database.markLocationDeleted(owned.id)
+      }
+    } else {
+      await database.deleteLocation(locationId)
+    }
     this.locations = this.locations.filter((l) => l.id !== locationId)
     log('Location deleted:', location.name)
   }
@@ -1448,7 +1489,16 @@ class StoryStore {
     const existing = this.items.find((i) => i.id === id)
     if (!existing) throw new Error('Item not found')
 
-    await database.deleteItem(id)
+    if (settings.experimentalFeatures.lightweightBranches) {
+      if (existing.branchId === this.currentStory.currentBranchId) {
+        await database.markItemDeleted(id)
+      } else {
+        const { entity: owned } = await this.cowItem(existing)
+        await database.markItemDeleted(owned.id)
+      }
+    } else {
+      await database.deleteItem(id)
+    }
     this.items = this.items.filter((i) => i.id !== id)
   }
 
@@ -1511,7 +1561,16 @@ class StoryStore {
     const existing = this.storyBeats.find((b) => b.id === id)
     if (!existing) throw new Error('Story beat not found')
 
-    await database.deleteStoryBeat(id)
+    if (settings.experimentalFeatures.lightweightBranches) {
+      if (existing.branchId === this.currentStory.currentBranchId) {
+        await database.markStoryBeatDeleted(id)
+      } else {
+        const { entity: owned } = await this.cowStoryBeat(existing)
+        await database.markStoryBeatDeleted(owned.id)
+      }
+    } else {
+      await database.deleteStoryBeat(id)
+    }
     this.storyBeats = this.storyBeats.filter((b) => b.id !== id)
   }
 
@@ -1618,7 +1677,21 @@ class StoryStore {
   async deleteLorebookEntry(id: string): Promise<void> {
     if (!this.currentStory) throw new Error('No story loaded')
 
-    await database.deleteEntry(id)
+    if (settings.experimentalFeatures.lightweightBranches) {
+      const existing = this.lorebookEntries.find((e) => e.id === id)
+      if (existing) {
+        if (existing.branchId === this.currentStory.currentBranchId) {
+          await database.markEntryDeleted(id)
+        } else {
+          const { entity: owned } = await this.cowLorebookEntry(existing)
+          await database.markEntryDeleted(owned.id)
+        }
+      } else {
+        await database.deleteEntry(id)
+      }
+    } else {
+      await database.deleteEntry(id)
+    }
     this.lorebookEntries = this.lorebookEntries.filter((e) => e.id !== id)
     log('Lorebook entry deleted:', id)
   }
@@ -1629,8 +1702,24 @@ class StoryStore {
   async deleteLorebookEntries(ids: string[]): Promise<void> {
     if (!this.currentStory) throw new Error('No story loaded')
 
-    // Delete all entries in parallel
-    await Promise.all(ids.map((id) => database.deleteEntry(id)))
+    if (settings.experimentalFeatures.lightweightBranches) {
+      // COD: process each entry individually for correct tombstone handling
+      for (const id of ids) {
+        const existing = this.lorebookEntries.find((e) => e.id === id)
+        if (existing) {
+          if (existing.branchId === this.currentStory.currentBranchId) {
+            await database.markEntryDeleted(id)
+          } else {
+            const { entity: owned } = await this.cowLorebookEntry(existing)
+            await database.markEntryDeleted(owned.id)
+          }
+        } else {
+          await database.deleteEntry(id)
+        }
+      }
+    } else {
+      await Promise.all(ids.map((id) => database.deleteEntry(id)))
+    }
     this.lorebookEntries = this.lorebookEntries.filter((e) => !ids.includes(e.id))
     log('Lorebook entries deleted:', ids.length)
   }
@@ -2769,8 +2858,91 @@ class StoryStore {
     // Copy world state from checkpoint into database with the new branch_id
     // This ensures the branch has its own copy of the world state at the fork point
     if (settings.experimentalFeatures.lightweightBranches) {
-      // COW path: skip entity copy entirely — entities are resolved through lineage at load time
-      log('COW branch: skipping entity copy, entities will be inherited from lineage')
+      // Snapshot isolation: copy all entities from checkpoint into the new branch.
+      // Each branch gets its own complete entity set for full isolation.
+      log('COW branch: copying entity snapshot for branch isolation')
+
+      // Copy characters
+      for (const char of checkpoint.charactersSnapshot) {
+        const branchChar: Character = {
+          ...char,
+          id: crypto.randomUUID(),
+          branchId: branch.id,
+          overridesId: null,
+        }
+        await database.addCharacter(branchChar)
+      }
+
+      // Copy locations — remap connection IDs to new location IDs
+      const locationIdMap = new SvelteMap<string, string>()
+      for (const loc of checkpoint.locationsSnapshot) {
+        locationIdMap.set(loc.id, crypto.randomUUID())
+      }
+      for (const loc of checkpoint.locationsSnapshot) {
+        const newId = locationIdMap.get(loc.id)!
+        const branchLoc: Location = {
+          ...loc,
+          id: newId,
+          branchId: branch.id,
+          overridesId: null,
+          connections: loc.connections.map((connId) => locationIdMap.get(connId) ?? connId),
+        }
+        await database.addLocation(branchLoc)
+      }
+
+      // Copy items — remap location IDs to the new branch's locations
+      for (const item of checkpoint.itemsSnapshot) {
+        const remappedLocation =
+          item.location === 'inventory'
+            ? 'inventory'
+            : (locationIdMap.get(item.location) ?? item.location)
+        const branchItem: Item = {
+          ...item,
+          id: crypto.randomUUID(),
+          branchId: branch.id,
+          overridesId: null,
+          location: remappedLocation,
+        }
+        await database.addItem(branchItem)
+      }
+
+      // Copy story beats
+      for (const beat of checkpoint.storyBeatsSnapshot) {
+        const branchBeat: StoryBeat = {
+          ...beat,
+          id: crypto.randomUUID(),
+          branchId: branch.id,
+          overridesId: null,
+        }
+        await database.addStoryBeat(branchBeat)
+      }
+
+      // Copy lorebook entries
+      if (checkpoint.lorebookEntriesSnapshot) {
+        for (const entry of checkpoint.lorebookEntriesSnapshot) {
+          const branchEntry: Entry = {
+            ...entry,
+            id: crypto.randomUUID(),
+            branchId: branch.id,
+            overridesId: null,
+          }
+          await database.addEntry(branchEntry)
+        }
+      }
+
+      // Mark branch as snapshot-complete so loading uses direct queries (no lineage resolution)
+      await database.setBranchSnapshotComplete(branch.id)
+      this.branches = this.branches.map((b) =>
+        b.id === branch.id ? { ...b, snapshotComplete: true } : b,
+      )
+
+      log('COW branch: entity snapshot complete', {
+        characters: checkpoint.charactersSnapshot.length,
+        locations: checkpoint.locationsSnapshot.length,
+        items: checkpoint.itemsSnapshot.length,
+        storyBeats: checkpoint.storyBeatsSnapshot.length,
+        lorebookEntries: checkpoint.lorebookEntriesSnapshot?.length ?? 0,
+      })
 
       // Create a world state snapshot at the fork point for rollback support
       if (settings.experimentalFeatures.stateTracking) {
@@ -2949,6 +3121,10 @@ class StoryStore {
     // Reload background from database for the branch
     this.currentBgImage = await database.getBackgroundForBranch(this.currentStory.id, branchId)
 
+    // Restore suggested actions from the new branch's last narration entry
+    // Without this, stale actions from the previous branch persist in the UI
+    this.restoreSuggestedActionsAfterDelete()
+
     log('Switched to branch:', branchId ?? 'main')
   }
 
@@ -2983,6 +3159,15 @@ class StoryStore {
       this.items = items
       this.storyBeats = storyBeats
       this.lorebookEntries = lorebookEntries
+
+      // Filter out tombstoned entities when COW is enabled
+      if (settings.experimentalFeatures.lightweightBranches) {
+        this.characters = this.characters.filter((c) => !c.deleted)
+        this.locations = this.locations.filter((l) => !l.deleted)
+        this.items = this.items.filter((i) => !i.deleted)
+        this.storyBeats = this.storyBeats.filter((b) => !b.deleted)
+        this.lorebookEntries = this.lorebookEntries.filter((e) => !e.deleted)
+      }
     } else {
       // Non-main branch: load entries across branch lineage (main -> ancestors -> current)
       const lineage = this.buildBranchLineage(branchId)
@@ -3058,22 +3243,47 @@ class StoryStore {
       let lorebookEntries: Entry[]
 
       if (settings.experimentalFeatures.lightweightBranches) {
-        // COW path: resolve entities through lineage
-        ;[characters, locations, items, storyBeats, lorebookEntries] = await Promise.all([
-          database.getCharactersResolved(this.currentStory.id, lineage),
-          database.getLocationsResolved(this.currentStory.id, lineage),
-          database.getItemsResolved(this.currentStory.id, lineage),
-          database.getStoryBeatsResolved(this.currentStory.id, lineage),
-          database.getLorebookEntriesResolved(this.currentStory.id, lineage),
-        ])
-        log('COW: Resolved world state through lineage for branch:', branchId, {
-          lineageDepth: lineage.length,
-          characters: characters.length,
-          locations: locations.length,
-          items: items.length,
-          storyBeats: storyBeats.length,
-          lorebookEntries: lorebookEntries.length,
-        })
+        const currentBranchInfo = this.branches.find((b) => b.id === branchId)
+        if (currentBranchInfo?.snapshotComplete) {
+          // Snapshot isolation: branch has its own complete entity set
+          ;[characters, locations, items, storyBeats, lorebookEntries] = await Promise.all([
+            database.getCharactersForBranch(this.currentStory.id, branchId),
+            database.getLocationsForBranch(this.currentStory.id, branchId),
+            database.getItemsForBranch(this.currentStory.id, branchId),
+            database.getStoryBeatsForBranch(this.currentStory.id, branchId),
+            database.getEntriesForBranch(this.currentStory.id, branchId),
+          ])
+          // Filter out tombstoned entities
+          characters = characters.filter((c) => !c.deleted)
+          locations = locations.filter((l) => !l.deleted)
+          items = items.filter((i) => !i.deleted)
+          storyBeats = storyBeats.filter((b) => !b.deleted)
+          lorebookEntries = lorebookEntries.filter((e) => !e.deleted)
+          log('Snapshot isolation: loaded entities for branch:', branchId, {
+            characters: characters.length,
+            locations: locations.length,
+            items: items.length,
+            storyBeats: storyBeats.length,
+            lorebookEntries: lorebookEntries.length,
+          })
+        } else {
+          // Legacy COW: resolve through lineage (pre-snapshot branches)
+          ;[characters, locations, items, storyBeats, lorebookEntries] = await Promise.all([
+            database.getCharactersResolved(this.currentStory.id, lineage),
+            database.getLocationsResolved(this.currentStory.id, lineage),
+            database.getItemsResolved(this.currentStory.id, lineage),
+            database.getStoryBeatsResolved(this.currentStory.id, lineage),
+            database.getLorebookEntriesResolved(this.currentStory.id, lineage),
+          ])
+          log('COW: Resolved world state through lineage for branch:', branchId, {
+            lineageDepth: lineage.length,
+            characters: characters.length,
+            locations: locations.length,
+            items: items.length,
+            storyBeats: storyBeats.length,
+            lorebookEntries: lorebookEntries.length,
+          })
+        }
       } else {
         // Legacy path: direct branch loading (entities were fully copied at branch creation)
         ;[characters, locations, items, storyBeats, lorebookEntries] = await Promise.all([

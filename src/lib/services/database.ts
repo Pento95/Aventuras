@@ -1552,7 +1552,13 @@ class DatabaseService {
       forkEntryId: row.fork_entry_id,
       checkpointId: row.checkpoint_id || null,
       createdAt: row.created_at,
+      snapshotComplete: row.snapshot_complete === 1,
     }
+  }
+
+  async setBranchSnapshotComplete(branchId: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE branches SET snapshot_complete = 1 WHERE id = ?', [branchId])
   }
 
   // ===== Entry/Lorebook Operations (per design doc section 3.2) =====
@@ -1593,18 +1599,31 @@ class DatabaseService {
     branchLineage: { id: string }[],
   ): Promise<Character[]> {
     const resolved = new Map<string, Character>()
+    const currentBranchId = branchLineage[branchLineage.length - 1]?.id
 
-    // Load main entities
+    // Load main entities — strip deleted flag so children always inherit them
     const mainEntities = await this.getCharactersForBranch(storyId, null)
     for (const entity of mainEntities) {
-      resolved.set(entity.overridesId ?? entity.id, entity)
+      const mapped = entity.deleted ? { ...entity, deleted: false } : entity
+      resolved.set(entity.overridesId ?? entity.id, mapped)
     }
 
     // Overlay each branch in lineage order (root → current)
     for (const branch of branchLineage) {
       const branchEntities = await this.getCharactersForBranch(storyId, branch.id)
       for (const entity of branchEntities) {
-        resolved.set(entity.overridesId ?? entity.id, entity)
+        const canonicalId = entity.overridesId ?? entity.id
+        if (entity.deleted) {
+          if (branch.id === currentBranchId) {
+            // Tombstone on current branch: remove from resolved view
+            resolved.delete(canonicalId)
+          } else {
+            // Ancestor tombstone: preserve entity for further inheritance
+            resolved.set(canonicalId, { ...entity, deleted: false })
+          }
+        } else {
+          resolved.set(canonicalId, entity)
+        }
       }
     }
 
@@ -1619,16 +1638,27 @@ class DatabaseService {
     branchLineage: { id: string }[],
   ): Promise<Location[]> {
     const resolved = new Map<string, Location>()
+    const currentBranchId = branchLineage[branchLineage.length - 1]?.id
 
     const mainEntities = await this.getLocationsForBranch(storyId, null)
     for (const entity of mainEntities) {
-      resolved.set(entity.overridesId ?? entity.id, entity)
+      const mapped = entity.deleted ? { ...entity, deleted: false } : entity
+      resolved.set(entity.overridesId ?? entity.id, mapped)
     }
 
     for (const branch of branchLineage) {
       const branchEntities = await this.getLocationsForBranch(storyId, branch.id)
       for (const entity of branchEntities) {
-        resolved.set(entity.overridesId ?? entity.id, entity)
+        const canonicalId = entity.overridesId ?? entity.id
+        if (entity.deleted) {
+          if (branch.id === currentBranchId) {
+            resolved.delete(canonicalId)
+          } else {
+            resolved.set(canonicalId, { ...entity, deleted: false })
+          }
+        } else {
+          resolved.set(canonicalId, entity)
+        }
       }
     }
 
@@ -1640,16 +1670,27 @@ class DatabaseService {
    */
   async getItemsResolved(storyId: string, branchLineage: { id: string }[]): Promise<Item[]> {
     const resolved = new Map<string, Item>()
+    const currentBranchId = branchLineage[branchLineage.length - 1]?.id
 
     const mainEntities = await this.getItemsForBranch(storyId, null)
     for (const entity of mainEntities) {
-      resolved.set(entity.overridesId ?? entity.id, entity)
+      const mapped = entity.deleted ? { ...entity, deleted: false } : entity
+      resolved.set(entity.overridesId ?? entity.id, mapped)
     }
 
     for (const branch of branchLineage) {
       const branchEntities = await this.getItemsForBranch(storyId, branch.id)
       for (const entity of branchEntities) {
-        resolved.set(entity.overridesId ?? entity.id, entity)
+        const canonicalId = entity.overridesId ?? entity.id
+        if (entity.deleted) {
+          if (branch.id === currentBranchId) {
+            resolved.delete(canonicalId)
+          } else {
+            resolved.set(canonicalId, { ...entity, deleted: false })
+          }
+        } else {
+          resolved.set(canonicalId, entity)
+        }
       }
     }
 
@@ -1664,16 +1705,27 @@ class DatabaseService {
     branchLineage: { id: string }[],
   ): Promise<StoryBeat[]> {
     const resolved = new Map<string, StoryBeat>()
+    const currentBranchId = branchLineage[branchLineage.length - 1]?.id
 
     const mainEntities = await this.getStoryBeatsForBranch(storyId, null)
     for (const entity of mainEntities) {
-      resolved.set(entity.overridesId ?? entity.id, entity)
+      const mapped = entity.deleted ? { ...entity, deleted: false } : entity
+      resolved.set(entity.overridesId ?? entity.id, mapped)
     }
 
     for (const branch of branchLineage) {
       const branchEntities = await this.getStoryBeatsForBranch(storyId, branch.id)
       for (const entity of branchEntities) {
-        resolved.set(entity.overridesId ?? entity.id, entity)
+        const canonicalId = entity.overridesId ?? entity.id
+        if (entity.deleted) {
+          if (branch.id === currentBranchId) {
+            resolved.delete(canonicalId)
+          } else {
+            resolved.set(canonicalId, { ...entity, deleted: false })
+          }
+        } else {
+          resolved.set(canonicalId, entity)
+        }
       }
     }
 
@@ -1688,20 +1740,62 @@ class DatabaseService {
     branchLineage: { id: string }[],
   ): Promise<Entry[]> {
     const resolved = new Map<string, Entry>()
+    const currentBranchId = branchLineage[branchLineage.length - 1]?.id
 
     const mainEntities = await this.getEntriesForBranch(storyId, null)
     for (const entity of mainEntities) {
-      resolved.set(entity.overridesId ?? entity.id, entity)
+      const mapped = entity.deleted ? { ...entity, deleted: false } : entity
+      resolved.set(entity.overridesId ?? entity.id, mapped)
     }
 
     for (const branch of branchLineage) {
       const branchEntities = await this.getEntriesForBranch(storyId, branch.id)
       for (const entity of branchEntities) {
-        resolved.set(entity.overridesId ?? entity.id, entity)
+        const canonicalId = entity.overridesId ?? entity.id
+        if (entity.deleted) {
+          if (branch.id === currentBranchId) {
+            resolved.delete(canonicalId)
+          } else {
+            resolved.set(canonicalId, { ...entity, deleted: false })
+          }
+        } else {
+          resolved.set(canonicalId, entity)
+        }
       }
     }
 
     return Array.from(resolved.values())
+  }
+
+  // ===== Copy-on-Delete (COD) Tombstone Methods =====
+
+  /**
+   * Mark an entity as deleted (tombstone) on a COW branch.
+   * The entity must already be owned by the branch (via cowEnsure*).
+   */
+  async markCharacterDeleted(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE characters SET deleted = 1 WHERE id = ?', [id])
+  }
+
+  async markLocationDeleted(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE locations SET deleted = 1 WHERE id = ?', [id])
+  }
+
+  async markItemDeleted(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE items SET deleted = 1 WHERE id = ?', [id])
+  }
+
+  async markStoryBeatDeleted(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE story_beats SET deleted = 1 WHERE id = ?', [id])
+  }
+
+  async markEntryDeleted(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE entries SET deleted = 1 WHERE id = ?', [id])
   }
 
   /**
@@ -1720,6 +1814,7 @@ class DatabaseService {
         JOIN characters orig ON o.overrides_id = orig.id
         WHERE o.story_id = ? AND o.branch_id ${branchId === null ? 'IS NULL' : '= ?'}
           AND o.overrides_id IS NOT NULL
+          AND o.deleted = 0
           AND IFNULL(o.name,'') = IFNULL(orig.name,'')
           AND IFNULL(o.description,'') = IFNULL(orig.description,'')
           AND IFNULL(o.relationship,'') = IFNULL(orig.relationship,'')
@@ -1740,6 +1835,7 @@ class DatabaseService {
         JOIN locations orig ON o.overrides_id = orig.id
         WHERE o.story_id = ? AND o.branch_id ${branchId === null ? 'IS NULL' : '= ?'}
           AND o.overrides_id IS NOT NULL
+          AND o.deleted = 0
           AND IFNULL(o.name,'') = IFNULL(orig.name,'')
           AND IFNULL(o.description,'') = IFNULL(orig.description,'')
           AND o.visited = orig.visited
@@ -1758,6 +1854,7 @@ class DatabaseService {
         JOIN items orig ON o.overrides_id = orig.id
         WHERE o.story_id = ? AND o.branch_id ${branchId === null ? 'IS NULL' : '= ?'}
           AND o.overrides_id IS NOT NULL
+          AND o.deleted = 0
           AND IFNULL(o.name,'') = IFNULL(orig.name,'')
           AND IFNULL(o.description,'') = IFNULL(orig.description,'')
           AND o.quantity = orig.quantity
@@ -1776,6 +1873,7 @@ class DatabaseService {
         JOIN story_beats orig ON o.overrides_id = orig.id
         WHERE o.story_id = ? AND o.branch_id ${branchId === null ? 'IS NULL' : '= ?'}
           AND o.overrides_id IS NOT NULL
+          AND o.deleted = 0
           AND IFNULL(o.title,'') = IFNULL(orig.title,'')
           AND IFNULL(o.description,'') = IFNULL(orig.description,'')
           AND IFNULL(o.type,'') = IFNULL(orig.type,'')
@@ -2256,6 +2354,7 @@ class DatabaseService {
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       branchId: row.branch_id || null,
       overridesId: row.overrides_id || null,
+      deleted: row.deleted === 1,
       // Translation fields
       translatedName: row.translated_name || null,
       translatedDescription: row.translated_description || null,
@@ -2280,6 +2379,7 @@ class DatabaseService {
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       branchId: row.branch_id || null,
       overridesId: row.overrides_id || null,
+      deleted: row.deleted === 1,
       // Translation fields
       translatedName: row.translated_name || null,
       translatedDescription: row.translated_description || null,
@@ -2299,6 +2399,7 @@ class DatabaseService {
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       branchId: row.branch_id || null,
       overridesId: row.overrides_id || null,
+      deleted: row.deleted === 1,
       // Translation fields
       translatedName: row.translated_name || null,
       translatedDescription: row.translated_description || null,
@@ -2319,6 +2420,7 @@ class DatabaseService {
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       branchId: row.branch_id || null,
       overridesId: row.overrides_id || null,
+      deleted: row.deleted === 1,
       // Translation fields
       translatedTitle: row.translated_title || null,
       translatedDescription: row.translated_description || null,
@@ -2415,6 +2517,7 @@ class DatabaseService {
       loreManagementBlacklisted: row.lore_management_blacklisted === 1,
       branchId: row.branch_id || null,
       overridesId: row.overrides_id || null,
+      deleted: row.deleted === 1,
     }
   }
 
