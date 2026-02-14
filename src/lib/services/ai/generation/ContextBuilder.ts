@@ -13,6 +13,7 @@ import { createLogger } from '../core/config'
 import { generateStructured } from '../sdk/generate'
 import { entitySelectionSchema } from '../sdk/schemas/context'
 import { promptService } from '$lib/services/prompts'
+import { escapeRegex } from '$lib/utils/text'
 
 const log = createLogger('ContextBuilder')
 
@@ -453,7 +454,7 @@ export class ContextBuilder {
     }
 
     // Word boundary match (name appears as a word)
-    const wordPattern = new RegExp(`\\b${this.escapeRegex(normalizedName)}\\b`, 'i')
+    const wordPattern = new RegExp(`\\b${escapeRegex(normalizedName)}\\b`, 'i')
     if (wordPattern.test(searchText)) {
       return true
     }
@@ -468,10 +469,6 @@ export class ContextBuilder {
     }
 
     return false
-  }
-
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
   /**

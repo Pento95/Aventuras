@@ -119,13 +119,17 @@ export class MemoryService {
       protagonistName: '',
     }
 
-    const entriesText = entries.map((e) => `[${e.type}]: ${e.content}`).join('\n\n')
+    const firstValidMessageId = lastChapterEndIndex + 1
+    const lastValidMessageId = firstValidMessageId + entries.length - 1
+    const entriesText = entries
+      .map((e, index) => `[Message ${firstValidMessageId + index}] [${e.type}]: ${e.content}`)
+      .join('\n\n')
 
     const system = promptService.renderPrompt('chapter-analysis', promptContext)
     const prompt = promptService.renderUserPrompt('chapter-analysis', promptContext, {
       messagesInRange: entriesText,
-      firstValidId: (lastChapterEndIndex + 1).toString(),
-      lastValidId: (lastChapterEndIndex + entries.length).toString(),
+      firstValidId: firstValidMessageId.toString(),
+      lastValidId: lastValidMessageId.toString(),
     })
 
     const result = await generateStructured(

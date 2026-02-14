@@ -8,6 +8,7 @@
  * - Tier 3: LLM selection (STUBBED - awaiting SDK migration)
  */
 
+import { escapeRegex } from '$lib/utils/text'
 import type {
   Entry,
   EntryType,
@@ -682,16 +683,12 @@ export class EntryRetrievalService {
     }
 
     // Word boundary match
-    const wordPattern = new RegExp(`\\b${this.escapeRegex(normalized)}\\b`, 'i')
+    const wordPattern = new RegExp(`\\b${escapeRegex(normalized)}\\b`, 'i')
     if (wordPattern.test(searchContent)) {
       return true
     }
 
     return false
-  }
-
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
   /**
