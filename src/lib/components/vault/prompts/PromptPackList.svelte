@@ -2,6 +2,8 @@
   import type { PresetPack } from '$lib/services/packs/types'
   import { packService } from '$lib/services/packs/pack-service'
   import { database } from '$lib/services/database'
+  import { importExportService } from '$lib/services/packs/import-export'
+  import { ui } from '$lib/stores/ui.svelte'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { fade } from 'svelte/transition'
   import PromptPackCard from './PromptPackCard.svelte'
@@ -61,6 +63,16 @@
     loadPacks()
   }
 
+  async function handleExportPack(packId: string) {
+    try {
+      const success = await importExportService.exportPack(packId)
+      if (success) ui.showToast('Pack exported successfully', 'info')
+    } catch (e) {
+      console.error('Export failed:', e)
+      ui.showToast('Export failed', 'error')
+    }
+  }
+
   // Load on mount
   $effect(() => {
     loadPacks()
@@ -83,6 +95,7 @@
         modifiedCount={modifiedCounts.get(pack.id) ?? 0}
         usageCount={usageCounts.get(pack.id) ?? 0}
         onclick={() => onOpenPack(pack.id)}
+        onExport={() => handleExportPack(pack.id)}
       />
     {/each}
   </div>

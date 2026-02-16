@@ -30,6 +30,9 @@
   import { fade } from 'svelte/transition'
   import PromptPackList from './prompts/PromptPackList.svelte'
   import PromptPackEditor from './prompts/PromptPackEditor.svelte'
+  import ImportPreviewDialog from './prompts/ImportPreviewDialog.svelte'
+  import { importExportService, type ImportValidationResult, type ConflictStrategy } from '$lib/services/packs/import-export'
+  import type { PresetPack } from '$lib/services/packs/types'
 
   // Shared Components
   import EmptyState from '$lib/components/ui/empty-state/empty-state.svelte'
@@ -41,7 +44,6 @@
   import { Badge } from '$lib/components/ui/badge'
   import { Skeleton } from '$lib/components/ui/skeleton'
   import { ScrollArea } from '$lib/components/ui/scroll-area'
-  import * as Tooltip from '$lib/components/ui/tooltip'
   import { cn } from '$lib/utils/cn'
 
   // Types
@@ -58,6 +60,12 @@
   let filterLogic = $state<'AND' | 'OR'>('OR')
   let showTagManager = $state(false)
   let showCreatePackDialog = $state(false)
+
+  // Import state
+  let importDialogOpen = $state(false)
+  let importValidation = $state<ImportValidationResult | null>(null)
+  let importConflictPack = $state<PresetPack | null>(null)
+  let isImporting = $state(false)
 
   // Prompts tab view state
   type PromptsViewState = { mode: 'browsing' } | { mode: 'editing'; packId: string }
@@ -284,6 +292,43 @@
       promptsViewState = { mode: 'browsing' }
     }
   })
+
+  // Import pack handlers
+  async function handleImportPack() {
+    const content = await importExportService.pickAndReadImportFile()
+    if (!content) return
+    const result = importExportService.validateImport(content)
+    importValidation = result
+    if (result.valid && result.pack) {
+      importConflictPack = await importExportService.checkNameConflict(result.pack.name)
+    } else {
+      importConflictPack = null
+    }
+    importDialogOpen = true
+  }
+
+  async function handleImportConfirm(strategy: ConflictStrategy) {
+    if (!importValidation?.pack) return
+    isImporting = true
+    try {
+      const newPackId = await importExportService.applyImport(
+        importValidation.pack,
+        strategy,
+        importConflictPack ?? undefined,
+      )
+      if (newPackId) {
+        ui.showToast('Pack imported successfully', 'info')
+      }
+    } catch (e) {
+      console.error('Import failed:', e)
+      ui.showToast('Import failed', 'error')
+    } finally {
+      isImporting = false
+      importDialogOpen = false
+      importValidation = null
+      importConflictPack = null
+    }
+  }
 </script>
 
 <Tabs
@@ -314,23 +359,14 @@
       <!-- Right Side Actions -->
       <div class="flex items-center gap-2">
         {#if activeTab === 'prompts' && promptsViewState.mode === 'browsing'}
-          <Tooltip.Provider>
-            <Tooltip.Root>
-              <Tooltip.Trigger>
-                <Button
-                  icon={Download}
-                  label="Import"
-                  variant="outline"
-                  size="sm"
-                  class="h-9"
-                  disabled
-                />
-              </Tooltip.Trigger>
-              <Tooltip.Content>
-                <p>Available in Phase 5</p>
-              </Tooltip.Content>
-            </Tooltip.Root>
-          </Tooltip.Provider>
+          <Button
+            icon={Download}
+            label="Import"
+            variant="outline"
+            size="sm"
+            class="h-9"
+            onclick={handleImportPack}
+          />
 
           <Button
             icon={Plus}
@@ -579,3 +615,16 @@
 {#if showTagManager}
   <TagManager open={showTagManager} onOpenChange={(v) => (showTagManager = v)} />
 {/if}
+
+<!-- Import Preview Dialog -->
+<ImportPreviewDialog
+  open={importDialogOpen}
+  validationResult={importValidation}
+  conflictPack={importConflictPack}
+  onConfirm={handleImportConfirm}
+  onCancel={() => {
+    importDialogOpen = false
+    importValidation = null
+    importConflictPack = null
+  }}
+/>
