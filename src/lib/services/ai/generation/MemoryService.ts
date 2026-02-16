@@ -103,14 +103,18 @@ export class MemoryService {
   ): Promise<ChapterAnalysis> {
     log('analyzeForChapter', { entryCount: entries.length, tokensOutsideBuffer })
 
-    const entriesText = entries.map((e) => `[${e.type}]: ${e.content}`).join('\n\n')
+    const firstValidMessageId = lastChapterEndIndex + 1
+    const lastValidMessageId = firstValidMessageId + entries.length - 1
+    const entriesText = entries
+      .map((e, index) => `[Message ${firstValidMessageId + index}] [${e.type}]: ${e.content}`)
+      .join('\n\n')
 
     const ctx = new ContextBuilder()
     ctx.add({
       mode, pov, tense,
       messagesInRange: entriesText,
-      firstValidId: (lastChapterEndIndex + 1).toString(),
-      lastValidId: (lastChapterEndIndex + entries.length).toString(),
+      firstValidId: firstValidMessageId.toString(),
+      lastValidId: lastValidMessageId.toString(),
     })
     const { system, user: prompt } = await ctx.render('chapter-analysis')
 

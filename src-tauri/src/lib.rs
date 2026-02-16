@@ -156,10 +156,40 @@ pub fn run() {
         },
         Migration {
             version: 25,
+            description: "world_state_deltas",
+            sql: include_str!("../migrations/025_world_state_deltas.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 26,
+            description: "cow_branches",
+            sql: include_str!("../migrations/026_cow_branches.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 27,
+            description: "entry_suggested_actions",
+            sql: include_str!("../migrations/027_entry_suggested_actions.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 28,
+            description: "cow_tombstones",
+            sql: include_str!("../migrations/028_cow_tombstones.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 29,
+            description: "branch_entity_snapshots",
+            sql: include_str!("../migrations/029_branch_entity_snapshots.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 30,
             description: "preset_packs",
             sql: include_str!("../migrations/025_preset_packs.sql"),
             kind: MigrationKind::Up,
-        },
+        }
     ];
 
     #[cfg(debug_assertions)] // only enable instrumentation in development builds

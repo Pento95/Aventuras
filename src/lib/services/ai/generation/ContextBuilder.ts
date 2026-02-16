@@ -435,7 +435,7 @@ export class ContextBuilder {
     }
 
     // Word boundary match (name appears as a word)
-    const wordPattern = new RegExp(`\\b${this.escapeRegex(normalizedName)}\\b`, 'i')
+    const wordPattern = new RegExp(`\\b${escapeRegex(normalizedName)}\\b`, 'i')
     if (wordPattern.test(searchText)) {
       return true
     }
@@ -450,10 +450,6 @@ export class ContextBuilder {
     }
 
     return false
-  }
-
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
   /**
