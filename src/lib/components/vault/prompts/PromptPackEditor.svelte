@@ -33,9 +33,10 @@
   interface Props {
     packId: string
     onClose: () => void
+    onDirtyChange?: (dirty: boolean) => void
   }
 
-  let { packId, onClose }: Props = $props()
+  let { packId, onClose, onDirtyChange }: Props = $props()
 
   let selectedTemplateId = $state<string | null>(null)
   let showVariables = $state(false)
@@ -149,6 +150,18 @@
 
   function handleDirtyChange(dirty: boolean) {
     isEditorDirty = dirty
+  }
+
+  // Propagate dirty state to parent
+  $effect(() => {
+    onDirtyChange?.(isEditorDirty)
+  })
+
+  /**
+   * Guard wrapper exposed to parent: show dialog if dirty, else execute immediately.
+   */
+  export function guardNavigation(action: () => void) {
+    guardDirty(action)
   }
 
   // Dirty dialog actions
@@ -575,7 +588,7 @@
 
 <!-- Dirty guard dialog -->
 <Dialog.Root bind:open={showDirtyDialog}>
-  <Dialog.Content class="sm:max-w-md">
+  <Dialog.Content class="gap-4 py-6 sm:max-w-md">
     <Dialog.Header>
       <Dialog.Title>Unsaved Changes</Dialog.Title>
       <Dialog.Description>You have unsaved changes. What would you like to do?</Dialog.Description>

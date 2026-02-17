@@ -72,6 +72,8 @@
   // Prompts tab view state
   type PromptsViewState = { mode: 'browsing' } | { mode: 'editing'; packId: string }
   let promptsViewState = $state<PromptsViewState>({ mode: 'browsing' })
+  let isPromptEditorDirty = $state(false)
+  let promptEditorRef = $state<PromptPackEditor | null>(null)
 
   // Modal States
   let showCharForm = $state(false)
@@ -288,12 +290,24 @@
     promptsViewState = { mode: 'editing', packId }
   }
 
-  // Reset prompts view when switching away from Prompts tab
-  $effect(() => {
-    if (activeTab !== 'prompts') {
-      promptsViewState = { mode: 'browsing' }
+  function guardPromptNavigation(action: () => void) {
+    if (
+      activeTab === 'prompts' &&
+      promptsViewState.mode === 'editing' &&
+      isPromptEditorDirty &&
+      promptEditorRef
+    ) {
+      promptEditorRef.guardNavigation(() => {
+        promptsViewState = { mode: 'browsing' }
+        action()
+      })
+    } else {
+      if (activeTab === 'prompts' && promptsViewState.mode === 'editing') {
+        promptsViewState = { mode: 'browsing' }
+      }
+      action()
     }
-  })
+  }
 
   // Import pack handlers
   async function handleImportPack() {
@@ -333,7 +347,14 @@
 
 <Tabs
   value={activeTab}
-  onValueChange={(v) => (activeTab = v as VaultTab)}
+  onValueChange={(v) => {
+    if (!v) return
+    const newTab = v as VaultTab
+    if (newTab === activeTab) return
+    guardPromptNavigation(() => {
+      activeTab = newTab
+    })
+  }}
   class="bg-background flex h-full flex-col"
 >
   <!-- Header -->
@@ -345,7 +366,7 @@
           variant="link"
           size="icon"
           class="text-muted-foreground hover:text-foreground -ml-2 h-9 w-9"
-          onclick={() => ui.setActivePanel('library')}
+          onclick={() => guardPromptNavigation(() => ui.setActivePanel('library'))}
           title="Back to Library"
         >
           <ChevronLeft class="h-5 w-5" />
@@ -574,9 +595,13 @@
       </ScrollArea>
     {:else}
       <PromptPackEditor
+        bind:this={promptEditorRef}
         packId={promptsViewState.packId}
         onClose={() => {
           promptsViewState = { mode: 'browsing' }
+        }}
+        onDirtyChange={(dirty) => {
+          isPromptEditorDirty = dirty
         }}
       />
     {/if}
