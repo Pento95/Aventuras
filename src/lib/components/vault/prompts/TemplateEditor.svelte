@@ -12,7 +12,8 @@
   import type { ValidationError } from '$lib/services/templates/types'
   import type { CustomVariable } from '$lib/services/packs/types'
   import type { Completion } from '@codemirror/autocomplete'
-  import { AlertTriangle, CircleCheck } from 'lucide-svelte'
+  import { AlertTriangle, CircleCheck, FlaskConical } from 'lucide-svelte'
+  import { Button } from '$lib/components/ui/button'
   import TemplatePreview from './TemplatePreview.svelte'
   import { createIsMobile } from '$lib/hooks/is-mobile.svelte'
 
@@ -23,6 +24,8 @@
     activeTab?: 'system' | 'user'
     mobileView?: 'editor' | 'preview'
     testValues?: Record<string, string>
+    hasCustomVariables?: boolean
+    onTestVarsOpen?: () => void
     onDirtyChange?: (dirty: boolean) => void
     onActiveTabChange?: (tab: 'system' | 'user') => void
     onHasUserContent?: (has: boolean) => void
@@ -35,6 +38,8 @@
     activeTab = 'system',
     mobileView = 'editor',
     testValues = {},
+    hasCustomVariables = false,
+    onTestVarsOpen,
     onDirtyChange,
     onActiveTabChange,
     onHasUserContent,
@@ -385,26 +390,40 @@
     </div>
 
     <!-- Validation bar (full width) -->
-    <div class="border-t px-4 py-2">
-      {#if validationErrors.length > 0}
-        <div class="flex flex-col gap-1">
-          {#each validationErrors as error (error.message)}
-            <div class="flex items-start gap-2 text-xs">
-              <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-500" />
-              <span class="text-muted-foreground">
-                {error.message}
-                {#if error.line}
-                  <span class="text-muted-foreground/70">(line {error.line})</span>
-                {/if}
-              </span>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <div class="flex items-center gap-2 text-xs">
-          <CircleCheck class="h-3.5 w-3.5 text-green-500" />
-          <span class="text-muted-foreground">Template is valid</span>
-        </div>
+    <div class="flex items-center justify-between border-t px-4 py-2">
+      <div class="min-w-0 flex-1">
+        {#if validationErrors.length > 0}
+          <div class="flex flex-col gap-1">
+            {#each validationErrors as error (error.message)}
+              <div class="flex items-start gap-2 text-xs">
+                <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                <span class="text-muted-foreground">
+                  {error.message}
+                  {#if error.line}
+                    <span class="text-muted-foreground/70">(line {error.line})</span>
+                  {/if}
+                </span>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="flex items-center gap-2 text-xs">
+            <CircleCheck class="h-3.5 w-3.5 text-green-500" />
+            <span class="text-muted-foreground">Template is valid</span>
+          </div>
+        {/if}
+      </div>
+
+      {#if hasCustomVariables && onTestVarsOpen}
+        <Button
+          variant="ghost"
+          size="sm"
+          class="ml-2 h-7 shrink-0 gap-1.5 text-xs"
+          onclick={onTestVarsOpen}
+        >
+          <FlaskConical class="h-3.5 w-3.5" />
+          Test Variables
+        </Button>
       {/if}
     </div>
   </div>

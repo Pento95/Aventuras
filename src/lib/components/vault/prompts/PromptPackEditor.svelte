@@ -28,7 +28,6 @@
     Check,
     X,
     Settings,
-    FlaskConical,
   } from 'lucide-svelte'
 
   interface Props {
@@ -262,18 +261,6 @@
             onInsert={(name) => editorRef?.insertVariable(name)}
           />
 
-          {#if (fullPack?.variables.length ?? 0) > 0}
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              onclick={() => (showTestVars = true)}
-              title="Test Variables"
-            >
-              <FlaskConical class="h-3.5 w-3.5" />
-            </Button>
-          {/if}
-
           <Button
             variant="ghost"
             size="icon"
@@ -370,18 +357,6 @@
             onInsert={(name) => editorRef?.insertVariable(name)}
           />
 
-          {#if (fullPack?.variables.length ?? 0) > 0}
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              onclick={() => (showTestVars = true)}
-              title="Test Variables"
-            >
-              <FlaskConical class="h-3.5 w-3.5" />
-            </Button>
-          {/if}
-
           <div class="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"
@@ -463,6 +438,8 @@
               activeTab={editorActiveTab}
               {mobileView}
               {testValues}
+              hasCustomVariables={(fullPack?.variables.length ?? 0) > 0}
+              onTestVarsOpen={() => (showTestVars = true)}
               onDirtyChange={handleDirtyChange}
               onActiveTabChange={(tab) => (editorActiveTab = tab)}
               onHasUserContent={(has) => (editorHasUserContent = has)}
