@@ -16,11 +16,21 @@
   // Track newly created variable ID so its card renders expanded
   let newlyCreatedId = $state<string | null>(null)
 
+  function nextVariableName(): string {
+    const existing = new Set(variables.map((v) => v.variableName))
+    if (!existing.has('new_variable')) return 'new_variable'
+    for (let i = 2; ; i++) {
+      const name = `new_variable_${i}`
+      if (!existing.has(name)) return name
+    }
+  }
+
   async function handleAddVariable() {
     try {
+      const name = nextVariableName()
       const created = await database.createPackVariable(packId, {
-        variableName: 'new_variable',
-        displayName: 'New Variable',
+        variableName: name,
+        displayName: name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
         variableType: 'text',
         isRequired: false,
         sortOrder: variables.length,
