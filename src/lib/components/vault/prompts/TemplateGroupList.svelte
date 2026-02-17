@@ -6,7 +6,6 @@
   import { cn } from '$lib/utils/cn'
 
   interface Props {
-    packId: string
     selectedTemplateId: string | null
     showVariables: boolean
     showSettings: boolean
@@ -15,8 +14,14 @@
     onShowSettings: () => void
   }
 
-  let { packId, selectedTemplateId, showVariables, showSettings, onSelectTemplate, onToggleVariables, onShowSettings }: Props =
-    $props()
+  let {
+    selectedTemplateId,
+    showVariables,
+    showSettings,
+    onSelectTemplate,
+    onToggleVariables,
+    onShowSettings,
+  }: Props = $props()
 
   const groups = getTemplateGroups()
 </script>
@@ -48,7 +53,7 @@
         >
           <span class="text-sm font-medium">{group.name}</span>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-muted-foreground">{group.templates.length}</span>
+            <span class="text-muted-foreground text-xs">{group.templates.length}</span>
             <ChevronRight
               class="text-muted-foreground h-4 w-4 transition-transform duration-200 [[data-state=open]>&]:rotate-90"
             />

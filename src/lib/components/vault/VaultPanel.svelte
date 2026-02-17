@@ -31,7 +31,11 @@
   import PromptPackList from './prompts/PromptPackList.svelte'
   import PromptPackEditor from './prompts/PromptPackEditor.svelte'
   import ImportPreviewDialog from './prompts/ImportPreviewDialog.svelte'
-  import { importExportService, type ImportValidationResult, type ConflictStrategy } from '$lib/services/packs/import-export'
+  import {
+    importExportService,
+    type ImportValidationResult,
+    type ConflictStrategy,
+  } from '$lib/services/packs/import-export'
   import type { PresetPack } from '$lib/services/packs/types'
 
   // Shared Components
@@ -65,8 +69,6 @@
   let importDialogOpen = $state(false)
   let importValidation = $state<ImportValidationResult | null>(null)
   let importConflictPack = $state<PresetPack | null>(null)
-  let isImporting = $state(false)
-
   // Prompts tab view state
   type PromptsViewState = { mode: 'browsing' } | { mode: 'editing'; packId: string }
   let promptsViewState = $state<PromptsViewState>({ mode: 'browsing' })
@@ -309,7 +311,6 @@
 
   async function handleImportConfirm(strategy: ConflictStrategy) {
     if (!importValidation?.pack) return
-    isImporting = true
     try {
       const newPackId = await importExportService.applyImport(
         importValidation.pack,
@@ -323,7 +324,6 @@
       console.error('Import failed:', e)
       ui.showToast('Import failed', 'error')
     } finally {
-      isImporting = false
       importDialogOpen = false
       importValidation = null
       importConflictPack = null

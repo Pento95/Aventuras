@@ -65,7 +65,7 @@
     }
   }
 
-  function handlePackCreated(pack: PresetPack) {
+  function handlePackCreated() {
     loadPacks()
   }
 
@@ -122,7 +122,11 @@
         usageCount={usageCounts.get(pack.id) ?? 0}
         onclick={() => onOpenPack(pack.id)}
         onExport={() => handleExportPack(pack.id)}
-        onDelete={pack.isDefault ? undefined : () => { deleteTarget = pack }}
+        onDelete={pack.isDefault
+          ? undefined
+          : () => {
+              deleteTarget = pack
+            }}
       />
     {/each}
   </div>
@@ -135,8 +139,13 @@
 />
 
 <!-- Delete confirmation -->
-<ResponsiveModal.Root open={!!deleteTarget} onOpenChange={(v) => { if (!v) deleteTarget = null }}>
-  <ResponsiveModal.Content class="sm:max-w-sm p-0">
+<ResponsiveModal.Root
+  open={!!deleteTarget}
+  onOpenChange={(v) => {
+    if (!v) deleteTarget = null
+  }}
+>
+  <ResponsiveModal.Content class="p-0 sm:max-w-sm">
     <ResponsiveModal.Header class="border-b px-6 py-4">
       <ResponsiveModal.Title>Delete Pack</ResponsiveModal.Title>
       <ResponsiveModal.Description>
@@ -144,7 +153,12 @@
       </ResponsiveModal.Description>
     </ResponsiveModal.Header>
     <ResponsiveModal.Footer class="border-t px-6 py-4">
-      <Button variant="outline" onclick={() => { deleteTarget = null }}>Cancel</Button>
+      <Button
+        variant="outline"
+        onclick={() => {
+          deleteTarget = null
+        }}>Cancel</Button
+      >
       <Button variant="destructive" onclick={handleConfirmDelete} disabled={deleting}>
         {deleting ? 'Deleting...' : 'Delete'}
       </Button>

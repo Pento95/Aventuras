@@ -23,8 +23,13 @@
   let pack = $derived(validationResult?.pack)
 </script>
 
-<ResponsiveModal.Root {open} onOpenChange={(v) => { if (!v) onCancel() }}>
-  <ResponsiveModal.Content class="sm:max-w-lg p-0">
+<ResponsiveModal.Root
+  {open}
+  onOpenChange={(v) => {
+    if (!v) onCancel()
+  }}
+>
+  <ResponsiveModal.Content class="p-0 sm:max-w-lg">
     <ResponsiveModal.Header class="border-b px-6 py-4">
       <ResponsiveModal.Title class="flex items-center gap-2">
         Import Prompt Pack
@@ -52,7 +57,7 @@
           <div class="flex flex-col gap-1">
             <p class="text-sm font-medium">Structural errors:</p>
             <ul class="text-destructive list-disc pl-5 text-sm">
-              {#each validationResult.structuralErrors as error}
+              {#each validationResult.structuralErrors as error (error)}
                 <li>{error}</li>
               {/each}
             </ul>
@@ -64,7 +69,7 @@
             <p class="text-sm font-medium">Template syntax errors:</p>
             <ScrollArea class="max-h-48">
               <ul class="text-destructive list-disc pl-5 text-sm">
-                {#each validationResult.templateErrors as templateError}
+                {#each validationResult.templateErrors as templateError (templateError.templateId)}
                   <li>
                     <span class="font-mono text-xs">{templateError.templateId}</span>:
                     {templateError.error}
@@ -114,7 +119,9 @@
         {#if conflictPack}
           <Button variant="ghost" onclick={onCancel}>Cancel</Button>
           <Button variant="outline" onclick={() => onConfirm('rename')}>Import as Copy</Button>
-          <Button variant="destructive" onclick={() => onConfirm('replace')}>Replace Existing</Button>
+          <Button variant="destructive" onclick={() => onConfirm('replace')}
+            >Replace Existing</Button
+          >
         {:else}
           <Button variant="outline" onclick={onCancel}>Cancel</Button>
           <Button onclick={() => onConfirm('rename')}>Import</Button>

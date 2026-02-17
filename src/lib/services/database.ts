@@ -25,12 +25,7 @@ import type {
   VisualDescriptors,
   WorldStateSnapshot,
 } from '$lib/types'
-import type {
-  PresetPack,
-  PackTemplate,
-  CustomVariable,
-  EnumOption,
-} from '$lib/services/packs/types'
+import type { PresetPack, PackTemplate, CustomVariable } from '$lib/services/packs/types'
 import { hashContent } from '$lib/services/packs/hash'
 
 /**
@@ -3093,7 +3088,9 @@ class DatabaseService {
 
   async getAllPacks(): Promise<PresetPack[]> {
     const db = await this.getDb()
-    const results = await db.select<any[]>('SELECT * FROM preset_packs ORDER BY is_default DESC, name ASC')
+    const results = await db.select<any[]>(
+      'SELECT * FROM preset_packs ORDER BY is_default DESC, name ASC',
+    )
     return results.map(this.mapPack)
   }
 
@@ -3105,7 +3102,9 @@ class DatabaseService {
 
   async getDefaultPack(): Promise<PresetPack | null> {
     const db = await this.getDb()
-    const results = await db.select<any[]>('SELECT * FROM preset_packs WHERE is_default = 1 LIMIT 1')
+    const results = await db.select<any[]>(
+      'SELECT * FROM preset_packs WHERE is_default = 1 LIMIT 1',
+    )
     return results.length > 0 ? this.mapPack(results[0]) : null
   }
 
@@ -3119,7 +3118,10 @@ class DatabaseService {
     return { ...pack, createdAt: now, updatedAt: now }
   }
 
-  async updatePack(id: string, updates: { name?: string, description?: string | null, author?: string | null }): Promise<void> {
+  async updatePack(
+    id: string,
+    updates: { name?: string; description?: string | null; author?: string | null },
+  ): Promise<void> {
     const db = await this.getDb()
     const now = Date.now()
     const setClauses: string[] = ['updated_at = ?']
@@ -3200,16 +3202,24 @@ class DatabaseService {
     await db.execute(
       `INSERT OR REPLACE INTO pack_templates (id, pack_id, template_id, content, content_hash, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [existing?.id ?? crypto.randomUUID(), packId, templateId, content, contentHash, createdAt, now],
+      [
+        existing?.id ?? crypto.randomUUID(),
+        packId,
+        templateId,
+        content,
+        contentHash,
+        createdAt,
+        now,
+      ],
     )
   }
 
   async deletePackTemplate(packId: string, templateId: string): Promise<void> {
     const db = await this.getDb()
-    await db.execute(
-      'DELETE FROM pack_templates WHERE pack_id = ? AND template_id = ?',
-      [packId, templateId],
-    )
+    await db.execute('DELETE FROM pack_templates WHERE pack_id = ? AND template_id = ?', [
+      packId,
+      templateId,
+    ])
   }
 
   // ===== Pack Variable Operations =====
@@ -3232,7 +3242,10 @@ class DatabaseService {
     return results.length > 0 ? this.mapPackVariable(results[0]) : null
   }
 
-  async createPackVariable(packId: string, variable: Omit<CustomVariable, 'id' | 'packId' | 'createdAt'>): Promise<CustomVariable> {
+  async createPackVariable(
+    packId: string,
+    variable: Omit<CustomVariable, 'id' | 'packId' | 'createdAt'>,
+  ): Promise<CustomVariable> {
     const db = await this.getDb()
     const id = crypto.randomUUID()
     const now = Date.now()
@@ -3256,7 +3269,10 @@ class DatabaseService {
     return { id, packId, ...variable, createdAt: now }
   }
 
-  async updatePackVariable(id: string, updates: Partial<Omit<CustomVariable, 'id' | 'packId' | 'createdAt'>>): Promise<void> {
+  async updatePackVariable(
+    id: string,
+    updates: Partial<Omit<CustomVariable, 'id' | 'packId' | 'createdAt'>>,
+  ): Promise<void> {
     const db = await this.getDb()
     const setClauses: string[] = []
     const values: any[] = []
@@ -3338,10 +3354,10 @@ class DatabaseService {
    */
   async setStoryCustomVariables(storyId: string, values: Record<string, string>): Promise<void> {
     const db = await this.getDb()
-    await db.execute(
-      'UPDATE stories SET custom_variable_values = ? WHERE id = ?',
-      [JSON.stringify(values), storyId],
-    )
+    await db.execute('UPDATE stories SET custom_variable_values = ? WHERE id = ?', [
+      JSON.stringify(values),
+      storyId,
+    ])
   }
 
   private mapVaultTag(row: any): VaultTag {

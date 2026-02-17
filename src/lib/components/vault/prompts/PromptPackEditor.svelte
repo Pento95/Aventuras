@@ -16,7 +16,18 @@
   import { Textarea } from '$lib/components/ui/textarea'
   import { Label } from '$lib/components/ui/label'
   import { renderDescription } from '$lib/utils/markdown'
-  import { ChevronLeft, Menu, Save, Undo2, RotateCcw, Pencil, Eye, Check, X, Settings } from 'lucide-svelte'
+  import {
+    ChevronLeft,
+    Menu,
+    Save,
+    Undo2,
+    RotateCcw,
+    Pencil,
+    Eye,
+    Check,
+    X,
+    Settings,
+  } from 'lucide-svelte'
 
   interface Props {
     packId: string
@@ -190,7 +201,7 @@
       <Button
         variant="ghost"
         size="icon"
-        class="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0 -ml-2"
+        class="text-muted-foreground hover:text-foreground -ml-2 h-8 w-8 shrink-0"
         onclick={handleBack}
       >
         <ChevronLeft class="h-4 w-4" />
@@ -201,7 +212,9 @@
       {:else if fullPack}
         <h2 class="min-w-0 shrink truncate font-semibold">{fullPack.pack.name}</h2>
         {#if isEditorDirty}
-          <Badge variant="outline" class="shrink-0 border-yellow-500/50 text-yellow-500 text-xs">Unsaved</Badge>
+          <Badge variant="outline" class="shrink-0 border-yellow-500/50 text-xs text-yellow-500"
+            >Unsaved</Badge
+          >
         {/if}
       {/if}
 
@@ -226,7 +239,9 @@
           <ToggleGroup.Root
             type="single"
             value={mobileView}
-            onValueChange={(v) => { if (v) mobileView = v as 'editor' | 'preview' }}
+            onValueChange={(v) => {
+              if (v) mobileView = v as 'editor' | 'preview'
+            }}
             variant="outline"
             size="sm"
             class="gap-0"
@@ -244,13 +259,19 @@
           <ToggleGroup.Root
             type="single"
             value={editorActiveTab}
-            onValueChange={(v) => { if (v) editorActiveTab = v as 'system' | 'user' }}
+            onValueChange={(v) => {
+              if (v) editorActiveTab = v as 'system' | 'user'
+            }}
             variant="outline"
             size="sm"
             class="gap-0"
           >
-            <ToggleGroup.Item value="system" class="h-7 rounded-r-none px-2.5 text-xs">System</ToggleGroup.Item>
-            <ToggleGroup.Item value="user" class="h-7 rounded-l-none px-2.5 text-xs">User</ToggleGroup.Item>
+            <ToggleGroup.Item value="system" class="h-7 rounded-r-none px-2.5 text-xs"
+              >System</ToggleGroup.Item
+            >
+            <ToggleGroup.Item value="user" class="h-7 rounded-l-none px-2.5 text-xs"
+              >User</ToggleGroup.Item
+            >
           </ToggleGroup.Root>
         {/if}
 
@@ -310,7 +331,6 @@
       {#if !isMobile.current}
         <div class="w-64 shrink-0 overflow-hidden border-r">
           <TemplateGroupList
-            {packId}
             {selectedTemplateId}
             {showVariables}
             {showSettings}
@@ -378,7 +398,11 @@
 
                   <div class="space-y-1.5">
                     <Label for="pack-author">Author</Label>
-                    <Input id="pack-author" bind:value={settingsDraft.author} placeholder="Author name" />
+                    <Input
+                      id="pack-author"
+                      bind:value={settingsDraft.author}
+                      placeholder="Author name"
+                    />
                   </div>
 
                   <div class="space-y-1.5">
@@ -448,7 +472,6 @@
       </Drawer.Header>
       <div class="flex-1 overflow-hidden">
         <TemplateGroupList
-          {packId}
           {selectedTemplateId}
           {showVariables}
           {showSettings}
@@ -466,9 +489,7 @@
   <Dialog.Content class="sm:max-w-md">
     <Dialog.Header>
       <Dialog.Title>Unsaved Changes</Dialog.Title>
-      <Dialog.Description>
-        You have unsaved changes. What would you like to do?
-      </Dialog.Description>
+      <Dialog.Description>You have unsaved changes. What would you like to do?</Dialog.Description>
     </Dialog.Header>
     <Dialog.Footer class="flex gap-2 sm:justify-end">
       <Button variant="outline" onclick={handleCancelSwitch}>Cancel</Button>
