@@ -8,9 +8,10 @@
   interface Props {
     customVariables: CustomVariable[]
     onInsert: (variableName: string) => void
+    iconOnly?: boolean
   }
 
-  let { customVariables, onInsert }: Props = $props()
+  let { customVariables, onInsert, iconOnly = false }: Props = $props()
 
   let open = $state(false)
 
@@ -26,14 +27,25 @@
 <Popover.Root bind:open>
   <Popover.Trigger>
     {#snippet child({ props })}
-      <button
-        {...props}
-        type="button"
-        class="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors"
-      >
-        <Braces class="h-4 w-4" />
-        <span class="hidden sm:inline">Insert Variable</span>
-      </button>
+      {#if iconOnly}
+        <button
+          {...props}
+          type="button"
+          title="Insert Variable"
+          class="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center justify-center rounded-md h-8 w-8 transition-colors"
+        >
+          <Braces class="h-3.5 w-3.5" />
+        </button>
+      {:else}
+        <button
+          {...props}
+          type="button"
+          class="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors"
+        >
+          <Braces class="h-4 w-4" />
+          <span class="hidden sm:inline">Insert Variable</span>
+        </button>
+      {/if}
     {/snippet}
   </Popover.Trigger>
   <Popover.Content class="w-80 p-0" align="start" side="bottom">
