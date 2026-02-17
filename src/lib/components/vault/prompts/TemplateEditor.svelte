@@ -97,24 +97,24 @@
       padding: '12px 0',
     },
     '.cm-gutters': {
-      backgroundColor: 'var(--surface-100, hsl(var(--muted)))',
-      borderRight: '1px solid hsl(var(--border))',
-      color: 'hsl(var(--muted-foreground))',
+      backgroundColor: 'var(--surface-100, var(--muted))',
+      borderRight: '1px solid var(--border)',
+      color: 'var(--muted-foreground)',
     },
     '.cm-activeLineGutter': {
-      backgroundColor: 'var(--surface-200, hsl(var(--accent)))',
+      backgroundColor: 'var(--surface-200, var(--accent))',
     },
     '.cm-activeLine': {
-      backgroundColor: 'hsl(var(--accent) / 0.3)',
+      backgroundColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
     },
     '.cm-selectionBackground': {
-      backgroundColor: 'hsl(var(--accent) / 0.5) !important',
+      backgroundColor: 'color-mix(in srgb, var(--accent) 50%, transparent) !important',
     },
     '&.cm-focused .cm-selectionBackground': {
-      backgroundColor: 'hsl(var(--accent) / 0.5) !important',
+      backgroundColor: 'color-mix(in srgb, var(--primary) 40%, transparent) !important',
     },
     '.cm-cursor': {
-      borderLeftColor: 'hsl(var(--foreground))',
+      borderLeftColor: 'var(--foreground)',
     },
     '.cm-scroller': {
       overflow: 'auto',
@@ -123,7 +123,7 @@
     '.cm-tooltip-autocomplete': {
       backgroundColor: 'var(--popover, hsl(217 33% 17%))',
       color: 'var(--popover-foreground, hsl(210 40% 98%))',
-      border: '1px solid hsl(var(--border))',
+      border: '1px solid var(--border)',
       borderRadius: '6px',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
     },
@@ -133,8 +133,8 @@
     },
     // Selected/highlighted completion item
     '.cm-tooltip-autocomplete ul li[aria-selected]': {
-      backgroundColor: 'hsl(var(--accent))',
-      color: 'hsl(var(--accent-foreground))',
+      backgroundColor: 'var(--accent)',
+      color: 'var(--accent-foreground)',
     },
     // Completion label (main text)
     '.cm-completionLabel': {
@@ -150,7 +150,7 @@
     '.cm-tooltip.cm-completionInfo': {
       backgroundColor: 'var(--popover, hsl(217 33% 17%))',
       color: 'var(--popover-foreground, hsl(210 40% 98%))',
-      border: '1px solid hsl(var(--border))',
+      border: '1px solid var(--border)',
       borderRadius: '6px',
       padding: '8px 12px',
       maxWidth: '300px',
@@ -170,7 +170,7 @@
     '.cm-tooltip': {
       backgroundColor: 'var(--popover, hsl(217 33% 17%))',
       color: 'var(--popover-foreground, hsl(210 40% 98%))',
-      border: '1px solid hsl(var(--border))',
+      border: '1px solid var(--border)',
     },
   })
 
