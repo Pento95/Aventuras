@@ -37,7 +37,6 @@ export class StyleReviewerService {
 
   /**
    * Format style review results for injection into the system prompt.
-   * This is a static method used by systemBuilder.
    */
   static formatForPromptInjection(review: StyleReviewResult): string {
     if (!review.phrases || review.phrases.length === 0) {

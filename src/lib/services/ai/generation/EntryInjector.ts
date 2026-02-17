@@ -1,5 +1,5 @@
 /**
- * Context Builder Service for Aventura
+ * Entry Injector Service
  * Per design doc section 3.2.3: Tiered Injection
  *
  * Implements three tiers of entry injection:
@@ -14,7 +14,7 @@ import { generateStructured } from '../sdk/generate'
 import { entitySelectionSchema } from '../sdk/schemas/context'
 import { ContextBuilder as ContextPipeline } from '$lib/services/context'
 
-const log = createLogger('ContextBuilder')
+const log = createLogger('EntryInjector')
 
 export interface WorldState {
   characters: Character[]
@@ -66,7 +66,7 @@ export interface ContextResult {
  * - Tier 1 and Tier 2 work without AI
  * - Tier 3 uses LLM selection when entry count exceeds threshold
  */
-export class ContextBuilder {
+export class EntryInjector {
   private config: ContextConfig
   private presetId: string
 

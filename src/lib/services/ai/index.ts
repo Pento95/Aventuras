@@ -11,7 +11,7 @@
  * - generateSuggestions() - SuggestionsService
  * - generateActionChoices() - ActionChoicesService
  * - runTimelineFill(), answerChapterQuestion(), answerChapterRangeQuestion() - TimelineFillService
- * - buildTieredContext(), getRelevantLorebookEntries() - ContextBuilder/EntryRetrievalService
+ * - buildTieredContext(), getRelevantLorebookEntries() - EntryInjector/EntryRetrievalService
  * - analyzeStyle() - StyleReviewerService
  * - runLoreManagement() - LoreManagementService
  * - generateImagesForNarrative() (both inline and analyzed modes) - ImageAnalysisService
@@ -39,7 +39,7 @@ import {
   type RetrievalContext as AgenticRetrievalContext,
 } from './retrieval/AgenticRetrievalService'
 import type { TimelineFillResult } from './retrieval/TimelineFillService'
-import { ContextBuilder, type ContextResult, type ContextConfig } from './generation/ContextBuilder'
+import { EntryInjector, type ContextResult, type ContextConfig } from './generation/EntryInjector'
 import {
   EntryRetrievalService,
   type EntryRetrievalResult,
@@ -412,7 +412,7 @@ class AIService {
   }
 
   /**
-   * Build tiered context using the ContextBuilder.
+   * Build tiered context using the EntryInjector.
    * NOTE: Tier 1 & 2 work. Tier 3 (LLM selection) is stubbed.
    */
   async buildTieredContext(
@@ -428,7 +428,7 @@ class AIService {
       hasRetrievedContext: !!retrievedChapterContext,
     })
 
-    const contextBuilder = new ContextBuilder(config)
+    const contextBuilder = new EntryInjector(config)
     const result = await contextBuilder.buildContext(
       worldState,
       userInput,

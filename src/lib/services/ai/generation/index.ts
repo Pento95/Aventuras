@@ -9,7 +9,7 @@
  * - SuggestionsService: Story direction suggestions
  * - ActionChoicesService: RPG-style action choices
  * - StyleReviewerService: Writing style analysis
- * - ContextBuilder: Tiered context building for prompts
+ * - EntryInjector: Tiered entry injection for prompts
  */
 
 // Main orchestrator (exports singleton instance)
@@ -70,12 +70,12 @@ export {
   type PhraseAnalysis,
 } from './StyleReviewerService'
 
-// Context building
+// Entry injection
 export {
-  ContextBuilder,
+  EntryInjector,
   DEFAULT_CONTEXT_CONFIG,
   type ContextResult,
   type ContextConfig,
   type WorldState,
   type RelevantEntry,
-} from './ContextBuilder'
+} from './EntryInjector'
