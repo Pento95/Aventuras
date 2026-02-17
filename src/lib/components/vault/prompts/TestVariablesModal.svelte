@@ -223,7 +223,7 @@
         <!-- System -->
         {#if filteredSystem.length > 0}
           <Collapsible.Root bind:open={systemOpen}>
-            <Collapsible.Trigger class="hover:bg-muted/50 -mx-2 flex w-[calc(100%+1rem)] rounded-md px-2">
+            <Collapsible.Trigger class="flex w-full">
               <div class="flex w-full items-center gap-2 py-1.5">
                 <ChevronDown class="text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 {systemOpen ? '' : '-rotate-90'}" />
                 <span class="text-sm font-medium">System</span>
@@ -243,7 +243,7 @@
         <!-- Custom -->
         {#if filteredCustom.length > 0}
           <Collapsible.Root bind:open={customOpen}>
-            <Collapsible.Trigger class="hover:bg-muted/50 -mx-2 flex w-[calc(100%+1rem)] rounded-md px-2">
+            <Collapsible.Trigger class="flex w-full">
               <div class="flex w-full items-center gap-2 py-1.5">
                 <ChevronDown class="text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 {customOpen ? '' : '-rotate-90'}" />
                 <span class="text-sm font-medium">Custom</span>
@@ -268,7 +268,7 @@
         <!-- Runtime groups -->
         {#each filteredRuntimeGroups as group (group.name)}
           <Collapsible.Root bind:open={runtimeOpenStates[group.name]}>
-            <Collapsible.Trigger class="hover:bg-muted/50 -mx-2 flex w-[calc(100%+1rem)] rounded-md px-2">
+            <Collapsible.Trigger class="flex w-full">
               <div class="flex w-full items-center gap-2 py-1.5">
                 <ChevronDown class="text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200 {runtimeOpenStates[group.name] ? '' : '-rotate-90'}" />
                 <span class="text-sm font-medium">{group.name}</span>
