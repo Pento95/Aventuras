@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { FullPack } from '$lib/services/packs/types'
+  import { untrack } from 'svelte'
+  import type { FullPack, CustomVariable } from '$lib/services/packs/types'
   import { packService } from '$lib/services/packs/pack-service'
   import { createIsMobile } from '$lib/hooks/is-mobile.svelte'
   import TemplateGroupList from './TemplateGroupList.svelte'
@@ -63,6 +64,35 @@
     testValues = values
   }
 
+  /** Build test values from custom variable defaults (non-empty only). */
+  function buildDefaultTestValues(variables: CustomVariable[]): Record<string, string> {
+    const result: Record<string, string> = {}
+    for (const v of variables) {
+      if (v.defaultValue) {
+        result[v.variableName] = v.defaultValue
+      }
+    }
+    return result
+  }
+
+  // Sync testValues when variables change: defaults as base, user overrides on top
+  $effect(() => {
+    const vars = fullPack?.variables
+    if (!vars) return
+    const defaults = buildDefaultTestValues(vars)
+    const validNames = new Set(vars.map((v) => v.variableName))
+    // Read current testValues without creating a dependency (avoid infinite loop)
+    const current = untrack(() => testValues)
+    // Overlay existing non-empty user overrides on top of defaults
+    const merged: Record<string, string> = { ...defaults }
+    for (const [key, value] of Object.entries(current)) {
+      if (value !== '' && validNames.has(key)) {
+        merged[key] = value
+      }
+    }
+    testValues = merged
+  })
+
   // Pack settings edit state
   let editingSettings = $state(false)
   let settingsDraft = $state({ name: '', author: '', description: '' })
@@ -87,11 +117,7 @@
   async function refreshPack() {
     try {
       fullPack = await packService.getFullPack(packId)
-      // Clean up test values for deleted variables
-      const validNames = new Set(fullPack?.variables.map((v) => v.variableName) ?? [])
-      testValues = Object.fromEntries(
-        Object.entries(testValues).filter(([key]) => validNames.has(key)),
-      )
+      // testValues cleanup and default re-initialization handled by $effect watching fullPack.variables
     } catch (error) {
       console.error('[PromptPackEditor] Failed to refresh pack:', error)
     }

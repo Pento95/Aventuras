@@ -25,7 +25,7 @@
       context[v.name] = runtimeSamples[v.name] ?? `[${v.name}]`
     }
     for (const v of vars) {
-      context[v.variableName] = v.defaultValue ?? `[${v.displayName}]`
+      context[v.variableName] = `[${v.displayName}]`
     }
 
     // Apply test value overrides for ANY variable (system, runtime, or custom)

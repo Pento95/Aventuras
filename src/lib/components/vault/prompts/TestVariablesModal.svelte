@@ -152,7 +152,7 @@
   let overrideCount = $derived(Object.values(draft).filter((v) => v !== '').length)
 </script>
 
-{#snippet varInput(name: string, description: string, type?: string, enumValues?: string[], useTextarea: boolean = false, sampleValue?: string)}
+{#snippet varInput(name: string, description: string, type?: string, enumValues?: string[], useTextarea: boolean = false, sampleValue?: string, isCustom: boolean = false)}
   <div class="grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-1 py-2">
     <div class="flex flex-col gap-0.5">
       <span class="text-foreground text-xs font-medium">{description}</span>
@@ -166,7 +166,7 @@
           onValueChange={(v) => updateDraft(name, v)}
         >
           <Select.Trigger class="h-7 w-full text-xs">
-            {draft[name] || 'Default'}
+            {draft[name] || (isCustom ? '' : 'Default')}
           </Select.Trigger>
           <Select.Content>
             {#each enumValues as opt (opt)}
@@ -186,14 +186,14 @@
           type="number"
           value={draft[name] ?? ''}
           oninput={(e) => updateDraft(name, e.currentTarget.value)}
-          placeholder={sampleValue ?? 'Default'}
+          placeholder={isCustom ? undefined : (sampleValue ?? 'Default')}
           class="h-7 text-xs"
         />
       {:else if useTextarea}
         <Textarea
           value={draft[name] ?? ''}
           oninput={(e) => updateDraft(name, e.currentTarget.value)}
-          placeholder={sampleValue ?? 'Default'}
+          placeholder={isCustom ? undefined : (sampleValue ?? 'Default')}
           rows={2}
           class="text-xs"
         />
@@ -201,7 +201,7 @@
         <Input
           value={draft[name] ?? ''}
           oninput={(e) => updateDraft(name, e.currentTarget.value)}
-          placeholder={sampleValue ?? 'Default'}
+          placeholder={isCustom ? undefined : (sampleValue ?? 'Default')}
           class="h-7 text-xs"
         />
       {/if}
@@ -276,7 +276,8 @@
                     v.variableType,
                     v.enumOptions?.map((o) => o.value),
                     v.variableType === 'textarea',
-                    v.defaultValue ?? undefined,
+                    undefined,
+                    true,
                   )}
                 {/each}
               </div>
