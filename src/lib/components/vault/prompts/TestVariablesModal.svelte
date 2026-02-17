@@ -28,8 +28,6 @@
   // Collapsible open states
   let systemOpen = $state(true)
   let customOpen = $state(true)
-  let runtimeOpenStates = $state<Record<string, boolean>>({})
-
   const systemVars = variableRegistry.getByCategory('system')
   const runtimeVars = variableRegistry.getByCategory('runtime')
 
@@ -111,6 +109,11 @@
           .filter((v): v is VariableDefinition => v != null),
       }))
       .filter((g) => g.variables.length > 0),
+  )
+
+  // Initialize runtime open states (all collapsed)
+  let runtimeOpenStates = $state<Record<string, boolean>>(
+    Object.fromEntries(RUNTIME_GROUPS.map((g) => [g.name, false])),
   )
 
   // Sync draft when modal opens
