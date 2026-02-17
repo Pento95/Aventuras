@@ -41,7 +41,6 @@ export interface ProcessSettings {
   profileId?: string | null
   presetId?: string
   model?: string
-  systemPrompt?: string
   temperature?: number
   topP?: number
   maxTokens?: number
@@ -74,7 +73,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -85,7 +83,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -96,7 +93,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -107,7 +103,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -118,7 +113,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -129,7 +123,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -140,7 +133,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,
@@ -151,7 +143,6 @@ export function getDefaultAdvancedSettingsForProvider(
       presetId: 'wizard',
       profileId: null,
       model: preset.model,
-      systemPrompt: '',
       temperature: 0.3,
       topP: 0.95,
       maxTokens: 8192,

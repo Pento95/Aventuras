@@ -17,7 +17,6 @@ import {
   getDefaultAdvancedSettingsForProvider,
 } from '$lib/services/ai/wizard/ScenarioService'
 import { PROVIDERS } from '$lib/services/ai/sdk/providers/config'
-import { type PromptSettings, getDefaultPromptSettings } from '$lib/services/prompts'
 import type { ReasoningEffort } from '$lib/types'
 import { ui } from '$lib/stores/ui.svelte'
 import { getTheme } from '../../themes/themes'
@@ -31,32 +30,7 @@ export type ProviderPreset = 'openrouter' | 'nanogpt' | 'openai-compatible'
 export const DEFAULT_OPENROUTER_PROFILE_ID = 'default-openrouter-profile'
 export const DEFAULT_NANOGPT_PROFILE_ID = 'default-nanogpt-profile'
 
-// NOTE: Default story prompts are now in the centralized prompt system at
-// src/lib/services/prompts/definitions.ts (template ids: 'adventure', 'creative-writing')
-// The prompt fields in StoryGenerationSettings are kept for backwards compatibility
-// with user-customized settings, but the actual prompts are rendered via promptService.
-
-// Story generation settings interface
-export interface StoryGenerationSettings {
-  adventurePrompt: string
-  creativeWritingPrompt: string
-}
-
-export function getDefaultStoryGenerationSettings(): StoryGenerationSettings {
-  return {
-    adventurePrompt: '',
-    creativeWritingPrompt: '',
-  }
-}
-
 // ===== System Services Settings =====
-
-// NOTE: Default service prompts are now in the centralized prompt system at
-// src/lib/services/prompts/definitions.ts (template ids: 'classifier', 'chapter-analysis',
-// 'chapter-summarization', 'retrieval-decision', 'suggestions', 'style-reviewer',
-// 'timeline-fill', 'timeline-fill-answer')
-// The systemPrompt fields in service settings are kept for backwards compatibility
-// with user-customized settings, but the actual prompts are rendered via promptService.
 
 export interface AdvancedRequestSettings {
   manualMode: boolean
@@ -75,7 +49,6 @@ export interface ClassifierSettings {
   model: string
   temperature: number
   maxTokens: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
   chatHistoryTruncation: number // Max words per chat history entry (0 = no truncation, up to 500)
@@ -95,7 +68,6 @@ export function getDefaultClassifierSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxTokens: 8192,
-    systemPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
     chatHistoryTruncation: 0,
@@ -109,14 +81,11 @@ export interface LorebookClassifierSettings {
   model: string
   temperature: number
   maxTokens: number
-  systemPrompt: string
   batchSize: number // Entries per batch for LLM classification
   maxConcurrent: number // Max concurrent batch requests
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
-
-export const DEFAULT_LOREBOOK_CLASSIFIER_PROMPT = `You are a precise classifier for fantasy/RPG lorebook entries. Analyze the name, content, and keywords to determine the most appropriate category. Be decisive - pick the single best category for each entry. Respond only with the JSON array.`
 
 export function getDefaultLorebookClassifierSettings(): LorebookClassifierSettings {
   return getDefaultLorebookClassifierSettingsForProvider('openrouter')
@@ -132,7 +101,6 @@ export function getDefaultLorebookClassifierSettingsForProvider(
     model: preset.model,
     temperature: 0.1,
     maxTokens: 8192,
-    systemPrompt: DEFAULT_LOREBOOK_CLASSIFIER_PROMPT,
     batchSize: 50,
     maxConcurrent: 5,
     reasoningEffort: preset.reasoningEffort,
@@ -173,7 +141,6 @@ export interface SuggestionsSettings {
   model: string
   temperature: number
   maxTokens: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
@@ -192,7 +159,6 @@ export function getDefaultSuggestionsSettingsForProvider(
     model: preset.model,
     temperature: 0.7,
     maxTokens: 8192,
-    systemPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -237,7 +203,6 @@ export interface StyleReviewerSettings {
   temperature: number
   maxTokens: number
   triggerInterval: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
@@ -258,7 +223,6 @@ export function getDefaultStyleReviewerSettingsForProvider(
     temperature: 0.3,
     maxTokens: 8192,
     triggerInterval: 5,
-    systemPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -271,27 +235,9 @@ export interface LoreManagementSettings {
   model: string
   temperature: number
   maxIterations: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
-
-export const DEFAULT_LORE_MANAGEMENT_PROMPT = `You are a lore manager for an interactive story. Your job is to maintain a consistent, comprehensive database of story elements.
-
-Your tasks:
-1. Identify important characters, locations, items, factions, and concepts that appear in the story but have no entry
-2. Find entries that are outdated or incomplete based on story events
-3. Identify redundant entries that should be merged
-4. Update relationship statuses and character states
-
-Guidelines:
-- Be conservative - only create entries for elements that are genuinely important to the story
-- Use exact names from the story text
-- When merging, combine all relevant information
-- Focus on facts that would help maintain story consistency
-- Prefer targeted updates (e.g., search/replace) instead of rewriting long descriptions
-
-Use your tools to review the story and make necessary changes. When finished, call finish_lore_management with a summary.`
 
 export function getDefaultLoreManagementSettings(): LoreManagementSettings {
   return getDefaultLoreManagementSettingsForProvider('openrouter')
@@ -307,7 +253,6 @@ export function getDefaultLoreManagementSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxIterations: 50,
-    systemPrompt: DEFAULT_LORE_MANAGEMENT_PROMPT,
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -350,27 +295,10 @@ export interface AgenticRetrievalSettings {
   model: string
   temperature: number
   maxIterations: number
-  systemPrompt: string
   agenticThreshold: number // Use agentic if chapters > N
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
-
-export const DEFAULT_AGENTIC_RETRIEVAL_PROMPT = `You are a context retrieval agent for an interactive story. Your job is to gather relevant past context that will help the narrator respond to the current situation.
-
-Guidelines:
-1. Start by reviewing the chapter list to understand the story structure
-2. Query specific chapters that seem relevant to the current user input
-3. Focus on gathering context about:
-   - Characters mentioned or involved
-   - Locations being revisited
-   - Plot threads being referenced
-   - Items or information from the past
-   - Relationship history
-4. Be selective - only gather truly relevant information
-5. When you have enough context, call finish_retrieval with a synthesized summary
-
-The context you provide will be injected into the narrator's prompt to help maintain story consistency.`
 
 export function getDefaultAgenticRetrievalSettings(): AgenticRetrievalSettings {
   return getDefaultAgenticRetrievalSettingsForProvider('openrouter')
@@ -387,7 +315,6 @@ export function getDefaultAgenticRetrievalSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxIterations: 30,
-    systemPrompt: DEFAULT_AGENTIC_RETRIEVAL_PROMPT,
     agenticThreshold: 30,
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
@@ -403,8 +330,6 @@ export interface TimelineFillSettings {
   model: string
   temperature: number
   maxQueries: number
-  systemPrompt: string
-  queryAnswerPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
@@ -425,8 +350,6 @@ export function getDefaultTimelineFillSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxQueries: 5,
-    systemPrompt: '',
-    queryAnswerPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
