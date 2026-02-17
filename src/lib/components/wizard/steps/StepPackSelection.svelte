@@ -4,8 +4,8 @@
   import { Textarea } from '$lib/components/ui/textarea'
   import { Switch } from '$lib/components/ui/switch'
   import { Label } from '$lib/components/ui/label'
-  import { ScrollArea } from '$lib/components/ui/scroll-area'
   import { Badge } from '$lib/components/ui/badge'
+  import { Package } from 'lucide-svelte'
   import type { PresetPack, CustomVariable } from '$lib/services/packs/types'
 
   interface Props {
@@ -31,17 +31,23 @@
   const hasVariables = $derived(packVariables.length > 0)
 </script>
 
-<div class="space-y-6">
-  <div>
-    <h3 class="text-lg font-semibold">Prompt Pack</h3>
-    <p class="text-muted-foreground text-sm">
-      Choose which prompt templates to use for this story.
-    </p>
+<div class="space-y-4">
+  <!-- Header with icon badge -->
+  <div class="flex items-center gap-3">
+    <div class="bg-primary/10 flex h-8 w-8 items-center justify-center rounded-md">
+      <Package class="text-primary h-4 w-4" />
+    </div>
+    <div>
+      <h3 class="text-lg font-semibold">Prompt Pack</h3>
+      <p class="text-muted-foreground text-sm">
+        Choose which prompt templates to use for this story.
+      </p>
+    </div>
   </div>
 
   <!-- Pack Dropdown (only shown when multiple packs exist) -->
   {#if hasMultiplePacks}
-    <div class="space-y-2">
+    <div class="rounded-lg border p-4 space-y-3">
       <Label>Pack</Label>
       <Select.Root
         type="single"
@@ -65,92 +71,108 @@
         </Select.Content>
       </Select.Root>
       {#if selectedPack?.description}
-        <p class="text-muted-foreground text-xs italic">{selectedPack.description}</p>
+        <p class="text-muted-foreground text-xs">{selectedPack.description}</p>
       {/if}
     </div>
   {/if}
 
-  <!-- Placeholder message when only default pack with no variables -->
+  <!-- Empty state: default pack, no variables -->
   {#if !hasMultiplePacks && !hasVariables}
-    <div class="bg-muted/50 rounded-lg border p-4">
-      <p class="text-muted-foreground text-sm">
-        Using the default prompt pack. Custom packs with configurable variables can be created in the Vault.
+    <div class="flex flex-col items-center justify-center text-center py-8">
+      <div class="bg-muted rounded-full p-4 mb-3">
+        <Package class="text-muted-foreground h-10 w-10" />
+      </div>
+      <h4 class="text-sm font-medium mb-1">Default Pack Selected</h4>
+      <p class="text-muted-foreground text-sm max-w-sm">
+        Using the built-in prompt templates. You can create custom packs with configurable
+        variables in the Vault's Prompt Editor.
       </p>
     </div>
   {/if}
 
   <!-- Variable Inputs -->
   {#if hasVariables}
-    <div class="space-y-3">
-      <div>
-        <h4 class="text-sm font-medium">Custom Variables</h4>
-        <p class="text-muted-foreground text-xs">
-          Configure values for this story's prompt templates.
-        </p>
+    <!-- Divider with centered label -->
+    <div class="relative py-4">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t"></div>
       </div>
+      <div class="relative flex justify-center text-xs uppercase">
+        <span class="bg-background text-muted-foreground px-2">Variables</span>
+      </div>
+    </div>
 
-      <ScrollArea class="max-h-[400px]">
-        <div class="space-y-4 pr-3 pb-4">
-          {#each packVariables as variable (variable.id)}
-            <div class="space-y-1.5">
-              <Label for="var-{variable.variableName}">{variable.displayName}</Label>
-              {#if variable.description}
-                <p class="text-muted-foreground text-xs italic">{variable.description}</p>
-              {/if}
-
-              {#if variable.variableType === 'text'}
-                <Input
-                  id="var-{variable.variableName}"
-                  value={variableValues[variable.variableName] ?? ''}
-                  oninput={(e) => onVariableChange(variable.variableName, e.currentTarget.value)}
-                  placeholder={variable.displayName}
-                />
-              {:else if variable.variableType === 'textarea'}
-                <Textarea
-                  id="var-{variable.variableName}"
-                  rows={3}
-                  value={variableValues[variable.variableName] ?? ''}
-                  oninput={(e) => onVariableChange(variable.variableName, e.currentTarget.value)}
-                  placeholder={variable.displayName}
-                />
-              {:else if variable.variableType === 'number'}
-                <Input
-                  id="var-{variable.variableName}"
-                  type="number"
-                  value={variableValues[variable.variableName] ?? ''}
-                  oninput={(e) => onVariableChange(variable.variableName, e.currentTarget.value)}
-                  placeholder="0"
-                />
-              {:else if variable.variableType === 'boolean'}
-                <Switch
-                  id="var-{variable.variableName}"
-                  checked={variableValues[variable.variableName] === 'true'}
-                  onCheckedChange={(v) => onVariableChange(variable.variableName, v ? 'true' : 'false')}
-                />
-              {:else if variable.variableType === 'enum' && variable.enumOptions}
-                <Select.Root
-                  type="single"
-                  value={variableValues[variable.variableName] ?? ''}
-                  onValueChange={(v) => { if (v !== undefined) onVariableChange(variable.variableName, v) }}
-                >
-                  <Select.Trigger class="w-full">
-                    {variable.enumOptions.find((o) => o.value === variableValues[variable.variableName])?.label ?? 'Select...'}
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each variable.enumOptions as opt (opt.value)}
-                      {#if opt.value}
-                        <Select.Item value={opt.value} label={opt.label || opt.value}>
-                          {opt.label || opt.value}
-                        </Select.Item>
-                      {/if}
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              {/if}
+    <div class="space-y-3">
+      {#each packVariables as variable (variable.id)}
+        <div class="rounded-lg border p-3 space-y-2">
+          {#if variable.variableType === 'boolean'}
+            <!-- Boolean: horizontal layout with label left, switch right -->
+            <div class="flex items-center justify-between">
+              <div class="space-y-0.5">
+                <Label for="var-{variable.variableName}">{variable.displayName}</Label>
+                {#if variable.description}
+                  <p class="text-muted-foreground text-xs">{variable.description}</p>
+                {/if}
+              </div>
+              <Switch
+                id="var-{variable.variableName}"
+                checked={variableValues[variable.variableName] === 'true'}
+                onCheckedChange={(v) => onVariableChange(variable.variableName, v ? 'true' : 'false')}
+              />
             </div>
-          {/each}
+          {:else}
+            <!-- Non-boolean: stacked label then input -->
+            <Label for="var-{variable.variableName}">{variable.displayName}</Label>
+            {#if variable.description}
+              <p class="text-muted-foreground text-xs">{variable.description}</p>
+            {/if}
+
+            {#if variable.variableType === 'text'}
+              <Input
+                id="var-{variable.variableName}"
+                value={variableValues[variable.variableName] ?? ''}
+                oninput={(e) => onVariableChange(variable.variableName, e.currentTarget.value)}
+                placeholder={variable.displayName}
+              />
+            {:else if variable.variableType === 'textarea'}
+              <Textarea
+                id="var-{variable.variableName}"
+                rows={3}
+                value={variableValues[variable.variableName] ?? ''}
+                oninput={(e) => onVariableChange(variable.variableName, e.currentTarget.value)}
+                placeholder={variable.displayName}
+              />
+            {:else if variable.variableType === 'number'}
+              <Input
+                id="var-{variable.variableName}"
+                type="number"
+                value={variableValues[variable.variableName] ?? ''}
+                oninput={(e) => onVariableChange(variable.variableName, e.currentTarget.value)}
+                placeholder="0"
+              />
+            {:else if variable.variableType === 'enum' && variable.enumOptions}
+              <Select.Root
+                type="single"
+                value={variableValues[variable.variableName] ?? ''}
+                onValueChange={(v) => { if (v !== undefined) onVariableChange(variable.variableName, v) }}
+              >
+                <Select.Trigger class="w-full">
+                  {variable.enumOptions.find((o) => o.value === variableValues[variable.variableName])?.label ?? 'Select...'}
+                </Select.Trigger>
+                <Select.Content>
+                  {#each variable.enumOptions as opt (opt.value)}
+                    {#if opt.value}
+                      <Select.Item value={opt.value} label={opt.label || opt.value}>
+                        {opt.label || opt.value}
+                      </Select.Item>
+                    {/if}
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            {/if}
+          {/if}
         </div>
-      </ScrollArea>
+      {/each}
     </div>
   {/if}
 </div>
