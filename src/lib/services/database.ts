@@ -25,6 +25,8 @@ import type {
   VisualDescriptors,
   WorldStateSnapshot,
 } from '$lib/types'
+import type { PresetPack, PackTemplate, CustomVariable } from '$lib/services/packs/types'
+import { hashContent } from '$lib/services/packs/hash'
 
 /**
  * Migrate visual descriptors from old string array format to new structured object format.
@@ -105,6 +107,8 @@ class DatabaseService {
   async init(): Promise<void> {
     if (this.db) return
     this.db = await Database.load('sqlite:aventura.db')
+    // Enable foreign key enforcement (SQLite disables by default)
+    await this.db.execute('PRAGMA foreign_keys = ON')
   }
 
   /**
@@ -3080,6 +3084,282 @@ class DatabaseService {
     console.log('[Database] Tag migration complete')
   }
 
+  // ===== Preset Pack Operations =====
+
+  async getAllPacks(): Promise<PresetPack[]> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT * FROM preset_packs ORDER BY is_default DESC, name ASC',
+    )
+    return results.map(this.mapPack)
+  }
+
+  async getPack(id: string): Promise<PresetPack | null> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>('SELECT * FROM preset_packs WHERE id = ?', [id])
+    return results.length > 0 ? this.mapPack(results[0]) : null
+  }
+
+  async getDefaultPack(): Promise<PresetPack | null> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT * FROM preset_packs WHERE is_default = 1 LIMIT 1',
+    )
+    return results.length > 0 ? this.mapPack(results[0]) : null
+  }
+
+  async createPack(pack: Omit<PresetPack, 'createdAt' | 'updatedAt'>): Promise<PresetPack> {
+    const db = await this.getDb()
+    const now = Date.now()
+    await db.execute(
+      'INSERT INTO preset_packs (id, name, description, author, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [pack.id, pack.name, pack.description, pack.author, pack.isDefault ? 1 : 0, now, now],
+    )
+    return { ...pack, createdAt: now, updatedAt: now }
+  }
+
+  async updatePack(
+    id: string,
+    updates: { name?: string; description?: string | null; author?: string | null },
+  ): Promise<void> {
+    const db = await this.getDb()
+    const now = Date.now()
+    const setClauses: string[] = ['updated_at = ?']
+    const values: any[] = [now]
+
+    if (updates.name !== undefined) {
+      setClauses.push('name = ?')
+      values.push(updates.name)
+    }
+    if (updates.description !== undefined) {
+      setClauses.push('description = ?')
+      values.push(updates.description)
+    }
+    if (updates.author !== undefined) {
+      setClauses.push('author = ?')
+      values.push(updates.author)
+    }
+
+    values.push(id)
+    await db.execute(`UPDATE preset_packs SET ${setClauses.join(', ')} WHERE id = ?`, values)
+  }
+
+  async deletePack(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('DELETE FROM preset_packs WHERE id = ? AND is_default = 0', [id])
+  }
+
+  async canDeletePack(packId: string): Promise<boolean> {
+    const db = await this.getDb()
+    // Cannot delete default pack
+    const pack = await this.getPack(packId)
+    if (!pack || pack.isDefault) return false
+    // Cannot delete if stories reference it
+    const results = await db.select<any[]>(
+      'SELECT COUNT(*) as count FROM stories WHERE pack_id = ?',
+      [packId],
+    )
+    return results[0].count === 0
+  }
+
+  async getPackUsageCount(packId: string): Promise<number> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT COUNT(*) as count FROM stories WHERE pack_id = ?',
+      [packId],
+    )
+    return results[0].count
+  }
+
+  // ===== Pack Template Operations =====
+
+  async getPackTemplates(packId: string): Promise<PackTemplate[]> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT * FROM pack_templates WHERE pack_id = ? ORDER BY template_id',
+      [packId],
+    )
+    return results.map(this.mapPackTemplate)
+  }
+
+  async getPackTemplate(packId: string, templateId: string): Promise<PackTemplate | null> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT * FROM pack_templates WHERE pack_id = ? AND template_id = ?',
+      [packId, templateId],
+    )
+    return results.length > 0 ? this.mapPackTemplate(results[0]) : null
+  }
+
+  async setPackTemplateContent(packId: string, templateId: string, content: string): Promise<void> {
+    const db = await this.getDb()
+    const now = Date.now()
+    const contentHash = await hashContent(content)
+    // Use INSERT OR REPLACE to handle both create and update
+    // Need to preserve original created_at if exists
+    const existing = await this.getPackTemplate(packId, templateId)
+    const createdAt = existing ? existing.createdAt : now
+    await db.execute(
+      `INSERT OR REPLACE INTO pack_templates (id, pack_id, template_id, content, content_hash, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        existing?.id ?? crypto.randomUUID(),
+        packId,
+        templateId,
+        content,
+        contentHash,
+        createdAt,
+        now,
+      ],
+    )
+  }
+
+  async deletePackTemplate(packId: string, templateId: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('DELETE FROM pack_templates WHERE pack_id = ? AND template_id = ?', [
+      packId,
+      templateId,
+    ])
+  }
+
+  // ===== Pack Variable Operations =====
+
+  async getPackVariables(packId: string): Promise<CustomVariable[]> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT * FROM pack_variables WHERE pack_id = ? ORDER BY sort_order ASC, variable_name ASC',
+      [packId],
+    )
+    return results.map(this.mapPackVariable)
+  }
+
+  async getPackVariable(packId: string, variableName: string): Promise<CustomVariable | null> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT * FROM pack_variables WHERE pack_id = ? AND variable_name = ?',
+      [packId, variableName],
+    )
+    return results.length > 0 ? this.mapPackVariable(results[0]) : null
+  }
+
+  async createPackVariable(
+    packId: string,
+    variable: Omit<CustomVariable, 'id' | 'packId' | 'createdAt'>,
+  ): Promise<CustomVariable> {
+    const db = await this.getDb()
+    const id = crypto.randomUUID()
+    const now = Date.now()
+    await db.execute(
+      `INSERT INTO pack_variables (id, pack_id, variable_name, display_name, description, variable_type, is_required, sort_order, default_value, enum_options, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        packId,
+        variable.variableName,
+        variable.displayName,
+        variable.description ?? null,
+        variable.variableType,
+        variable.isRequired ? 1 : 0,
+        variable.sortOrder ?? 0,
+        variable.defaultValue ?? null,
+        variable.enumOptions ? JSON.stringify(variable.enumOptions) : null,
+        now,
+      ],
+    )
+    return { id, packId, ...variable, createdAt: now }
+  }
+
+  async updatePackVariable(
+    id: string,
+    updates: Partial<Omit<CustomVariable, 'id' | 'packId' | 'createdAt'>>,
+  ): Promise<void> {
+    const db = await this.getDb()
+    const setClauses: string[] = []
+    const values: any[] = []
+
+    if (updates.variableName !== undefined) {
+      setClauses.push('variable_name = ?')
+      values.push(updates.variableName)
+    }
+    if (updates.displayName !== undefined) {
+      setClauses.push('display_name = ?')
+      values.push(updates.displayName)
+    }
+    if (updates.description !== undefined) {
+      setClauses.push('description = ?')
+      values.push(updates.description || null)
+    }
+    if (updates.variableType !== undefined) {
+      setClauses.push('variable_type = ?')
+      values.push(updates.variableType)
+    }
+    if (updates.isRequired !== undefined) {
+      setClauses.push('is_required = ?')
+      values.push(updates.isRequired ? 1 : 0)
+    }
+    if (updates.sortOrder !== undefined) {
+      setClauses.push('sort_order = ?')
+      values.push(updates.sortOrder)
+    }
+    if (updates.defaultValue !== undefined) {
+      setClauses.push('default_value = ?')
+      values.push(updates.defaultValue)
+    }
+    if (updates.enumOptions !== undefined) {
+      setClauses.push('enum_options = ?')
+      values.push(updates.enumOptions ? JSON.stringify(updates.enumOptions) : null)
+    }
+
+    if (setClauses.length === 0) return
+
+    values.push(id)
+    await db.execute(`UPDATE pack_variables SET ${setClauses.join(', ')} WHERE id = ?`, values)
+  }
+
+  async deletePackVariable(id: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('DELETE FROM pack_variables WHERE id = ?', [id])
+  }
+
+  // ===== Story-Pack Assignment =====
+
+  async getStoryPackId(storyId: string): Promise<string | null> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>('SELECT pack_id FROM stories WHERE id = ?', [storyId])
+    return results.length > 0 ? results[0].pack_id : null
+  }
+
+  async setStoryPack(storyId: string, packId: string): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE stories SET pack_id = ? WHERE id = ?', [packId, storyId])
+  }
+
+  /**
+   * Get per-story custom variable value overrides.
+   * Returns null if no overrides have been set.
+   */
+  async getStoryCustomVariables(storyId: string): Promise<Record<string, string> | null> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      'SELECT custom_variable_values FROM stories WHERE id = ?',
+      [storyId],
+    )
+    if (results.length === 0 || !results[0].custom_variable_values) return null
+    return JSON.parse(results[0].custom_variable_values)
+  }
+
+  /**
+   * Set per-story custom variable value overrides.
+   * Pass an object mapping variable names to their story-specific values.
+   */
+  async setStoryCustomVariables(storyId: string, values: Record<string, string>): Promise<void> {
+    const db = await this.getDb()
+    await db.execute('UPDATE stories SET custom_variable_values = ? WHERE id = ?', [
+      JSON.stringify(values),
+      storyId,
+    ])
+  }
+
   private mapVaultTag(row: any): VaultTag {
     return {
       id: row.id,
@@ -3107,6 +3387,46 @@ class DatabaseService {
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    }
+  }
+
+  private mapPack(row: any): PresetPack {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      author: row.author,
+      isDefault: row.is_default === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }
+  }
+
+  private mapPackTemplate(row: any): PackTemplate {
+    return {
+      id: row.id,
+      packId: row.pack_id,
+      templateId: row.template_id,
+      content: row.content,
+      contentHash: row.content_hash,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }
+  }
+
+  private mapPackVariable(row: any): CustomVariable {
+    return {
+      id: row.id,
+      packId: row.pack_id,
+      variableName: row.variable_name,
+      displayName: row.display_name,
+      description: row.description ?? undefined,
+      variableType: row.variable_type,
+      isRequired: row.is_required === 1,
+      sortOrder: row.sort_order ?? 0,
+      defaultValue: row.default_value ?? undefined,
+      enumOptions: row.enum_options ? JSON.parse(row.enum_options) : undefined,
+      createdAt: row.created_at,
     }
   }
 }

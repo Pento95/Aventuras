@@ -1,5 +1,5 @@
 /**
- * Context Builder Service for Aventura
+ * Entry Injector Service
  * Per design doc section 3.2.3: Tiered Injection
  *
  * Implements three tiers of entry injection:
@@ -12,10 +12,9 @@ import type { Character, Location, Item, StoryBeat, StoryEntry, Chapter } from '
 import { createLogger } from '../core/config'
 import { generateStructured } from '../sdk/generate'
 import { entitySelectionSchema } from '../sdk/schemas/context'
-import { promptService } from '$lib/services/prompts'
-import { escapeRegex } from '$lib/utils/text'
+import { ContextBuilder as ContextPipeline } from '$lib/services/context'
 
-const log = createLogger('ContextBuilder')
+const log = createLogger('EntryInjector')
 
 export interface WorldState {
   characters: Character[]
@@ -67,7 +66,7 @@ export interface ContextResult {
  * - Tier 1 and Tier 2 work without AI
  * - Tier 3 uses LLM selection when entry count exceeds threshold
  */
-export class ContextBuilder {
+export class EntryInjector {
   private config: ContextConfig
   private presetId: string
 
@@ -377,27 +376,9 @@ export class ContextBuilder {
       .map((e) => e.content)
       .join('\n\n')
 
-    const system = promptService.renderPrompt('tier3-entry-selection', {
-      mode: 'adventure',
-      pov: 'second',
-      tense: 'present',
-      protagonistName: '',
-    })
-
-    const prompt = promptService.renderUserPrompt(
-      'tier3-entry-selection',
-      {
-        mode: 'adventure',
-        pov: 'second',
-        tense: 'present',
-        protagonistName: '',
-      },
-      {
-        recentContent,
-        userInput,
-        entrySummaries,
-      },
-    )
+    const ctx = new ContextPipeline()
+    ctx.add({ recentContent, userInput, entrySummaries })
+    const { system, user: prompt } = await ctx.render('tier3-entry-selection')
 
     try {
       const result = await generateStructured(
@@ -454,7 +435,8 @@ export class ContextBuilder {
     }
 
     // Word boundary match (name appears as a word)
-    const wordPattern = new RegExp(`\\b${escapeRegex(normalizedName)}\\b`, 'i')
+    const escaped = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const wordPattern = new RegExp(`\\b${escaped}\\b`, 'i')
     if (wordPattern.test(searchText)) {
       return true
     }

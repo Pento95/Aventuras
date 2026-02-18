@@ -19,7 +19,6 @@ import {
   getDefaultAdvancedSettingsForProvider,
 } from '$lib/services/ai/wizard/ScenarioService'
 import { PROVIDERS } from '$lib/services/ai/sdk/providers/config'
-import { promptService, type PromptSettings, getDefaultPromptSettings } from '$lib/services/prompts'
 import type { ReasoningEffort } from '$lib/types'
 import { ui } from '$lib/stores/ui.svelte'
 import { getTheme } from '../../themes/themes'
@@ -33,32 +32,7 @@ export type ProviderPreset = 'openrouter' | 'nanogpt' | 'openai-compatible'
 export const DEFAULT_OPENROUTER_PROFILE_ID = 'default-openrouter-profile'
 export const DEFAULT_NANOGPT_PROFILE_ID = 'default-nanogpt-profile'
 
-// NOTE: Default story prompts are now in the centralized prompt system at
-// src/lib/services/prompts/definitions.ts (template ids: 'adventure', 'creative-writing')
-// The prompt fields in StoryGenerationSettings are kept for backwards compatibility
-// with user-customized settings, but the actual prompts are rendered via promptService.
-
-// Story generation settings interface
-export interface StoryGenerationSettings {
-  adventurePrompt: string
-  creativeWritingPrompt: string
-}
-
-export function getDefaultStoryGenerationSettings(): StoryGenerationSettings {
-  return {
-    adventurePrompt: '',
-    creativeWritingPrompt: '',
-  }
-}
-
 // ===== System Services Settings =====
-
-// NOTE: Default service prompts are now in the centralized prompt system at
-// src/lib/services/prompts/definitions.ts (template ids: 'classifier', 'chapter-analysis',
-// 'chapter-summarization', 'retrieval-decision', 'suggestions', 'style-reviewer',
-// 'timeline-fill', 'timeline-fill-answer')
-// The systemPrompt fields in service settings are kept for backwards compatibility
-// with user-customized settings, but the actual prompts are rendered via promptService.
 
 export interface AdvancedRequestSettings {
   manualMode: boolean
@@ -77,7 +51,6 @@ export interface ClassifierSettings {
   model: string
   temperature: number
   maxTokens: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
   chatHistoryTruncation: number // Max words per chat history entry (0 = no truncation, up to 500)
@@ -97,7 +70,6 @@ export function getDefaultClassifierSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxTokens: 8192,
-    systemPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
     chatHistoryTruncation: 0,
@@ -111,14 +83,11 @@ export interface LorebookClassifierSettings {
   model: string
   temperature: number
   maxTokens: number
-  systemPrompt: string
   batchSize: number // Entries per batch for LLM classification
   maxConcurrent: number // Max concurrent batch requests
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
-
-export const DEFAULT_LOREBOOK_CLASSIFIER_PROMPT = `You are a precise classifier for fantasy/RPG lorebook entries. Analyze the name, content, and keywords to determine the most appropriate category. Be decisive - pick the single best category for each entry. Respond only with the JSON array.`
 
 export function getDefaultLorebookClassifierSettings(): LorebookClassifierSettings {
   return getDefaultLorebookClassifierSettingsForProvider('openrouter')
@@ -134,7 +103,6 @@ export function getDefaultLorebookClassifierSettingsForProvider(
     model: preset.model,
     temperature: 0.1,
     maxTokens: 8192,
-    systemPrompt: DEFAULT_LOREBOOK_CLASSIFIER_PROMPT,
     batchSize: 50,
     maxConcurrent: 5,
     reasoningEffort: preset.reasoningEffort,
@@ -175,7 +143,6 @@ export interface SuggestionsSettings {
   model: string
   temperature: number
   maxTokens: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
@@ -194,7 +161,6 @@ export function getDefaultSuggestionsSettingsForProvider(
     model: preset.model,
     temperature: 0.7,
     maxTokens: 8192,
-    systemPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -239,7 +205,6 @@ export interface StyleReviewerSettings {
   temperature: number
   maxTokens: number
   triggerInterval: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
@@ -260,7 +225,6 @@ export function getDefaultStyleReviewerSettingsForProvider(
     temperature: 0.3,
     maxTokens: 8192,
     triggerInterval: 5,
-    systemPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -273,27 +237,9 @@ export interface LoreManagementSettings {
   model: string
   temperature: number
   maxIterations: number
-  systemPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
-
-export const DEFAULT_LORE_MANAGEMENT_PROMPT = `You are a lore manager for an interactive story. Your job is to maintain a consistent, comprehensive database of story elements.
-
-Your tasks:
-1. Identify important characters, locations, items, factions, and concepts that appear in the story but have no entry
-2. Find entries that are outdated or incomplete based on story events
-3. Identify redundant entries that should be merged
-4. Update relationship statuses and character states
-
-Guidelines:
-- Be conservative - only create entries for elements that are genuinely important to the story
-- Use exact names from the story text
-- When merging, combine all relevant information
-- Focus on facts that would help maintain story consistency
-- Prefer targeted updates (e.g., search/replace) instead of rewriting long descriptions
-
-Use your tools to review the story and make necessary changes. When finished, call finish_lore_management with a summary.`
 
 export function getDefaultLoreManagementSettings(): LoreManagementSettings {
   return getDefaultLoreManagementSettingsForProvider('openrouter')
@@ -309,7 +255,6 @@ export function getDefaultLoreManagementSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxIterations: 50,
-    systemPrompt: DEFAULT_LORE_MANAGEMENT_PROMPT,
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -352,27 +297,10 @@ export interface AgenticRetrievalSettings {
   model: string
   temperature: number
   maxIterations: number
-  systemPrompt: string
   agenticThreshold: number // Use agentic if chapters > N
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
-
-export const DEFAULT_AGENTIC_RETRIEVAL_PROMPT = `You are a context retrieval agent for an interactive story. Your job is to gather relevant past context that will help the narrator respond to the current situation.
-
-Guidelines:
-1. Start by reviewing the chapter list to understand the story structure
-2. Query specific chapters that seem relevant to the current user input
-3. Focus on gathering context about:
-   - Characters mentioned or involved
-   - Locations being revisited
-   - Plot threads being referenced
-   - Items or information from the past
-   - Relationship history
-4. Be selective - only gather truly relevant information
-5. When you have enough context, call finish_retrieval with a synthesized summary
-
-The context you provide will be injected into the narrator's prompt to help maintain story consistency.`
 
 export function getDefaultAgenticRetrievalSettings(): AgenticRetrievalSettings {
   return getDefaultAgenticRetrievalSettingsForProvider('openrouter')
@@ -389,7 +317,6 @@ export function getDefaultAgenticRetrievalSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxIterations: 30,
-    systemPrompt: DEFAULT_AGENTIC_RETRIEVAL_PROMPT,
     agenticThreshold: 30,
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
@@ -405,8 +332,6 @@ export interface TimelineFillSettings {
   model: string
   temperature: number
   maxQueries: number
-  systemPrompt: string
-  queryAnswerPrompt: string
   reasoningEffort: ReasoningEffort
   manualBody: string
 }
@@ -427,8 +352,6 @@ export function getDefaultTimelineFillSettingsForProvider(
     model: preset.model,
     temperature: 0.3,
     maxQueries: 5,
-    systemPrompt: '',
-    queryAnswerPrompt: '',
     reasoningEffort: preset.reasoningEffort,
     manualBody: '',
   }
@@ -1127,17 +1050,11 @@ class SettingsStore {
   // Advanced wizard settings for scenario generation
   wizardSettings = $state<AdvancedWizardSettings>(getDefaultAdvancedSettings())
 
-  // Story generation settings (main AI prompts)
-  storyGenerationSettings = $state<StoryGenerationSettings>(getDefaultStoryGenerationSettings())
-
   // System services settings (classifier, memory, suggestions)
   systemServicesSettings = $state<SystemServicesSettings>(getDefaultSystemServicesSettings())
 
   // Update settings
   updateSettings = $state<UpdateSettings>(getDefaultUpdateSettings())
-
-  // Prompt settings (centralized macro-based prompts)
-  promptSettings = $state<PromptSettings>(getDefaultPromptSettings())
 
   // Translation settings
   translationSettings = $state<TranslationSettings>(getDefaultTranslationSettings())
@@ -1469,21 +1386,6 @@ class SettingsStore {
         }
       }
 
-      // Load story generation settings
-      const storyGenSettingsJson = await database.getSetting('story_generation_settings')
-      if (storyGenSettingsJson) {
-        try {
-          const loaded = JSON.parse(storyGenSettingsJson)
-          const defaults = getDefaultStoryGenerationSettings()
-          this.storyGenerationSettings = {
-            adventurePrompt: loaded.adventurePrompt || defaults.adventurePrompt,
-            creativeWritingPrompt: loaded.creativeWritingPrompt || defaults.creativeWritingPrompt,
-          }
-        } catch {
-          this.storyGenerationSettings = getDefaultStoryGenerationSettings()
-        }
-      }
-
       // Load Generation Presets
       const presetsJson = await database.getSetting('generation_presets')
       if (presetsJson) {
@@ -1695,144 +1597,6 @@ class SettingsStore {
 
       // Load image profiles
       await this.loadImageProfiles()
-
-      // Load prompt settings and initialize the prompt service
-      const promptSettingsJson = await database.getSetting('prompt_settings')
-      if (promptSettingsJson) {
-        try {
-          const loaded = JSON.parse(promptSettingsJson)
-          const defaults = getDefaultPromptSettings()
-          this.promptSettings = {
-            customMacros: loaded.customMacros ?? defaults.customMacros,
-            macroOverrides: loaded.macroOverrides ?? defaults.macroOverrides,
-            templateOverrides: loaded.templateOverrides ?? defaults.templateOverrides,
-            legacyMigrationComplete: loaded.legacyMigrationComplete ?? false,
-          }
-        } catch {
-          this.promptSettings = getDefaultPromptSettings()
-        }
-      }
-
-      // Migrate legacy prompt overrides into centralized prompt settings
-      // Only run this migration once - check the flag to prevent re-migration
-      if (!this.promptSettings.legacyMigrationComplete) {
-        const defaultStorySettings = getDefaultStoryGenerationSettings()
-        const defaultWizardSettings = getDefaultAdvancedSettings()
-        const defaultSystemServices = getDefaultSystemServicesSettingsForProvider(
-          this.getDefaultProviderType(),
-        )
-        const overrideIds = new SvelteSet(
-          this.promptSettings.templateOverrides.map((o) => o.templateId),
-        )
-
-        const addOverride = (
-          templateId: string,
-          content?: string | null,
-          defaultContent?: string | null,
-        ) => {
-          if (!content) return
-          if (overrideIds.has(templateId)) return
-          if (defaultContent !== undefined && content === defaultContent) return
-          this.promptSettings.templateOverrides.push({ templateId, content })
-          overrideIds.add(templateId)
-        }
-
-        // Story generation prompts
-        addOverride(
-          'adventure',
-          this.storyGenerationSettings.adventurePrompt,
-          defaultStorySettings.adventurePrompt,
-        )
-        addOverride(
-          'creative-writing',
-          this.storyGenerationSettings.creativeWritingPrompt,
-          defaultStorySettings.creativeWritingPrompt,
-        )
-
-        // System services prompts
-        addOverride(
-          'classifier',
-          this.systemServicesSettings.classifier.systemPrompt,
-          defaultSystemServices.classifier.systemPrompt,
-        )
-        addOverride(
-          'suggestions',
-          this.systemServicesSettings.suggestions.systemPrompt,
-          defaultSystemServices.suggestions.systemPrompt,
-        )
-        addOverride(
-          'style-reviewer',
-          this.systemServicesSettings.styleReviewer.systemPrompt,
-          defaultSystemServices.styleReviewer.systemPrompt,
-        )
-        addOverride(
-          'lore-management',
-          this.systemServicesSettings.loreManagement.systemPrompt,
-          defaultSystemServices.loreManagement.systemPrompt,
-        )
-        addOverride(
-          'agentic-retrieval',
-          this.systemServicesSettings.agenticRetrieval.systemPrompt,
-          defaultSystemServices.agenticRetrieval.systemPrompt,
-        )
-        addOverride(
-          'timeline-fill',
-          this.systemServicesSettings.timelineFill?.systemPrompt,
-          defaultSystemServices.timelineFill?.systemPrompt,
-        )
-        addOverride(
-          'timeline-fill-answer',
-          this.systemServicesSettings.timelineFill?.queryAnswerPrompt,
-          defaultSystemServices.timelineFill?.queryAnswerPrompt,
-        )
-        addOverride(
-          'lorebook-classifier',
-          this.systemServicesSettings.lorebookClassifier.systemPrompt,
-          defaultSystemServices.lorebookClassifier.systemPrompt,
-        )
-
-        // Wizard prompts
-        addOverride(
-          'setting-expansion',
-          this.wizardSettings.settingExpansion.systemPrompt,
-          defaultWizardSettings.settingExpansion.systemPrompt,
-        )
-        addOverride(
-          'protagonist-generation',
-          this.wizardSettings.protagonistGeneration.systemPrompt,
-          defaultWizardSettings.protagonistGeneration.systemPrompt,
-        )
-        addOverride(
-          'character-elaboration',
-          this.wizardSettings.characterElaboration.systemPrompt,
-          defaultWizardSettings.characterElaboration.systemPrompt,
-        )
-        addOverride(
-          'supporting-characters',
-          this.wizardSettings.supportingCharacters.systemPrompt,
-          defaultWizardSettings.supportingCharacters.systemPrompt,
-        )
-
-        if (this.wizardSettings.openingGeneration.systemPrompt) {
-          const converted = this.wizardSettings.openingGeneration.systemPrompt
-            .replace(/\{userName\}/g, '{{protagonistName}}')
-            .replace(/\{genreLabel\}/g, '{{genreLabel}}')
-            .replace(/\{mode\}/g, '{{mode}}')
-            .replace(/\{tense\}/g, '{{tenseInstruction}}')
-            .replace(/\{tone\}/g, '{{tone}}')
-          addOverride('opening-generation-adventure', converted, '')
-          addOverride('opening-generation-creative', converted, '')
-        }
-
-        // Mark migration as complete so it doesn't run again
-        this.promptSettings.legacyMigrationComplete = true
-
-        // Always save after migration to persist the legacyMigrationComplete flag
-        await database.setSetting('prompt_settings', JSON.stringify(this.promptSettings))
-      }
-
-      // Initialize the centralized prompt service with loaded settings
-      promptService.init(this.promptSettings)
 
       // Ensure default image generation profiles are set
       await this.migrateImageProfileDefaults()
@@ -2522,13 +2286,6 @@ class SettingsStore {
     }
   }
 
-  private stripWizardSystemPrompts() {
-    if (!this.promptSettings.legacyMigrationComplete) return
-    for (const process of Object.values(this.wizardSettings)) {
-      process.systemPrompt = undefined
-    }
-  }
-
   async setFontFamily(fontFamily: string, source: FontSource) {
     this.uiSettings.fontFamily = fontFamily
     this.uiSettings.fontSource = source
@@ -2599,7 +2356,6 @@ class SettingsStore {
 
   // Wizard settings methods
   async saveWizardSettings() {
-    this.stripWizardSystemPrompts()
     await database.setSetting('wizard_settings', JSON.stringify(this.wizardSettings))
   }
 
@@ -2612,19 +2368,6 @@ class SettingsStore {
   async resetAllWizardSettings() {
     this.wizardSettings = getDefaultAdvancedSettingsForProvider(this.getDefaultProviderType())
     await this.saveWizardSettings()
-  }
-
-  // Story generation settings methods
-  async saveStoryGenerationSettings() {
-    await database.setSetting(
-      'story_generation_settings',
-      JSON.stringify(this.storyGenerationSettings),
-    )
-  }
-
-  async resetStoryGenerationSettings() {
-    this.storyGenerationSettings = getDefaultStoryGenerationSettings()
-    await this.saveStoryGenerationSettings()
   }
 
   // System services settings methods
@@ -2920,43 +2663,6 @@ class SettingsStore {
     await this.saveUpdateSettings()
   }
 
-  // Prompt settings methods
-  async savePromptSettings() {
-    await database.setSetting('prompt_settings', JSON.stringify(this.promptSettings))
-    // Re-initialize the prompt service with updated settings
-    promptService.init(this.promptSettings)
-  }
-
-  async resetPromptSettings() {
-    this.promptSettings = getDefaultPromptSettings()
-    await this.savePromptSettings()
-  }
-
-  /**
-   * Update a template override in prompt settings
-   */
-  async setTemplateOverride(templateId: string, content: string) {
-    const existingIndex = this.promptSettings.templateOverrides.findIndex(
-      (o) => o.templateId === templateId,
-    )
-    if (existingIndex >= 0) {
-      this.promptSettings.templateOverrides[existingIndex].content = content
-    } else {
-      this.promptSettings.templateOverrides.push({ templateId, content })
-    }
-    await this.savePromptSettings()
-  }
-
-  /**
-   * Remove a template override (reset to default)
-   */
-  async removeTemplateOverride(templateId: string) {
-    this.promptSettings.templateOverrides = this.promptSettings.templateOverrides.filter(
-      (o) => o.templateId !== templateId,
-    )
-    await this.savePromptSettings()
-  }
-
   /**
    * Reset ALL settings to their default values based on the current provider preset.
    * This preserves the API key and URL but resets everything else.
@@ -3020,17 +2726,11 @@ class SettingsStore {
     // Reset wizard settings based on provider
     this.wizardSettings = getDefaultAdvancedSettingsForProvider(provider)
 
-    // Reset story generation settings
-    this.storyGenerationSettings = getDefaultStoryGenerationSettings()
-
     // Reset system services settings based on provider
     this.systemServicesSettings = getDefaultSystemServicesSettingsForProvider(provider)
 
     // Reset update settings
     this.updateSettings = getDefaultUpdateSettings()
-
-    // Reset prompt settings
-    this.promptSettings = getDefaultPromptSettings()
 
     // Save all to database
     await database.setSetting('default_model', this.apiSettings.defaultModel)
@@ -3055,10 +2755,8 @@ class SettingsStore {
       this.advancedRequestSettings.manualMode.toString(),
     )
     await this.saveWizardSettings()
-    await this.saveStoryGenerationSettings()
     await this.saveSystemServicesSettings()
     await this.saveUpdateSettings()
-    await this.savePromptSettings()
 
     // Apply theme and font size
     this.applyTheme(this.uiSettings.theme)

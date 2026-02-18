@@ -183,6 +183,18 @@ pub fn run() {
             description: "branch_entity_snapshots",
             sql: include_str!("../migrations/029_branch_entity_snapshots.sql"),
             kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 30,
+            description: "preset_packs",
+            sql: include_str!("../migrations/025_preset_packs.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 31,
+            description: "pack_variable_extensions",
+            sql: include_str!("../migrations/030_pack_variable_extensions.sql"),
+            kind: MigrationKind::Up,
         }
     ];
 

@@ -17,7 +17,6 @@ import {
   supportsImageGeneration,
 } from './providers/registry'
 import { database } from '$lib/services/database'
-import { promptService } from '$lib/services/prompts'
 import { settings } from '$lib/stores/settings.svelte'
 import { emitImageQueued, emitImageReady } from '$lib/services/events'
 import { normalizeImageDataUrl } from '$lib/utils/image'
@@ -163,7 +162,7 @@ export class InlineImageGenerationService {
     }
 
     // Build full prompt with style
-    const stylePrompt = this.getStylePrompt(imageSettings.styleId)
+    const stylePrompt = await this.getStylePrompt(imageSettings.styleId)
     const fullPrompt = `${tag.prompt}. ${stylePrompt}`
 
     const { width, height } = parseImageSize(sizeToUse)
@@ -210,33 +209,20 @@ export class InlineImageGenerationService {
   }
 
   /**
-   * Get the style prompt for the selected style ID
+   * Get the style prompt for the selected style ID.
+   * Image style templates are external (raw text) -- fetched directly from the database.
    */
-  private getStylePrompt(styleId: string): string {
-    // Try to get from prompt service (user may have customized)
+  private async getStylePrompt(styleId: string): Promise<string> {
     try {
-      const promptContext = {
-        mode: 'adventure' as const,
-        pov: 'second' as const,
-        tense: 'present' as const,
-        protagonistName: '',
-      }
-      const customized = promptService.getPrompt(styleId, promptContext)
-      if (customized) {
-        return customized
+      const template = await database.getPackTemplate('default-pack', styleId)
+      if (template?.content) {
+        return template.content
       }
     } catch {
       // Template not found, use fallback
     }
 
-    // Fallback to default styles
-    const defaultStyles: Record<string, string> = {
-      'image-style-soft-anime': DEFAULT_FALLBACK_STYLE_PROMPT,
-      'image-style-semi-realistic': `Semi-realistic anime art with refined, detailed rendering. Realistic proportions with anime influence. Detailed hair strands, subtle skin tones, fabric folds. Naturalistic lighting with clear direction and soft falloff. Cinematic composition with depth of field. Rich, slightly desaturated colors with intentional color grading. Painterly quality with polished edges. Atmospheric and grounded mood.`,
-      'image-style-photorealistic': `Photorealistic digital art. True-to-life rendering with natural lighting. Detailed textures, accurate proportions. Professional photography aesthetic. Cinematic depth of field. High dynamic range. Realistic materials and surfaces.`,
-    }
-
-    return defaultStyles[styleId] || defaultStyles['image-style-soft-anime']
+    return DEFAULT_FALLBACK_STYLE_PROMPT
   }
 
   /**
