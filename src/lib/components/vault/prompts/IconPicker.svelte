@@ -59,8 +59,7 @@
   let open = $state(false)
   let search = $state('')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  type IconEntry = { name: string; component: any }
+  type IconEntry = { name: string; component: typeof Heart }
 
   const ICONS: IconEntry[] = [
     { name: 'Heart', component: Heart },

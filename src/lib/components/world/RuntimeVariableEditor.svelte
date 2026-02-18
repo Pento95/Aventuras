@@ -56,8 +56,7 @@
 
   let { definition, currentValue, onChange }: Props = $props()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ICON_MAP: Record<string, any> = {
+  const ICON_MAP: Record<string, typeof Heart> = {
     Heart,
     Shield,
     Sword,
