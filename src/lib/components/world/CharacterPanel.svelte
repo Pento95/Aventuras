@@ -929,15 +929,26 @@
                     {character.translatedDescription ?? character.description}
                   </p>
                 {/if}
+
+                <!-- Runtime Variables (Non-pinned, collapsible) -->
+                {#if runtimeVarDefs.length > 0}
+                  <RuntimeVariableDisplay
+                    definitions={runtimeVarDefs}
+                    values={character.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                    entityId={character.id}
+                    pinnedOnly={false}
+                  />
+                {/if}
               </div>
             {/if}
 
-            <!-- Runtime Variables (Display) -->
+            <!-- Runtime Variables (Pinned, always visible) -->
             {#if runtimeVarDefs.length > 0}
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={character.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={character.id}
+                pinnedOnly={true}
               />
             {/if}
 

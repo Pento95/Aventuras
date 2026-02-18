@@ -257,14 +257,25 @@
               {currentLocation.translatedDescription ?? currentLocation.description}
             </p>
           </div>
+
+          <!-- Runtime Variables (Non-pinned, collapsible - Current) -->
+          {#if runtimeVarDefs.length > 0}
+            <RuntimeVariableDisplay
+              definitions={runtimeVarDefs}
+              values={currentLocation.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+              entityId={currentLocation.id}
+              pinnedOnly={false}
+            />
+          {/if}
         {/if}
 
-        <!-- Runtime Variables (Display - Current) -->
+        <!-- Runtime Variables (Pinned, always visible - Current) -->
         {#if runtimeVarDefs.length > 0}
           <RuntimeVariableDisplay
             definitions={runtimeVarDefs}
             values={currentLocation.metadata?.runtimeVars as RuntimeVarsMap | undefined}
             entityId={currentLocation.id}
+            pinnedOnly={true}
           />
         {/if}
 
@@ -441,14 +452,25 @@
                   {location.translatedDescription ?? location.description}
                 </p>
               </div>
+
+              <!-- Runtime Variables (Non-pinned, collapsible) -->
+              {#if runtimeVarDefs.length > 0}
+                <RuntimeVariableDisplay
+                  definitions={runtimeVarDefs}
+                  values={location.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                  entityId={location.id}
+                  pinnedOnly={false}
+                />
+              {/if}
             {/if}
 
-            <!-- Runtime Variables (Display) -->
+            <!-- Runtime Variables (Pinned, always visible) -->
             {#if runtimeVarDefs.length > 0}
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={location.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={location.id}
+                pinnedOnly={true}
               />
             {/if}
 

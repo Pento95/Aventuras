@@ -408,14 +408,25 @@
                   {item.translatedDescription ?? item.description}
                 </p>
               </div>
+
+              <!-- Runtime Variables (Non-pinned, collapsible - Equipped) -->
+              {#if runtimeVarDefs.length > 0}
+                <RuntimeVariableDisplay
+                  definitions={runtimeVarDefs}
+                  values={item.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                  entityId={item.id}
+                  pinnedOnly={false}
+                />
+              {/if}
             {/if}
 
-            <!-- Runtime Variables (Display - Equipped) -->
+            <!-- Runtime Variables (Pinned, always visible - Equipped) -->
             {#if runtimeVarDefs.length > 0}
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={item.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={item.id}
+                pinnedOnly={true}
               />
             {/if}
 
@@ -635,14 +646,25 @@
                   {item.translatedDescription ?? item.description}
                 </p>
               </div>
+
+              <!-- Runtime Variables (Non-pinned, collapsible - Backpack) -->
+              {#if runtimeVarDefs.length > 0}
+                <RuntimeVariableDisplay
+                  definitions={runtimeVarDefs}
+                  values={item.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                  entityId={item.id}
+                  pinnedOnly={false}
+                />
+              {/if}
             {/if}
 
-            <!-- Runtime Variables (Display - Backpack) -->
+            <!-- Runtime Variables (Pinned, always visible - Backpack) -->
             {#if runtimeVarDefs.length > 0}
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={item.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={item.id}
+                pinnedOnly={true}
               />
             {/if}
 
@@ -881,14 +903,25 @@
                   {item.translatedDescription ?? item.description}
                 </p>
               </div>
+
+              <!-- Runtime Variables (Non-pinned, collapsible - World) -->
+              {#if runtimeVarDefs.length > 0}
+                <RuntimeVariableDisplay
+                  definitions={runtimeVarDefs}
+                  values={item.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                  entityId={item.id}
+                  pinnedOnly={false}
+                />
+              {/if}
             {/if}
 
-            <!-- Runtime Variables (Display - World) -->
+            <!-- Runtime Variables (Pinned, always visible - World) -->
             {#if runtimeVarDefs.length > 0}
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={item.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={item.id}
+                pinnedOnly={true}
               />
             {/if}
 

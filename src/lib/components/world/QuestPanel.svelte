@@ -387,14 +387,25 @@
               <div class="text-muted-foreground mt-2 text-xs">
                 <p class="leading-relaxed whitespace-pre-wrap">{description}</p>
               </div>
+
+              <!-- Runtime Variables (Non-pinned, collapsible - Active) -->
+              {#if runtimeVarDefs.length > 0}
+                <RuntimeVariableDisplay
+                  definitions={runtimeVarDefs}
+                  values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                  entityId={beat.id}
+                  pinnedOnly={false}
+                />
+              {/if}
             {/if}
 
-            <!-- Runtime Variables (Display - Active) -->
+            <!-- Runtime Variables (Pinned, always visible - Active) -->
             {#if runtimeVarDefs.length > 0}
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={beat.id}
+                pinnedOnly={true}
               />
             {/if}
 
@@ -617,14 +628,25 @@
                 <div class="text-muted-foreground mt-2 text-xs">
                   <p class="leading-relaxed whitespace-pre-wrap">{description}</p>
                 </div>
+
+                <!-- Runtime Variables (Non-pinned, collapsible - History) -->
+                {#if runtimeVarDefs.length > 0}
+                  <RuntimeVariableDisplay
+                    definitions={runtimeVarDefs}
+                    values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
+                    entityId={beat.id}
+                    pinnedOnly={false}
+                  />
+                {/if}
               {/if}
 
-              <!-- Runtime Variables (Display - History) -->
+              <!-- Runtime Variables (Pinned, always visible - History) -->
               {#if runtimeVarDefs.length > 0}
                 <RuntimeVariableDisplay
                   definitions={runtimeVarDefs}
                   values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                   entityId={beat.id}
+                  pinnedOnly={true}
                 />
               {/if}
 

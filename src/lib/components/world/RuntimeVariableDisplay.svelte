@@ -57,9 +57,18 @@
     entityId: string
     onValueChange?: (defId: string, value: string | number | null) => void
     editMode?: boolean
+    /** Filter by pinned state: true = only pinned, false = only non-pinned, undefined = show all */
+    pinnedOnly?: boolean
   }
 
-  let { definitions, values, entityId, onValueChange, editMode = false }: Props = $props()
+  let {
+    definitions,
+    values,
+    entityId,
+    onValueChange,
+    editMode = false,
+    pinnedOnly = undefined,
+  }: Props = $props()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ICON_MAP: Record<string, any> = {
@@ -110,6 +119,14 @@
 
   const sorted = $derived([...definitions].sort((a, b) => a.sortOrder - b.sortOrder))
 
+  const filtered = $derived(
+    pinnedOnly === undefined
+      ? sorted
+      : pinnedOnly
+        ? sorted.filter((d) => d.pinned)
+        : sorted.filter((d) => !d.pinned),
+  )
+
   function getValue(def: RuntimeVariable): RuntimeVariableValue | undefined {
     return values?.[def.id]
   }
@@ -142,160 +159,159 @@
   }
 </script>
 
-{#if sorted.length > 0}
+{#if filtered.length > 0}
   <div class="border-border/50 mt-2 border-t pt-2">
-    <div class="flex flex-col gap-1.5">
-      {#each sorted as def (def.id)}
-        {@const rawVal = getRawValue(def)}
-        {@const isSet = rawVal != null}
-        {@const icon = getIconComponent(def.icon)}
-
-        {#if editMode && onValueChange}
-          <!-- Edit mode: inline editors -->
+    {#if editMode && onValueChange}
+      <!-- Edit mode: vertical list of inline editors -->
+      <div class="flex flex-col gap-1.5">
+        {#each filtered as def (def.id)}
+          {@const rawVal = getRawValue(def)}
           <RuntimeVariableEditor
             definition={def}
             currentValue={rawVal}
             onChange={(v) => onValueChange(def.id, v)}
           />
-        {:else}
-          <!-- Display mode -->
-          <div class="flex min-h-[22px] items-center gap-2">
-            {#if def.variableType === 'number' && hasMinMax(def)}
-              <!-- Number with min/max: stat bar -->
-              <div class="flex w-full items-center gap-1.5">
-                <!-- Icon or label -->
-                <div class="flex w-5 shrink-0 items-center justify-center" title={def.displayName}>
-                  {#if icon}
-                    <svelte:component
-                      this={icon}
-                      class="h-3.5 w-3.5 {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    />
-                  {:else}
-                    <span
-                      class="truncate text-[10px] font-medium {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    >
-                      {def.displayName.slice(0, 2)}
-                    </span>
-                  {/if}
-                </div>
+        {/each}
+      </div>
+    {:else}
+      <!-- Display mode: flowing chip layout -->
+      <div class="flex flex-wrap gap-1.5">
+        {#each filtered as def (def.id)}
+          {@const rawVal = getRawValue(def)}
+          {@const isSet = rawVal != null}
+          {@const Icon = getIconComponent(def.icon)}
 
-                {#if isSet && typeof rawVal === 'number'}
-                  <!-- Progress bar -->
-                  <div class="bg-muted relative h-4 flex-1 overflow-hidden rounded-sm">
-                    <div
-                      class="h-full rounded-sm transition-all duration-300"
-                      style="width: {getProgressPercent(
-                        def,
-                        rawVal,
-                      )}%; background-color: {def.color}; opacity: 0.7"
-                    ></div>
-                    <span
-                      class="text-foreground absolute inset-0 flex items-center justify-center text-[10px] font-medium mix-blend-normal"
-                    >
-                      {rawVal}/{def.maxValue}
-                    </span>
-                  </div>
-                {:else}
-                  <span class="text-muted-foreground text-[10px] italic">Not set</span>
-                {/if}
-              </div>
-            {:else if def.variableType === 'number'}
-              <!-- Number without min/max -->
-              <div class="flex w-full items-center gap-1.5">
-                <div class="flex w-5 shrink-0 items-center justify-center" title={def.displayName}>
-                  {#if icon}
-                    <svelte:component
-                      this={icon}
-                      class="h-3.5 w-3.5 {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    />
-                  {:else}
-                    <span
-                      class="text-[10px] font-medium {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    >
-                      {def.displayName.slice(0, 2)}
-                    </span>
-                  {/if}
-                </div>
-                <span class="text-muted-foreground flex-1 truncate text-xs">{def.displayName}</span>
-                {#if isSet}
-                  <span class="text-xs font-medium tabular-nums" style="color: {def.color}"
-                    >{rawVal}</span
-                  >
-                {:else}
-                  <span class="text-muted-foreground text-[10px] italic">Not set</span>
-                {/if}
-              </div>
-            {:else if def.variableType === 'enum'}
-              <!-- Enum: badge/pill -->
-              <div class="flex w-full items-center gap-1.5">
-                <div class="flex w-5 shrink-0 items-center justify-center" title={def.displayName}>
-                  {#if icon}
-                    <svelte:component
-                      this={icon}
-                      class="h-3.5 w-3.5 {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    />
-                  {:else}
-                    <span
-                      class="text-[10px] font-medium {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    >
-                      {def.displayName.slice(0, 2)}
-                    </span>
-                  {/if}
-                </div>
-                <span class="text-muted-foreground flex-1 truncate text-xs">{def.displayName}</span>
-                {#if isSet}
+          {#if def.variableType === 'number' && hasMinMax(def)}
+            <!-- Number with range: chip with stat bar -->
+            <div
+              class="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+              style="background-color: color-mix(in srgb, {def.color} {isSet
+                ? '12%'
+                : '6%'}, transparent)"
+            >
+              {#if Icon}
+                <Icon
+                  class="h-3.5 w-3.5 shrink-0 {isSet ? '' : 'opacity-40'}"
+                  style="color: {def.color}"
+                />
+              {/if}
+              <span
+                class="text-[10px] font-medium whitespace-nowrap {isSet ? '' : 'opacity-40'}"
+                style="color: {def.color}"
+              >
+                {def.displayName}
+              </span>
+              {#if isSet && typeof rawVal === 'number'}
+                <div class="bg-muted/50 relative h-3.5 w-16 overflow-hidden rounded-sm">
+                  <div
+                    class="h-full rounded-sm"
+                    style="width: {getProgressPercent(
+                      def,
+                      rawVal,
+                    )}%; background-color: {def.color}; opacity: 0.6"
+                  ></div>
                   <span
-                    class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-medium"
-                    style="background-color: color-mix(in srgb, {def.color} 15%, transparent); color: {def.color}"
-                  >
-                    {getEnumLabel(def, rawVal)}
-                  </span>
-                {:else}
-                  <span class="text-muted-foreground text-[10px] italic">Not set</span>
-                {/if}
-              </div>
-            {:else}
-              <!-- Text -->
-              <div class="flex w-full items-center gap-1.5">
-                <div class="flex w-5 shrink-0 items-center justify-center" title={def.displayName}>
-                  {#if icon}
-                    <svelte:component
-                      this={icon}
-                      class="h-3.5 w-3.5 {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    />
-                  {:else}
-                    <span
-                      class="text-[10px] font-medium {isSet ? '' : 'opacity-40'}"
-                      style="color: {def.color}"
-                    >
-                      {def.displayName.slice(0, 2)}
-                    </span>
-                  {/if}
-                </div>
-                <span class="text-muted-foreground flex-1 truncate text-xs">{def.displayName}</span>
-                {#if isSet}
-                  <span
-                    class="max-w-[120px] truncate text-xs"
+                    class="absolute inset-0 flex items-center justify-center text-[9px] font-bold tabular-nums"
                     style="color: {def.color}"
-                    title={String(rawVal)}
                   >
-                    {rawVal}
+                    {rawVal}/{def.maxValue}
                   </span>
-                {:else}
-                  <span class="text-muted-foreground text-[10px] italic">Not set</span>
-                {/if}
-              </div>
-            {/if}
-          </div>
-        {/if}
-      {/each}
-    </div>
+                </div>
+              {:else}
+                <span class="text-[10px] italic opacity-40">--</span>
+              {/if}
+            </div>
+          {:else if def.variableType === 'number'}
+            <!-- Number without range: chip with value -->
+            <div
+              class="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+              style="background-color: color-mix(in srgb, {def.color} {isSet
+                ? '12%'
+                : '6%'}, transparent)"
+            >
+              {#if Icon}
+                <Icon
+                  class="h-3.5 w-3.5 shrink-0 {isSet ? '' : 'opacity-40'}"
+                  style="color: {def.color}"
+                />
+              {/if}
+              <span
+                class="text-[10px] font-medium whitespace-nowrap {isSet ? '' : 'opacity-40'}"
+                style="color: {def.color}"
+              >
+                {def.displayName}
+              </span>
+              {#if isSet}
+                <span class="text-xs font-bold tabular-nums" style="color: {def.color}"
+                  >{rawVal}</span
+                >
+              {:else}
+                <span class="text-[10px] italic opacity-40">--</span>
+              {/if}
+            </div>
+          {:else if def.variableType === 'enum'}
+            <!-- Enum: colored badge chip -->
+            <div
+              class="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+              style="background-color: color-mix(in srgb, {def.color} {isSet
+                ? '12%'
+                : '6%'}, transparent)"
+            >
+              {#if Icon}
+                <Icon
+                  class="h-3.5 w-3.5 shrink-0 {isSet ? '' : 'opacity-40'}"
+                  style="color: {def.color}"
+                />
+              {/if}
+              <span
+                class="text-[10px] font-medium whitespace-nowrap {isSet ? '' : 'opacity-40'}"
+                style="color: {def.color}"
+              >
+                {def.displayName}
+              </span>
+              {#if isSet}
+                <span class="text-[10px] font-bold" style="color: {def.color}">
+                  {getEnumLabel(def, rawVal)}
+                </span>
+              {:else}
+                <span class="text-[10px] italic opacity-40">--</span>
+              {/if}
+            </div>
+          {:else}
+            <!-- Text: colored text chip -->
+            <div
+              class="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+              style="background-color: color-mix(in srgb, {def.color} {isSet
+                ? '12%'
+                : '6%'}, transparent)"
+            >
+              {#if Icon}
+                <Icon
+                  class="h-3.5 w-3.5 shrink-0 {isSet ? '' : 'opacity-40'}"
+                  style="color: {def.color}"
+                />
+              {/if}
+              <span
+                class="text-[10px] font-medium whitespace-nowrap {isSet ? '' : 'opacity-40'}"
+                style="color: {def.color}"
+              >
+                {def.displayName}
+              </span>
+              {#if isSet}
+                <span
+                  class="max-w-[100px] truncate text-[10px] font-medium"
+                  style="color: {def.color}"
+                  title={String(rawVal)}
+                >
+                  {rawVal}
+                </span>
+              {:else}
+                <span class="text-[10px] italic opacity-40">--</span>
+              {/if}
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
   </div>
 {/if}
