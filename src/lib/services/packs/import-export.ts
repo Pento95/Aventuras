@@ -132,6 +132,12 @@ class ImportExportService {
       if (existingPack.isDefault) {
         throw new Error('Cannot replace the default pack')
       }
+      const usageCount = await database.getPackUsageCount(existingPack.id)
+      if (usageCount > 0) {
+        throw new Error(
+          `Cannot replace pack "${existingPack.name}" — it is used by ${usageCount} ${usageCount === 1 ? 'story' : 'stories'}. Reassign them first.`,
+        )
+      }
       await database.deletePack(existingPack.id)
     }
 

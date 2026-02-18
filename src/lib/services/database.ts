@@ -3345,7 +3345,12 @@ class DatabaseService {
       [storyId],
     )
     if (results.length === 0 || !results[0].custom_variable_values) return null
-    return JSON.parse(results[0].custom_variable_values)
+    try {
+      return JSON.parse(results[0].custom_variable_values)
+    } catch {
+      console.error('[Database] Malformed custom_variable_values JSON for story:', storyId)
+      return null
+    }
   }
 
   /**
@@ -3425,7 +3430,15 @@ class DatabaseService {
       isRequired: row.is_required === 1,
       sortOrder: row.sort_order ?? 0,
       defaultValue: row.default_value ?? undefined,
-      enumOptions: row.enum_options ? JSON.parse(row.enum_options) : undefined,
+      enumOptions: row.enum_options
+        ? (() => {
+            try {
+              return JSON.parse(row.enum_options)
+            } catch {
+              return undefined
+            }
+          })()
+        : undefined,
       createdAt: row.created_at,
     }
   }

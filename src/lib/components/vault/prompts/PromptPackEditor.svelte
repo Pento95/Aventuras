@@ -188,7 +188,8 @@
   // Dirty dialog actions
   async function handleSaveAndSwitch() {
     if (editorRef) {
-      await editorRef.save()
+      const saved = await editorRef.save()
+      if (!saved) return
     }
     isEditorDirty = false
     showDirtyDialog = false
@@ -345,86 +346,86 @@
 
     <!-- Bottom toolbar (mobile only) -->
     {#if selectedTemplateId && editorRef && isMobile.current}
-        <!-- Mobile: full bottom toolbar (unchanged) -->
-        <div class="border-t"></div>
-        <div class="flex items-center gap-1 px-4 py-1.5">
+      <!-- Mobile: full bottom toolbar (unchanged) -->
+      <div class="border-t"></div>
+      <div class="flex items-center gap-1 px-4 py-1.5">
+        <ToggleGroup.Root
+          type="single"
+          value={mobileView}
+          onValueChange={(v) => {
+            if (v) mobileView = v as 'editor' | 'preview'
+          }}
+          variant="outline"
+          size="sm"
+          class="gap-0"
+        >
+          <ToggleGroup.Item value="editor" class="h-7 w-7 rounded-r-none" title="Editor">
+            <Pencil class="h-3.5 w-3.5" />
+          </ToggleGroup.Item>
+          <ToggleGroup.Item value="preview" class="h-7 w-7 rounded-l-none" title="Preview">
+            <Eye class="h-3.5 w-3.5" />
+          </ToggleGroup.Item>
+        </ToggleGroup.Root>
+
+        {#if editorHasUserContent}
           <ToggleGroup.Root
             type="single"
-            value={mobileView}
+            value={editorActiveTab}
             onValueChange={(v) => {
-              if (v) mobileView = v as 'editor' | 'preview'
+              if (v) editorActiveTab = v as 'system' | 'user'
             }}
             variant="outline"
             size="sm"
             class="gap-0"
           >
-            <ToggleGroup.Item value="editor" class="h-7 w-7 rounded-r-none" title="Editor">
-              <Pencil class="h-3.5 w-3.5" />
-            </ToggleGroup.Item>
-            <ToggleGroup.Item value="preview" class="h-7 w-7 rounded-l-none" title="Preview">
-              <Eye class="h-3.5 w-3.5" />
-            </ToggleGroup.Item>
+            <ToggleGroup.Item value="system" class="h-7 rounded-r-none px-2.5 text-xs"
+              >System</ToggleGroup.Item
+            >
+            <ToggleGroup.Item value="user" class="h-7 rounded-l-none px-2.5 text-xs"
+              >User</ToggleGroup.Item
+            >
           </ToggleGroup.Root>
+        {/if}
 
-          {#if editorHasUserContent}
-            <ToggleGroup.Root
-              type="single"
-              value={editorActiveTab}
-              onValueChange={(v) => {
-                if (v) editorActiveTab = v as 'system' | 'user'
-              }}
-              variant="outline"
-              size="sm"
-              class="gap-0"
-            >
-              <ToggleGroup.Item value="system" class="h-7 rounded-r-none px-2.5 text-xs"
-                >System</ToggleGroup.Item
-              >
-              <ToggleGroup.Item value="user" class="h-7 rounded-l-none px-2.5 text-xs"
-                >User</ToggleGroup.Item
-              >
-            </ToggleGroup.Root>
-          {/if}
+        <VariablePalette
+          customVariables={fullPack?.variables ?? []}
+          onInsert={(name) => editorRef?.insertVariable(name)}
+        />
 
-          <VariablePalette
-            customVariables={fullPack?.variables ?? []}
-            onInsert={(name) => editorRef?.insertVariable(name)}
-          />
+        <div class="ml-auto flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8"
+            disabled={!isEditorDirty}
+            onclick={() => editorRef?.save()}
+            title="Save"
+          >
+            <Save class="h-3.5 w-3.5" />
+          </Button>
 
-          <div class="ml-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              disabled={!isEditorDirty}
-              onclick={() => editorRef?.save()}
-              title="Save"
-            >
-              <Save class="h-3.5 w-3.5" />
-            </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8"
+            disabled={!isEditorDirty}
+            onclick={() => editorRef?.discard()}
+            title="Discard"
+          >
+            <Undo2 class="h-3.5 w-3.5" />
+          </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              disabled={!isEditorDirty}
-              onclick={() => editorRef?.discard()}
-              title="Discard"
-            >
-              <Undo2 class="h-3.5 w-3.5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8"
-              onclick={() => editorRef?.reset()}
-              title="Reset to default"
-            >
-              <RotateCcw class="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8"
+            onclick={() => editorRef?.reset()}
+            title="Reset to default"
+          >
+            <RotateCcw class="h-3.5 w-3.5" />
+          </Button>
         </div>
+      </div>
     {/if}
   </div>
 

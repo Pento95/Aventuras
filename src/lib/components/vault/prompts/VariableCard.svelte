@@ -27,28 +27,32 @@
   let editDefault = $state('')
   let editEnumOptions = $state<EnumOption[]>([])
   let showDeleteConfirm = $state(false)
+  let lastVariableId = ''
 
-  // Sync edit state from variable prop (runs on mount and when variable prop changes)
+  // Sync edit state from variable prop only when the variable identity changes (different variable swapped in)
   $effect.pre(() => {
-    editName = variable.variableName
-    editDisplayName = variable.displayName
-    editDescription = variable.description ?? ''
-    editType = variable.variableType
-    editDefault = variable.defaultValue ?? ''
-    editEnumOptions = variable.enumOptions
-      ? structuredClone($state.snapshot(variable.enumOptions))
-      : []
-    expanded = initialExpanded
-    showDeleteConfirm = false
+    if (variable.id !== lastVariableId) {
+      lastVariableId = variable.id
+      editName = variable.variableName
+      editDisplayName = variable.displayName
+      editDescription = variable.description ?? ''
+      editType = variable.variableType
+      editDefault = variable.defaultValue ?? ''
+      editEnumOptions = variable.enumOptions
+        ? structuredClone($state.snapshot(variable.enumOptions))
+        : []
+      expanded = initialExpanded
+      showDeleteConfirm = false
+    }
   })
 
-  const VARIABLE_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+  const VARIABLE_NAME_REGEX = /^[a-z_][a-z0-9_]*$/
 
   let nameError = $derived(
     editName.length === 0
       ? 'Variable name is required'
       : !VARIABLE_NAME_REGEX.test(editName)
-        ? 'Must start with letter or underscore, only alphanumeric and underscores'
+        ? 'Lowercase letters, numbers, and underscores only (e.g. my_variable)'
         : null,
   )
 
