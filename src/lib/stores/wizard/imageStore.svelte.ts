@@ -70,7 +70,7 @@ export class ImageStore {
 
     log('Starting protagonist portrait generation', {
       protagonistName: protagonist.name,
-      model: imageSettings.portraitModel,
+      model: settings.getImageProfile(imageSettings.portraitProfileId ?? '')?.model ?? '',
       styleId: imageSettings.portraitStyleId,
     })
 
@@ -129,7 +129,7 @@ export class ImageStore {
 
     log('Starting supporting character portrait generation', {
       characterName: charName,
-      model: imageSettings.portraitModel,
+      model: settings.getImageProfile(imageSettings.portraitProfileId ?? '')?.model ?? '',
       styleId: imageSettings.portraitStyleId,
     })
 
