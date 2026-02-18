@@ -949,6 +949,7 @@
                 values={character.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={character.id}
                 pinnedOnly={true}
+                class={isCollapsed ? 'mt-2' : 'mt-1'}
               />
             {/if}
 

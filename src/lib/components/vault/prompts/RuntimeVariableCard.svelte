@@ -525,13 +525,7 @@
         />
       </div>
 
-      <!-- Color -->
-      <div class="space-y-1.5">
-        <Label>Color</Label>
-        <ColorPicker value={editColor} onChange={handleColorChange} />
-      </div>
-
-      <!-- Label Style: icon or display name -->
+      <!-- Panel Label & Color -->
       <div class="space-y-1.5">
         <Label>Panel Label</Label>
         <p class="text-muted-foreground text-xs">What to show as the label on entity panels</p>
@@ -574,6 +568,13 @@
             />
           </div>
         {/if}
+
+        <div class="mt-2">
+          <Label>Color</Label>
+          <div class="mt-1">
+            <ColorPicker value={editColor} onChange={handleColorChange} />
+          </div>
+        </div>
       </div>
 
       <!-- Default Value -->

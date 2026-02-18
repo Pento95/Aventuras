@@ -265,6 +265,7 @@
               values={currentLocation.metadata?.runtimeVars as RuntimeVarsMap | undefined}
               entityId={currentLocation.id}
               pinnedOnly={false}
+              class="mt-1.5"
             />
           {/if}
         {/if}
@@ -276,6 +277,7 @@
             values={currentLocation.metadata?.runtimeVars as RuntimeVarsMap | undefined}
             entityId={currentLocation.id}
             pinnedOnly={true}
+            class={isCollapsed ? 'mt-2' : 'mt-1'}
           />
         {/if}
 
@@ -460,6 +462,7 @@
                   values={location.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                   entityId={location.id}
                   pinnedOnly={false}
+                  class="mt-1.5"
                 />
               {/if}
             {/if}
@@ -471,6 +474,7 @@
                 values={location.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={location.id}
                 pinnedOnly={true}
+                class={isCollapsed ? 'mt-2' : 'mt-1'}
               />
             {/if}
 

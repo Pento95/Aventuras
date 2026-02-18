@@ -59,6 +59,7 @@
     editMode?: boolean
     /** Filter by pinned state: true = only pinned, false = only non-pinned, undefined = show all */
     pinnedOnly?: boolean
+    class?: string
   }
 
   let {
@@ -68,6 +69,7 @@
     onValueChange,
     editMode = false,
     pinnedOnly = undefined,
+    class: className = '',
   }: Props = $props()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,7 +162,7 @@
 </script>
 
 {#if filtered.length > 0}
-  <div class="mt-2 flex flex-col gap-1">
+  <div class="flex flex-col gap-1 {className}">
     {#if editMode && onValueChange}
       <!-- Edit mode: vertical list of inline editors -->
       {#each filtered as def (def.id)}

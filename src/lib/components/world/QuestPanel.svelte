@@ -395,6 +395,7 @@
                   values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                   entityId={beat.id}
                   pinnedOnly={false}
+                  class="mt-1.5"
                 />
               {/if}
             {/if}
@@ -406,6 +407,7 @@
                 values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                 entityId={beat.id}
                 pinnedOnly={true}
+                class={isCollapsed ? 'mt-2' : 'mt-1'}
               />
             {/if}
 
@@ -636,6 +638,7 @@
                     values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                     entityId={beat.id}
                     pinnedOnly={false}
+                    class="mt-1.5"
                   />
                 {/if}
               {/if}
@@ -647,6 +650,7 @@
                   values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
                   entityId={beat.id}
                   pinnedOnly={true}
+                  class={isCollapsed ? 'mt-2' : 'mt-1'}
                 />
               {/if}
 
