@@ -330,7 +330,6 @@
                   <RuntimeVariableDisplay
                     definitions={runtimeVarDefs}
                     values={editRuntimeVars}
-                    entityId={beat.id}
                     editMode={true}
                     onValueChange={(defId, value) => {
                       const def = runtimeVarDefs.find((d) => d.id === defId)
@@ -567,7 +566,6 @@
                     <RuntimeVariableDisplay
                       definitions={runtimeVarDefs}
                       values={editRuntimeVars}
-                      entityId={beat.id}
                       editMode={true}
                       onValueChange={(defId, value) => {
                         const def = runtimeVarDefs.find((d) => d.id === defId)
@@ -636,7 +634,6 @@
                   <RuntimeVariableDisplay
                     definitions={runtimeVarDefs}
                     values={beat.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-                    entityId={beat.id}
                     pinnedOnly={false}
                     class="mt-1.5"
                   />

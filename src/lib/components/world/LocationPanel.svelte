@@ -205,7 +205,6 @@
             <RuntimeVariableDisplay
               definitions={runtimeVarDefs}
               values={editRuntimeVars}
-              entityId={currentLocation.id}
               editMode={true}
               onValueChange={(defId, value) => {
                 const def = runtimeVarDefs.find((d) => d.id === defId)
@@ -263,7 +262,6 @@
             <RuntimeVariableDisplay
               definitions={runtimeVarDefs}
               values={currentLocation.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-              entityId={currentLocation.id}
               pinnedOnly={false}
               class="mt-1.5"
             />
@@ -275,7 +273,6 @@
           <RuntimeVariableDisplay
             definitions={runtimeVarDefs}
             values={currentLocation.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-            entityId={currentLocation.id}
             pinnedOnly={true}
             class={isCollapsed ? 'mt-2' : 'mt-1'}
           />
@@ -386,7 +383,6 @@
                 <RuntimeVariableDisplay
                   definitions={runtimeVarDefs}
                   values={editRuntimeVars}
-                  entityId={location.id}
                   editMode={true}
                   onValueChange={(defId, value) => {
                     const def = runtimeVarDefs.find((d) => d.id === defId)
@@ -460,7 +456,6 @@
                 <RuntimeVariableDisplay
                   definitions={runtimeVarDefs}
                   values={location.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-                  entityId={location.id}
                   pinnedOnly={false}
                   class="mt-1.5"
                 />
@@ -472,7 +467,6 @@
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={location.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-                entityId={location.id}
                 pinnedOnly={true}
                 class={isCollapsed ? 'mt-2' : 'mt-1'}
               />

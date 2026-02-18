@@ -644,7 +644,6 @@
                 <RuntimeVariableDisplay
                   definitions={runtimeVarDefs}
                   values={editRuntimeVars}
-                  entityId={character.id}
                   editMode={true}
                   onValueChange={(defId, value) => {
                     const def = runtimeVarDefs.find((d) => d.id === defId)
@@ -935,7 +934,6 @@
                   <RuntimeVariableDisplay
                     definitions={runtimeVarDefs}
                     values={character.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-                    entityId={character.id}
                     pinnedOnly={false}
                   />
                 {/if}
@@ -947,7 +945,6 @@
               <RuntimeVariableDisplay
                 definitions={runtimeVarDefs}
                 values={character.metadata?.runtimeVars as RuntimeVarsMap | undefined}
-                entityId={character.id}
                 pinnedOnly={true}
                 class={isCollapsed ? 'mt-2' : 'mt-1'}
               />

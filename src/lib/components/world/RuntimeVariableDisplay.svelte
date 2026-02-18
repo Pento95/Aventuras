@@ -54,7 +54,6 @@
   interface Props {
     definitions: RuntimeVariable[]
     values: RuntimeVarsMap | undefined
-    entityId: string
     onValueChange?: (defId: string, value: string | number | null) => void
     editMode?: boolean
     /** Filter by pinned state: true = only pinned, false = only non-pinned, undefined = show all */
@@ -65,15 +64,13 @@
   let {
     definitions,
     values,
-    entityId,
     onValueChange,
     editMode = false,
     pinnedOnly = undefined,
     class: className = '',
   }: Props = $props()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ICON_MAP: Record<string, any> = {
+  const ICON_MAP: Record<string, typeof Heart> = {
     Heart,
     Shield,
     Sword,
