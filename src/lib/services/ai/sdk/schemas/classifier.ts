@@ -194,6 +194,21 @@ export const classificationResultSchema = z.object({
 })
 
 // ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Clamp a number to min/max bounds if defined.
+ * Used after LLM extraction to enforce number constraints that can't be expressed in Zod schemas.
+ */
+export function clampNumber(value: number, min?: number, max?: number): number {
+  let result = value
+  if (min !== undefined && result < min) result = min
+  if (max !== undefined && result > max) result = max
+  return result
+}
+
+// ============================================================================
 // Type Exports
 // ============================================================================
 
