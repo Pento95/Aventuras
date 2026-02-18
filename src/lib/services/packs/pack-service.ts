@@ -92,12 +92,13 @@ class PackService {
     const pack = await database.getPack(packId)
     if (!pack) return null
 
-    const [templates, variables] = await Promise.all([
+    const [templates, variables, runtimeVariables] = await Promise.all([
       database.getPackTemplates(packId),
       database.getPackVariables(packId),
+      database.getRuntimeVariables(packId),
     ])
 
-    return { pack, templates, variables }
+    return { pack, templates, variables, runtimeVariables }
   }
 
   /** Create a new pack seeded from the pristine PROMPT_TEMPLATES baseline. */
