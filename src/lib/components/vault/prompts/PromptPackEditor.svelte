@@ -188,7 +188,8 @@
   // Dirty dialog actions
   async function handleSaveAndSwitch() {
     if (editorRef) {
-      await editorRef.save()
+      const saved = await editorRef.save()
+      if (!saved) return
     }
     isEditorDirty = false
     showDirtyDialog = false
