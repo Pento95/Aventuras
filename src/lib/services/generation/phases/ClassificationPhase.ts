@@ -17,7 +17,7 @@ import type {
   WorldState,
 } from '../types'
 import type { Story, StoryEntry, TimeTracker } from '$lib/types'
-import type { ExtendedClassificationResult } from '$lib/services/ai/sdk/schemas/runtime-variables'
+import type { ClassificationResult } from '$lib/services/ai/sdk/schemas/classifier'
 
 /** Dependencies for classification phase - injected to avoid tight coupling */
 export interface ClassificationDependencies {
@@ -28,7 +28,7 @@ export interface ClassificationDependencies {
     story: Story | null | undefined,
     chatHistoryEntries: StoryEntry[],
     timeTracker: TimeTracker | null | undefined,
-  ) => Promise<ExtendedClassificationResult>
+  ) => Promise<ClassificationResult>
 }
 
 /** Input for the classification phase */
@@ -44,7 +44,7 @@ export interface ClassificationInput {
 
 /** Result from classification phase */
 export interface ClassificationPhaseResult {
-  classificationResult: ExtendedClassificationResult
+  classificationResult: ClassificationResult
   narrativeEntryId: string
 }
 

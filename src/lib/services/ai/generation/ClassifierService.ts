@@ -23,11 +23,12 @@ import { ContextBuilder } from '$lib/services/context'
 import { database } from '$lib/services/database'
 import { createLogger } from '../core/config'
 import { generateStructured } from '../sdk/generate'
-import { classificationResultSchema, clampNumber } from '../sdk/schemas/classifier'
 import {
-  buildExtendedClassificationSchema,
-  type ExtendedClassificationResult,
-} from '../sdk/schemas/runtime-variables'
+  classificationResultSchema,
+  clampNumber,
+  type ClassificationResult,
+} from '../sdk/schemas/classifier'
+import { buildExtendedClassificationSchema } from '../sdk/schemas/runtime-variables'
 import type { RuntimeVariable, RuntimeEntityType } from '$lib/services/packs/types'
 
 const log = createLogger('Classifier')
@@ -67,7 +68,7 @@ export class ClassifierService {
     context: ClassificationContext,
     visibleEntries?: StoryEntry[],
     currentStoryTime?: TimeTracker | null,
-  ): Promise<ExtendedClassificationResult> {
+  ): Promise<ClassificationResult> {
     log('classify', {
       narrativeLength: context.narrativeResponse.length,
       existingCharacters: context.existingCharacters.length,
@@ -149,7 +150,7 @@ export class ClassifierService {
           prompt,
         },
         'classifier',
-      )) as ExtendedClassificationResult
+      )) as ClassificationResult
 
       // Post-process: clamp number values to min/max constraints
       if (runtimeVars.length > 0) {
@@ -282,7 +283,7 @@ export class ClassifierService {
    * Walks through all entity updates/new entities and clamps inline number values.
    */
   private clampRuntimeVarNumbers(
-    result: ExtendedClassificationResult,
+    result: ClassificationResult,
     varsByType: Record<string, RuntimeVariable[]>,
   ): void {
     const numberDefs = new Map<string, RuntimeVariable>()

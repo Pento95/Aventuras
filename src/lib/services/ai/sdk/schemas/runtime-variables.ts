@@ -26,7 +26,6 @@ import {
   storyBeatUpdateSchema,
   newStoryBeatSchema,
   sceneSchema,
-  type ClassificationResult,
 } from './classifier'
 
 // ============================================================================
@@ -219,22 +218,6 @@ export function buildExtendedClassificationSchema(
     entryUpdates: z.object(entryUpdatesShape),
     scene: sceneSchema,
   })
-}
-
-// ============================================================================
-// Extended Classification Result Type
-// ============================================================================
-
-/**
- * Classification result that may include inline runtime variable fields.
- * Runtime variables appear as direct fields on changes/entity objects
- * (e.g., `health: 80` alongside `status: "active"`), not nested under `customVars`.
- *
- * Use extractInlineCustomVars() to pick out the variable fields from these objects.
- */
-export type ExtendedClassificationResult = ClassificationResult & {
-  /** Internal metadata: runtime variable definitions for use by applyClassificationResult. Not LLM output. */
-  _runtimeVarDefs?: RuntimeVariable[]
 }
 
 /**

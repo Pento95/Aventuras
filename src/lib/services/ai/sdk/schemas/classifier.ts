@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import type { RuntimeVariable } from '$lib/services/packs/types'
 
 // ============================================================================
 // Visual Descriptors Schema
@@ -222,4 +223,7 @@ export type StoryBeatUpdate = z.infer<typeof storyBeatUpdateSchema>
 export type NewStoryBeat = z.infer<typeof newStoryBeatSchema>
 export type EntryUpdates = z.infer<typeof entryUpdatesSchema>
 export type Scene = z.infer<typeof sceneSchema>
-export type ClassificationResult = z.infer<typeof classificationResultSchema>
+export type ClassificationResult = z.infer<typeof classificationResultSchema> & {
+  /** Internal metadata: runtime variable definitions for use by applyClassificationResult. Not LLM output. */
+  _runtimeVarDefs?: RuntimeVariable[]
+}

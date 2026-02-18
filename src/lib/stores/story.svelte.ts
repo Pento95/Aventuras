@@ -26,10 +26,8 @@ import { database } from '$lib/services/database'
 import { rollbackService } from '$lib/services/rollbackService'
 import { ui } from './ui.svelte'
 import { settings } from './settings.svelte'
-import {
-  extractInlineCustomVars,
-  type ExtendedClassificationResult,
-} from '$lib/services/ai/sdk/schemas/runtime-variables'
+import { extractInlineCustomVars } from '$lib/services/ai/sdk/schemas/runtime-variables'
+import type { ClassificationResult } from '$lib/services/ai/sdk/schemas/classifier'
 import type { RuntimeVariable } from '$lib/services/packs/types'
 import { DEFAULT_MEMORY_CONFIG } from '$lib/services/ai/generation/MemoryService'
 import { convertToEntries, type ImportedEntry } from '$lib/services/lorebookImporter'
@@ -1793,10 +1791,7 @@ class StoryStore {
    * Apply classification results to update world state.
    * This is Phase 4 of the processing pipeline per design doc.
    */
-  async applyClassificationResult(
-    result: ExtendedClassificationResult,
-    entryId?: string,
-  ): Promise<void> {
+  async applyClassificationResult(result: ClassificationResult, entryId?: string): Promise<void> {
     if (!this.currentStory) {
       log('applyClassificationResult: No story loaded, skipping')
       return

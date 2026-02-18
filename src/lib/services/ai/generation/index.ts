@@ -41,7 +41,6 @@ export type {
   StoryBeatUpdate,
   NewStoryBeat,
 } from '../sdk/schemas/classifier'
-export type { ExtendedClassificationResult } from '../sdk/schemas/runtime-variables'
 
 // Memory
 export {
