@@ -187,13 +187,13 @@ pub fn run() {
         Migration {
             version: 30,
             description: "preset_packs",
-            sql: include_str!("../migrations/025_preset_packs.sql"),
+            sql: include_str!("../migrations/030_preset_packs.sql"),
             kind: MigrationKind::Up,
         },
         Migration {
             version: 31,
             description: "pack_variable_extensions",
-            sql: include_str!("../migrations/030_pack_variable_extensions.sql"),
+            sql: include_str!("../migrations/031_pack_variable_extensions.sql"),
             kind: MigrationKind::Up,
         }
     ];
@@ -206,6 +206,7 @@ pub fn run() {
     #[cfg(debug_assertions)]
     {
         builder = builder.plugin(devtools);
+        builder = builder.plugin(tauri_plugin_mcp_bridge::init());
     }
 
     builder
