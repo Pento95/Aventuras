@@ -14,7 +14,10 @@
 
   let { content, customVariables, hideHeader = false, testValues }: Props = $props()
 
-  function buildSampleContext(vars: CustomVariable[], overrides?: Record<string, string>): TemplateContext {
+  function buildSampleContext(
+    vars: CustomVariable[],
+    overrides?: Record<string, string>,
+  ): TemplateContext {
     const context: TemplateContext = {}
 
     // All variables get bracket-name fallback; actual values come from testValues overrides

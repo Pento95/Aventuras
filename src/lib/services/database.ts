@@ -3430,7 +3430,15 @@ class DatabaseService {
       isRequired: row.is_required === 1,
       sortOrder: row.sort_order ?? 0,
       defaultValue: row.default_value ?? undefined,
-      enumOptions: row.enum_options ? (() => { try { return JSON.parse(row.enum_options) } catch { return undefined } })() : undefined,
+      enumOptions: row.enum_options
+        ? (() => {
+            try {
+              return JSON.parse(row.enum_options)
+            } catch {
+              return undefined
+            }
+          })()
+        : undefined,
       createdAt: row.created_at,
     }
   }
