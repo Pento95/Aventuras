@@ -14,7 +14,7 @@ import type {
   MemoryConfig,
   Entry,
 } from '$lib/types'
-import type { ClassificationResult } from '$lib/services/ai/sdk/schemas/classifier'
+import type { ExtendedClassificationResult } from '$lib/services/ai/sdk/schemas/runtime-variables'
 import type { TimelineFillResult } from '$lib/services/ai/retrieval'
 
 // Generation Phases
@@ -85,7 +85,7 @@ export interface NarrativeCompleteEvent {
 
 export interface ClassificationCompleteEvent {
   type: 'classification_complete'
-  result: ClassificationResult
+  result: ExtendedClassificationResult
 }
 
 export interface ErrorEvent {

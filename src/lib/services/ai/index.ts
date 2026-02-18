@@ -28,7 +28,7 @@ import type { StoryMode, POV, Tense } from '$lib/types'
 import type { PromptContext } from '../generation/phases/PostGenerationPhase'
 import { DEFAULT_FALLBACK_STYLE_PROMPT } from './image/constants'
 import { type ClassificationContext } from './generation/ClassifierService'
-import type { ClassificationResult } from './sdk/schemas/classifier'
+import type { ExtendedClassificationResult } from './sdk/schemas/runtime-variables'
 import { MemoryService, type RetrievalContext } from './generation/MemoryService'
 import type { ChapterAnalysis, ChapterSummaryResult, RetrievalDecision } from './sdk/schemas/memory'
 import type { SuggestionsResult } from './sdk/schemas/suggestions'
@@ -187,7 +187,7 @@ class AIService {
     story?: Story | null,
     visibleEntries?: StoryEntry[],
     currentStoryTime?: TimeTracker | null,
-  ): Promise<ClassificationResult> {
+  ): Promise<ExtendedClassificationResult> {
     log('classifyResponse called', {
       narrativeLength: narrativeResponse.length,
       userActionLength: userAction.length,

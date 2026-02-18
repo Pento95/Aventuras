@@ -20,9 +20,15 @@ import type {
   TimeTracker,
 } from '$lib/types'
 import { ContextBuilder } from '$lib/services/context'
+import { database } from '$lib/services/database'
 import { createLogger } from '../core/config'
 import { generateStructured } from '../sdk/generate'
-import { classificationResultSchema, type ClassificationResult } from '../sdk/schemas/classifier'
+import { classificationResultSchema, clampNumber } from '../sdk/schemas/classifier'
+import {
+  buildExtendedClassificationSchema,
+  type ExtendedClassificationResult,
+} from '../sdk/schemas/runtime-variables'
+import type { RuntimeVariable, RuntimeEntityType } from '$lib/services/packs/types'
 
 const log = createLogger('Classifier')
 
@@ -54,12 +60,14 @@ export class ClassifierService {
 
   /**
    * Classify a narrative response to extract world state changes.
+   * When the story's pack defines runtime variables, the schema is dynamically
+   * extended to include customVars extraction in the same LLM pass.
    */
   async classify(
     context: ClassificationContext,
     visibleEntries?: StoryEntry[],
     currentStoryTime?: TimeTracker | null,
-  ): Promise<ClassificationResult> {
+  ): Promise<ExtendedClassificationResult> {
     log('classify', {
       narrativeLength: context.narrativeResponse.length,
       existingCharacters: context.existingCharacters.length,
@@ -69,6 +77,21 @@ export class ClassifierService {
     })
 
     const mode = context.story.mode ?? 'adventure'
+
+    // Load runtime variable definitions for the story's pack (if any)
+    let runtimeVars: RuntimeVariable[] = []
+    let runtimeVarsByType: Record<string, RuntimeVariable[]> = {}
+    const packId = await database.getStoryPackId(context.storyId)
+    if (packId) {
+      runtimeVars = await database.getRuntimeVariables(packId)
+      runtimeVarsByType = this.groupByEntityType(runtimeVars)
+    }
+
+    // Build the schema: extended with customVars if runtime variables exist, else base
+    const schema =
+      runtimeVars.length > 0
+        ? buildExtendedClassificationSchema(runtimeVarsByType)
+        : classificationResultSchema
 
     // Format existing entities for the prompt
     const existingCharacters = this.formatExistingCharacters(context.existingCharacters)
@@ -86,10 +109,14 @@ export class ClassifierService {
       ? `Current story time: Year ${currentStoryTime.years}, Day ${currentStoryTime.days}, ${String(currentStoryTime.hours).padStart(2, '0')}:${String(currentStoryTime.minutes).padStart(2, '0')}`
       : ''
 
+    // Build custom variable instructions for the prompt
+    const customVariableInstructions =
+      runtimeVars.length > 0 ? this.buildCustomVarInstructions(runtimeVarsByType) : ''
+
     // Create ContextBuilder from story -- auto-populates mode, pov, tense, genre, etc.
     const ctx = await ContextBuilder.forStory(context.storyId)
 
-    // Add all 16 runtime variables explicitly via ctx.add()
+    // Add all runtime variables explicitly via ctx.add()
     ctx.add({
       genre: context.story.genre ? `Genre: ${context.story.genre}` : '',
       mode,
@@ -107,21 +134,32 @@ export class ClassifierService {
       itemLocationOptions: 'inventory, worn, ground, or specific location name',
       defaultItemLocation: 'inventory',
       sceneLocationDesc: 'Name of current location if identifiable, null otherwise',
+      customVariableInstructions,
     })
 
     // Render through the classifier template
     const { system, user: prompt } = await ctx.render('classifier')
 
     try {
-      const result = await generateStructured(
+      const result = (await generateStructured(
         {
           presetId: this.presetId,
-          schema: classificationResultSchema,
+          schema,
           system,
           prompt,
         },
         'classifier',
-      )
+      )) as ExtendedClassificationResult
+
+      // Post-process: clamp number values to min/max constraints
+      if (runtimeVars.length > 0) {
+        this.clampRuntimeVarNumbers(result, runtimeVarsByType)
+      }
+
+      // Attach runtime variable definitions for use by applyClassificationResult
+      if (runtimeVars.length > 0) {
+        result._runtimeVarDefs = runtimeVars
+      }
 
       log('classify complete', {
         characterUpdates: result.entryUpdates.characterUpdates.length,
@@ -133,6 +171,7 @@ export class ClassifierService {
         storyBeatUpdates: result.entryUpdates.storyBeatUpdates.length,
         newStoryBeats: result.entryUpdates.newStoryBeats.length,
         timeProgression: result.scene.timeProgression,
+        hasRuntimeVars: runtimeVars.length > 0,
       })
 
       return result
@@ -156,6 +195,142 @@ export class ClassifierService {
           timeProgression: 'none',
         },
       }
+    }
+  }
+
+  /**
+   * Group runtime variables by entity type.
+   */
+  private groupByEntityType(vars: RuntimeVariable[]): Record<string, RuntimeVariable[]> {
+    return vars.reduce(
+      (acc, v) => {
+        if (!acc[v.entityType]) acc[v.entityType] = []
+        acc[v.entityType].push(v)
+        return acc
+      },
+      {} as Record<string, RuntimeVariable[]>,
+    )
+  }
+
+  /**
+   * Build the prompt instruction block describing custom variables to track.
+   * Grouped by entity type for clarity.
+   */
+  private buildCustomVarInstructions(varsByType: Record<string, RuntimeVariable[]>): string {
+    const ENTITY_TYPE_LABELS: Record<RuntimeEntityType, { updates: string; new: string }> = {
+      character: { updates: 'character updates', new: 'new characters' },
+      location: { updates: 'location updates', new: 'new locations' },
+      item: { updates: 'item updates', new: 'new items' },
+      story_beat: { updates: 'story beat updates', new: 'new story beats' },
+    }
+
+    const sections: string[] = []
+
+    for (const [entityType, vars] of Object.entries(varsByType)) {
+      if (vars.length === 0) continue
+      const labels = ENTITY_TYPE_LABELS[entityType as RuntimeEntityType]
+      if (!labels) continue
+
+      const varLines = vars.map((v) => {
+        let line = `- ${v.variableName}`
+        const parts: string[] = []
+
+        // Type description
+        if (v.variableType === 'number') {
+          let numDesc = 'number'
+          if (v.minValue !== undefined && v.maxValue !== undefined) {
+            numDesc = `number ${v.minValue}-${v.maxValue}`
+          } else if (v.minValue !== undefined) {
+            numDesc = `number >= ${v.minValue}`
+          } else if (v.maxValue !== undefined) {
+            numDesc = `number <= ${v.maxValue}`
+          }
+          parts.push(numDesc)
+        } else if (v.variableType === 'enum' && v.enumOptions?.length) {
+          parts.push(`enum: ${v.enumOptions.map((o) => o.value).join('|')}`)
+        } else {
+          parts.push('text')
+        }
+
+        // Required vs optional
+        parts.push(
+          v.defaultValue !== undefined && v.defaultValue !== null ? 'optional' : 'required',
+        )
+
+        // Default value
+        if (v.defaultValue !== undefined && v.defaultValue !== null) {
+          parts.push(`default: ${v.defaultValue}`)
+        }
+
+        line += ` (${parts.join(', ')})`
+        if (v.description) line += `: ${v.description}`
+        return line
+      })
+
+      sections.push(
+        `For ${labels.updates}/${labels.new}, also extract these custom variables in a \`customVars\` object:\n${varLines.join('\n')}`,
+      )
+    }
+
+    if (sections.length === 0) return ''
+
+    return `## Custom Variables to Track\n${sections.join('\n\n')}`
+  }
+
+  /**
+   * Post-process: clamp number-type runtime variable values to min/max constraints.
+   * Walks through all entity updates/new entities and clamps customVars number values.
+   */
+  private clampRuntimeVarNumbers(
+    result: ExtendedClassificationResult,
+    varsByType: Record<string, RuntimeVariable[]>,
+  ): void {
+    const numberDefs = new Map<string, RuntimeVariable>()
+    for (const vars of Object.values(varsByType)) {
+      for (const v of vars) {
+        if (v.variableType === 'number' && (v.minValue !== undefined || v.maxValue !== undefined)) {
+          numberDefs.set(v.variableName, v)
+        }
+      }
+    }
+
+    if (numberDefs.size === 0) return
+
+    // Clamp values in update changes.customVars
+    const clampCustomVars = (customVars: Record<string, unknown> | undefined) => {
+      if (!customVars) return
+      for (const [key, value] of Object.entries(customVars)) {
+        const def = numberDefs.get(key)
+        if (def && typeof value === 'number') {
+          customVars[key] = clampNumber(value, def.minValue, def.maxValue)
+        }
+      }
+    }
+
+    // Walk all entity types
+    for (const update of result.entryUpdates.characterUpdates) {
+      clampCustomVars(update.changes?.customVars)
+    }
+    for (const entity of result.entryUpdates.newCharacters) {
+      clampCustomVars(entity.customVars)
+    }
+    for (const update of result.entryUpdates.locationUpdates) {
+      clampCustomVars(update.changes?.customVars)
+    }
+    for (const entity of result.entryUpdates.newLocations) {
+      clampCustomVars(entity.customVars)
+    }
+    for (const update of result.entryUpdates.itemUpdates) {
+      clampCustomVars(update.changes?.customVars)
+    }
+    for (const entity of result.entryUpdates.newItems) {
+      clampCustomVars(entity.customVars)
+    }
+    for (const update of result.entryUpdates.storyBeatUpdates) {
+      clampCustomVars(update.changes?.customVars)
+    }
+    for (const entity of result.entryUpdates.newStoryBeats) {
+      clampCustomVars(entity.customVars)
     }
   }
 
