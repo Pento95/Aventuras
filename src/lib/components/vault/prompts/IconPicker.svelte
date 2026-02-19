@@ -4,6 +4,7 @@
   import { Input } from '$lib/components/ui/input'
   import { cn } from '$lib/utils/cn'
   import {
+    Icon,
     Heart,
     Shield,
     Sword,
@@ -59,7 +60,7 @@
   let open = $state(false)
   let search = $state('')
 
-  type IconEntry = { name: string; component: typeof Heart }
+  type IconEntry = { name: string; component: typeof Icon }
 
   const ICONS: IconEntry[] = [
     { name: 'Heart', component: Heart },

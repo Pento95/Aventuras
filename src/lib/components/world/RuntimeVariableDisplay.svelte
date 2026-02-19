@@ -6,6 +6,7 @@
   } from '$lib/services/packs/types'
   import RuntimeVariableEditor from './RuntimeVariableEditor.svelte'
   import {
+    Icon,
     Heart,
     Shield,
     Sword,
@@ -70,7 +71,7 @@
     class: className = '',
   }: Props = $props()
 
-  const ICON_MAP: Record<string, typeof Heart> = {
+  const ICON_MAP: Record<string, typeof Icon> = {
     Heart,
     Shield,
     Sword,
