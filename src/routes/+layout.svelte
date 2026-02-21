@@ -13,7 +13,6 @@
 
     let lastBackAttemptAt = 0
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).__aventuraBackHandler = () => {
       const now = Date.now()
       const pressedBackAgain = now - lastBackAttemptAt <= BACK_EXIT_WINDOW_MS
@@ -29,7 +28,6 @@
     }
 
     return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).__aventuraBackHandler
     }
   })
