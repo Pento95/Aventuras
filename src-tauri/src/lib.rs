@@ -204,14 +204,15 @@ pub fn run() {
         },
     ];
 
-    #[cfg(debug_assertions)] // only enable instrumentation in development builds
-    let devtools = tauri_plugin_devtools::init();
+    let mut builder = tauri::Builder::default();
 
-    let mut builder = tauri::Builder::default();    
-
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "devtools"))] // only enable instrumentation in development builds
     {
-        builder = builder.plugin(devtools);
+        builder = builder.plugin(tauri_plugin_devtools::init());
+    }
+
+    #[cfg(all(debug_assertions, feature = "mcp-bridge"))]
+    {
         builder = builder.plugin(tauri_plugin_mcp_bridge::init());
     }
 
