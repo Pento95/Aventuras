@@ -14,39 +14,14 @@
     let lastBackAttemptAt = 0
 
     ;(window as any).__aventuraBackHandler = () => {
-      // Close open overlays before triggering exit flow
-      if (ui.settingsModalOpen) {
-        ui.closeSettings()
+      // Close open dialog/drawer via Escape key so vaul-svelte/bits-ui
+      // run their proper close sequence (animations, body style cleanup)
+      const openDialog = document.querySelector('[data-state="open"][role="dialog"]')
+      if (openDialog) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
         return
       }
-      if (ui.syncModalOpen) {
-        ui.closeSyncModal()
-        return
-      }
-      if (ui.debugModalOpen) {
-        ui.closeDebugModal()
-        return
-      }
-      if (ui.lorebookImportModalOpen) {
-        ui.closeLorebookImport()
-        return
-      }
-      if (ui.lorebookExportModalOpen) {
-        ui.closeLorebookExport()
-        return
-      }
-      if (ui.manualChapterModalOpen) {
-        ui.closeManualChapterModal()
-        return
-      }
-      if (ui.resummarizeModalOpen) {
-        ui.closeResummarizeModal()
-        return
-      }
-      if (ui.lorebookDebugOpen) {
-        ui.closeLorebookDebug()
-        return
-      }
+
       if (ui.sidebarOpen && window.innerWidth < 640) {
         ui.toggleSidebar()
         return
