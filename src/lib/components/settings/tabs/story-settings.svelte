@@ -26,8 +26,7 @@
     onTenseChange={(v) => story.updateStorySettings({ tense: v })}
     onToneChange={(v) => story.updateStorySettings({ tone: v })}
     onVisualProseModeChange={(v) => story.updateStorySettings({ visualProseMode: v })}
-    onImageGenerationModeChange={(v) =>
-      story.updateStorySettings({ imageGenerationMode: v })}
+    onImageGenerationModeChange={(v) => story.updateStorySettings({ imageGenerationMode: v })}
     onBackgroundImagesEnabledChange={(v) =>
       story.updateStorySettings({ backgroundImagesEnabled: v })}
     onReferenceModeChange={(v) => story.updateStorySettings({ referenceMode: v })}

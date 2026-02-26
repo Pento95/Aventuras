@@ -46,9 +46,9 @@ export function extractPicTags(content: string): ParsedPicTag[] {
     const charsMatch = attributes.match(/characters=["']([^"']*)["']/i)
     const characters = charsMatch
       ? charsMatch[1]
-        .split(',')
-        .map((c) => c.trim())
-        .filter((c) => c)
+          .split(',')
+          .map((c) => c.trim())
+          .filter((c) => c)
       : []
 
     // Only include tags with valid prompts
@@ -194,16 +194,31 @@ export function renderSinglePicTag(
   }
 
   if (imageInfo.status === 'generating') {
-    return buildPlaceholder('generating', imageInfo.id, prompt, loaderWithInfo('Generating image...', shortPrompt))
+    return buildPlaceholder(
+      'generating',
+      imageInfo.id,
+      prompt,
+      loaderWithInfo('Generating image...', shortPrompt),
+    )
   }
 
   if (imageInfo.status === 'failed') {
     const errorMsg = imageInfo.errorMessage || 'Generation failed'
-    return buildPlaceholder('failed', imageInfo.id, prompt, errorWithInfo(errorMsg, shortPrompt, imageInfo.id))
+    return buildPlaceholder(
+      'failed',
+      imageInfo.id,
+      prompt,
+      errorWithInfo(errorMsg, shortPrompt, imageInfo.id),
+    )
   }
 
   // Pending
-  return buildPlaceholder('pending', imageInfo.id, prompt, loaderWithInfo('In queue...', shortPrompt, 'pending'))
+  return buildPlaceholder(
+    'pending',
+    imageInfo.id,
+    prompt,
+    loaderWithInfo('In queue...', shortPrompt, 'pending'),
+  )
 }
 
 /**
@@ -219,7 +234,12 @@ export function replacePicTagsWithPlaceholders(content: string): string {
     const prompt = promptMatch ? promptMatch[1] : 'Image'
     const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '...' : prompt
     // No imageId during streaming — use empty string
-    return buildPlaceholder('generating', '', prompt, loaderWithInfo('Generating image...', shortPrompt))
+    return buildPlaceholder(
+      'generating',
+      '',
+      prompt,
+      loaderWithInfo('Generating image...', shortPrompt),
+    )
   })
 }
 
