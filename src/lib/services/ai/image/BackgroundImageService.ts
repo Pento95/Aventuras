@@ -5,29 +5,28 @@ import type { StoryEntry } from '$lib/types'
 import { createLogger } from '../core/config'
 import {
   backgroundImageAnalysisResultSchema,
-  generateStructured,
   type BackgroundImageAnalysisResult,
 } from '../sdk'
+import { BaseAIService } from '../BaseAIService'
 import { generateImage } from './providers/registry'
 
 const log = createLogger('BackgroundImageService')
 
-export class BackgroundImageService {
-  private analysisPresetId: string
+export class BackgroundImageService extends BaseAIService {
   private imageSettings: typeof settings.systemServicesSettings.imageGeneration
 
   constructor(
-    analysisPresetId: string = 'bgImageGeneration',
+    serviceId: string,
     imageSettings: typeof settings.systemServicesSettings.imageGeneration,
   ) {
-    this.analysisPresetId = analysisPresetId
+    super(serviceId)
     this.imageSettings = imageSettings
   }
 
-  async analyzeReponsesForBackgroundImage(
+  async analyzeResponsesForBackgroundImage(
     visibleEntries: StoryEntry[],
   ): Promise<BackgroundImageAnalysisResult> {
-    log('analyzeReponsesForBackgroundImage called', {
+    log('analyzeResponsesForBackgroundImage called', {
       visibleEntriesCount: visibleEntries.length,
     })
 
@@ -49,13 +48,10 @@ export class BackgroundImageService {
     const { system, user: prompt } = await ctx.render('background-image-prompt-analysis')
 
     try {
-      const result = await generateStructured(
-        {
-          presetId: this.analysisPresetId,
-          schema: backgroundImageAnalysisResultSchema,
-          system,
-          prompt,
-        },
+      const result = await this.generate(
+        backgroundImageAnalysisResultSchema,
+        system,
+        prompt,
         'background-image-prompt-analysis',
       )
 

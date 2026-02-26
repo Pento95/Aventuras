@@ -28,6 +28,10 @@ export function createPollinationsProvider(config: ImageProviderConfig): ImagePr
       const { model, prompt, size, referenceImages, signal } = options
       const [width, height] = size.split('x').map(Number)
 
+      if (!config.apiKey) {
+        throw new Error('Pollinations API key is required to bypass Turnstile protection.')
+      }
+
       const params = new URLSearchParams({
         model: model || DEFAULT_MODEL,
         width: String(width || 1024),
@@ -36,19 +40,19 @@ export function createPollinationsProvider(config: ImageProviderConfig): ImagePr
         safe: 'false',
       })
 
-      if (config.apiKey) {
-        params.set('token', config.apiKey)
-      }
-
       // img2img via ?image= param for kontext model
       if (referenceImages?.length) {
         params.set('image', `data:image/png;base64,${referenceImages[0]}`)
       }
 
       const encodedPrompt = encodeURIComponent(prompt)
-      const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?${params}`
+      const url = `https://gen.pollinations.ai/image/${encodedPrompt}?${params}`
 
-      const response = await imageGetFetch(url, undefined, {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${config.apiKey}`,
+      }
+
+      const response = await imageGetFetch(url, headers, {
         signal,
         serviceId: 'pollinations-image',
       })
@@ -56,7 +60,12 @@ export function createPollinationsProvider(config: ImageProviderConfig): ImagePr
       // Response is the image directly
       const blob = await response.blob()
       const buffer = await blob.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      const base64 = btoa(binary)
 
       return { base64 }
     },
