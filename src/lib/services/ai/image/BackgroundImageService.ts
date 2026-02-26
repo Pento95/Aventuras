@@ -3,10 +3,7 @@ import { ContextBuilder } from '$lib/services/context'
 import { settings } from '$lib/stores/settings.svelte'
 import type { StoryEntry } from '$lib/types'
 import { createLogger } from '../core/config'
-import {
-  backgroundImageAnalysisResultSchema,
-  type BackgroundImageAnalysisResult,
-} from '../sdk'
+import { backgroundImageAnalysisResultSchema, type BackgroundImageAnalysisResult } from '../sdk'
 import { BaseAIService } from '../BaseAIService'
 import { generateImage } from './providers/registry'
 

@@ -104,6 +104,118 @@ function escapeHtml(str: string): string {
 }
 
 /**
+ * Render HTML for a single <pic> tag match.
+ * Extracted from replacePicTagsWithImages for reuse in the unified rendering pipeline.
+ *
+ * @param match - The full <pic> tag match string
+ * @param imageMap - Map of original tag text to image info
+ * @param regeneratingIds - Optional set of image IDs currently being regenerated
+ * @returns HTML string for the image (or empty string if no image record found)
+ */
+export function renderSinglePicTag(
+  match: string,
+  imageMap: Map<string, ImageReplacementInfo>,
+  regeneratingIds?: Set<string>,
+): string {
+  const attrMatch = match.match(/<pic\s+([^>]*?)(?:\/>|>\s*<\/pic>)/i)
+  const attrs = attrMatch ? attrMatch[1] : ''
+  const promptMatch = attrs.match(/prompt=["']([^"']+)["']/i)
+  const prompt = promptMatch ? promptMatch[1] : ''
+  const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '...' : prompt
+
+  const imageInfo = imageMap.get(match)
+
+  if (!imageInfo) {
+    // No image record found - hide the tag gracefully
+    return ''
+  }
+
+  if (imageInfo.status === 'complete' && imageInfo.imageData) {
+    const isRegenerating = regeneratingIds?.has(imageInfo.id) ?? false
+    if (isRegenerating) {
+      return `<div class="inline-generated-image regenerating" data-image-id="${imageInfo.id}" data-prompt="${escapeHtml(prompt)}">
+            <img src="data:image/png;base64,${imageInfo.imageData}" alt="${escapeHtml(prompt)}" loading="lazy" class="regenerating-image" />
+            <div class="regenerating-overlay">
+              <div class="regenerating-content">
+                <svg class="regenerating-spinner" viewBox="0 0 50 50">
+                  <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="80, 200" stroke-dashoffset="0"></circle>
+                </svg>
+                <span class="regenerating-text">Regenerating...</span>
+              </div>
+            </div>
+          </div>`
+    }
+    return `<div class="inline-generated-image" data-image-id="${imageInfo.id}" data-prompt="${escapeHtml(prompt)}" data-action="view" role="button" tabindex="0"><img src="data:image/png;base64,${imageInfo.imageData}" alt="${escapeHtml(prompt)}" loading="lazy" /></div>`
+  }
+
+  if (imageInfo.status === 'generating') {
+    return `<div class="inline-image-placeholder generating" data-image-id="${imageInfo.id}" data-prompt="${escapeHtml(prompt)}">
+          <div class="placeholder-shimmer"></div>
+          <div class="placeholder-content">
+            <div class="placeholder-loader">
+              <svg class="placeholder-spinner-svg" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="80, 200" stroke-dashoffset="0"></circle>
+              </svg>
+              <svg class="placeholder-image-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                <circle cx="9" cy="9" r="2"/>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+              </svg>
+            </div>
+            <div class="placeholder-info">
+              <span class="placeholder-status">Generating image...</span>
+              <span class="placeholder-prompt">${escapeHtml(shortPrompt)}</span>
+            </div>
+          </div>
+        </div>`
+  }
+
+  if (imageInfo.status === 'failed') {
+    const errorMsg = imageInfo.errorMessage || 'Generation failed'
+    return `<div class="inline-image-placeholder failed" data-image-id="${imageInfo.id}" data-prompt="${escapeHtml(prompt)}">
+          <div class="placeholder-content">
+            <div class="placeholder-error-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" x2="12" y1="8" y2="12"/>
+                <line x1="12" x2="12.01" y1="16" y2="16"/>
+              </svg>
+            </div>
+            <div class="placeholder-info">
+              <span class="placeholder-status error">${escapeHtml(errorMsg)}</span>
+              <span class="placeholder-prompt">${escapeHtml(shortPrompt)}</span>
+            </div>
+            <button class="inline-image-btn retry-btn" data-action="regenerate" data-image-id="${imageInfo.id}" title="Retry generation">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+              Retry
+            </button>
+          </div>
+        </div>`
+  }
+
+  // Pending state
+  return `<div class="inline-image-placeholder pending" data-image-id="${imageInfo.id}" data-prompt="${escapeHtml(prompt)}">
+        <div class="placeholder-shimmer"></div>
+        <div class="placeholder-content">
+          <div class="placeholder-loader">
+            <svg class="placeholder-spinner-svg pending" viewBox="0 0 50 50">
+              <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="80, 200" stroke-dashoffset="0"></circle>
+            </svg>
+            <svg class="placeholder-image-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+              <circle cx="9" cy="9" r="2"/>
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+            </svg>
+          </div>
+          <div class="placeholder-info">
+            <span class="placeholder-status">In queue...</span>
+            <span class="placeholder-prompt">${escapeHtml(shortPrompt)}</span>
+          </div>
+        </div>
+      </div>`
+}
+
+/**
  * Replace <pic> tags with loading placeholders during streaming.
  * Shows a visual placeholder while images are being generated.
  *

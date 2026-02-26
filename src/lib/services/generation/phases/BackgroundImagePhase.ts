@@ -28,6 +28,7 @@ export interface BackgroundImageDependencies {
 /** Settings needed for image phase decision making */
 export interface BackgroundImageSettings {
   backgroundImagesEnabled?: boolean
+  imageGenerationMode?: 'none' | 'agentic' | 'inline'
 }
 
 /** Input for the image phase */
@@ -60,6 +61,13 @@ export class BackgroundImagePhase {
     // Check if background image generation is disabled
     if (imageSettings.backgroundImagesEnabled === false) {
       const result: BackgroundImageResult = { started: false, skippedReason: 'disabled' }
+      yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
+      return result
+    }
+
+    // Skip in inline mode - we don't want agentic background analysis in pure inline mode
+    if (imageSettings.imageGenerationMode === 'inline') {
+      const result: BackgroundImageResult = { started: false, skippedReason: 'inline_mode' }
       yield { type: 'phase_complete', phase: 'image', result } satisfies PhaseCompleteEvent
       return result
     }

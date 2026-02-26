@@ -3,6 +3,7 @@
   import { getVersion } from '@tauri-apps/api/app'
   import { ui } from '$lib/stores/ui.svelte'
   import { settings } from '$lib/stores/settings.svelte'
+  import { story } from '$lib/stores/story.svelte'
   import {
     Settings2,
     RotateCcw,
@@ -14,6 +15,7 @@
     Volume2,
     Settings as SettingsIcon,
     FlaskConical,
+    BookOpen,
   } from 'lucide-svelte'
 
   import * as ResponsiveModal from '$lib/components/ui/responsive-modal'
@@ -33,32 +35,26 @@
   import TTSSettings from './TTSSettings.svelte'
   import AdvancedSettings from './AdvancedSettings.svelte'
   import ExperimentalSettings from './ExperimentalSettings.svelte'
-  const tabs = [
-    { id: 'api', label: 'API', icon: Key },
-    { id: 'generation', label: 'Generation', icon: Cpu },
-    { id: 'interface', label: 'Interface', icon: Palette },
-    { id: 'images', label: 'Images', icon: Image },
-    { id: 'tts', label: 'TTS', icon: Volume2 },
-    { id: 'advanced', label: 'Advanced', icon: SettingsIcon },
-    { id: 'experimental', label: 'Labs', icon: FlaskConical },
-  ] as const
+  import StorySettingsTab from './tabs/story-settings.svelte'
 
-  type SettingsTab =
-    | 'api'
-    | 'generation'
-    | 'interface'
-    | 'images'
-    | 'tts'
-    | 'advanced'
-    | 'experimental'
+  const baseTabs = [
+    { id: 'api' as const, label: 'API', icon: Key },
+    { id: 'generation' as const, label: 'Generation', icon: Cpu },
+    { id: 'interface' as const, label: 'Interface', icon: Palette },
+    { id: 'images' as const, label: 'Images', icon: Image },
+    { id: 'tts' as const, label: 'TTS', icon: Volume2 },
+    { id: 'advanced' as const, label: 'Advanced', icon: SettingsIcon },
+    { id: 'experimental' as const, label: 'Labs', icon: FlaskConical },
+  ]
 
-  // Use the tab from UI store (allows navigation from outside, e.g., profile warning banner)
-  let activeTab = $state<SettingsTab>(ui.settingsTab as SettingsTab)
+  const storyTab = { id: 'story-settings' as const, label: 'Story', icon: BookOpen }
 
-  // Sync activeTab when modal opens with a specific tab requested
+  let tabs = $derived(story.currentStory ? [storyTab, ...baseTabs] : baseTabs)
+
+  // Fall back to 'api' if story tab is active but story is unloaded
   $effect(() => {
-    if (ui.settingsModalOpen && ui.settingsTab !== activeTab) {
-      activeTab = ui.settingsTab as SettingsTab
+    if (ui.settingsTab === 'story-settings' && !story.currentStory) {
+      ui.setSettingsTab('api')
     }
   })
 
@@ -113,16 +109,14 @@
     const diagonalRatio = absDeltaY / absDeltaX
     if (diagonalRatio > DIAGONAL_TOLERANCE) return
 
-    const currentIndex = tabs.findIndex((t) => t.id === activeTab)
+    const currentIndex = tabs.findIndex((t) => t.id === ui.settingsTab)
     if (deltaX > 0 && currentIndex > 0) {
       slideDirection = 'right'
-      activeTab = tabs[currentIndex - 1].id
-      ui.setSettingsTab(activeTab)
+      ui.setSettingsTab(tabs[currentIndex - 1].id)
       setTimeout(() => (slideDirection = 'none'), 300)
     } else if (deltaX < 0 && currentIndex < tabs.length - 1) {
       slideDirection = 'left'
-      activeTab = tabs[currentIndex + 1].id
-      ui.setSettingsTab(activeTab)
+      ui.setSettingsTab(tabs[currentIndex + 1].id)
       setTimeout(() => (slideDirection = 'none'), 300)
     }
   }
@@ -205,11 +199,10 @@
           {#each tabs as tab (tab.id)}
             <button
               class="hover:bg-accent/50 hover:text-foreground flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors"
-              class:bg-accent={activeTab === tab.id}
-              class:text-accent-foreground={activeTab === tab.id}
-              class:text-muted-foreground={activeTab !== tab.id}
+              class:bg-accent={ui.settingsTab === tab.id}
+              class:text-accent-foreground={ui.settingsTab === tab.id}
+              class:text-muted-foreground={ui.settingsTab !== tab.id}
               onclick={() => {
-                activeTab = tab.id
                 ui.setSettingsTab(tab.id)
               }}
             >
@@ -245,15 +238,14 @@
       >
         <div class="mx-auto px-4 sm:p-6">
           <Tabs
-            value={activeTab}
+            value={ui.settingsTab}
             onValueChange={(v) => {
-              activeTab = v as any
-              ui.setSettingsTab(v)
+              ui.setSettingsTab(v as any)
             }}
           >
             {#each tabs as tab (tab.id)}
               <TabsContent value={tab.id} class="mt-0">
-                {#if activeTab === tab.id}
+                {#if ui.settingsTab === tab.id}
                   <div
                     class={slideDirection === 'left'
                       ? 'slide-in-right'
@@ -261,7 +253,9 @@
                         ? 'slide-in-left'
                         : ''}
                   >
-                    {#if tab.id === 'api'}
+                    {#if tab.id === 'story-settings'}
+                      <StorySettingsTab />
+                    {:else if tab.id === 'api'}
                       <ApiConnectionTab />
                     {:else if tab.id === 'generation'}
                       <GenerationTab onOpenManualBodyEditor={openManualBodyEditor} />
@@ -316,10 +310,9 @@
       <div class="flex justify-center gap-0 overflow-x-auto pb-0.5">
         {#each tabs as tab (tab.id)}
           <Toggle
-            pressed={activeTab === tab.id}
+            pressed={ui.settingsTab === tab.id}
             onPressedChange={(pressed) => {
               if (pressed) {
-                activeTab = tab.id
                 ui.setSettingsTab(tab.id)
               }
             }}
@@ -328,7 +321,7 @@
           >
             <tab.icon class="h-4 w-4" />
             <span
-              class="overflow-hidden text-xs whitespace-nowrap transition-all duration-300 ease-in-out {activeTab ===
+              class="overflow-hidden text-xs whitespace-nowrap transition-all duration-300 ease-in-out {ui.settingsTab ===
               tab.id
                 ? 'max-w-20 opacity-100'
                 : 'max-w-0 opacity-0'}"
