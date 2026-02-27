@@ -15,6 +15,7 @@ import { streamNarrative, generateNarrative } from '../sdk/generate'
 import { ContextBuilder } from '$lib/services/context'
 import { StyleReviewerService } from './StyleReviewerService'
 import { createLogger } from '../core/config'
+import { stripPicTags } from '$lib/utils/inlineImageParser'
 import type { StreamChunk } from '../core/types'
 import type {
   Story,
@@ -295,7 +296,8 @@ export class NarrativeService {
 
     // Build the user prompt from entries
     const mode = story?.mode ?? 'adventure'
-    const userPrompt = this.buildUserPrompt(entries, mode)
+    const inlineImageMode = story?.settings?.imageGenerationMode === 'inline'
+    const userPrompt = this.buildUserPrompt(entries, mode, inlineImageMode)
 
     try {
       // Stream using the main narrative profile
@@ -352,7 +354,8 @@ export class NarrativeService {
     )
 
     const mode = story?.mode ?? 'adventure'
-    const userPrompt = this.buildUserPrompt(entries, mode)
+    const inlineImageMode = story?.settings?.imageGenerationMode === 'inline'
+    const userPrompt = this.buildUserPrompt(entries, mode, inlineImageMode)
 
     return generateNarrative({
       system: systemPrompt,
@@ -461,24 +464,35 @@ export class NarrativeService {
    *
    * Formats entries as a conversation history with the current action highlighted.
    */
-  private buildUserPrompt(entries: StoryEntry[], mode: 'adventure' | 'creative-writing'): string {
+  private buildUserPrompt(
+    entries: StoryEntry[],
+    mode: 'adventure' | 'creative-writing',
+    inlineImageMode: boolean = false,
+  ): string {
     // Use all entries passed - these are already the visible (non-summarized) entries
     // Truncation/context management happens upstream via the memory system
 
     // Format entries based on mode
     const historyParts: string[] = []
     for (const entry of entries) {
+      // Strip <pic> tags if not in inline mode to prevent AI from immitating them
+      const content = inlineImageMode ? entry.content : stripPicTags(entry.content)
+
       if (entry.type === 'user_action') {
         const prefix = mode === 'creative-writing' ? '[DIRECTION]' : '[ACTION]'
-        historyParts.push(`${prefix} ${entry.content}`)
+        historyParts.push(`${prefix} ${content}`)
       } else if (entry.type === 'narration') {
-        historyParts.push(`[NARRATIVE]\n${entry.content}`)
+        historyParts.push(`[NARRATIVE]\n${content}`)
       }
     }
 
     // Get the last user action as the current input
     const lastUserAction = [...entries].reverse().find((e) => e.type === 'user_action')
-    const currentAction = lastUserAction?.content ?? ''
+    const currentAction = lastUserAction
+      ? inlineImageMode
+        ? lastUserAction.content
+        : stripPicTags(lastUserAction.content)
+      : ''
 
     // Build final prompt
     let prompt = ''

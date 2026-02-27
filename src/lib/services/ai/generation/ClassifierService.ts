@@ -24,6 +24,7 @@ import { BaseAIService } from '../BaseAIService'
 import { ContextBuilder } from '$lib/services/context'
 import { database } from '$lib/services/database'
 import { createLogger } from '../core/config'
+import { stripPicTags } from '$lib/utils/inlineImageParser'
 import {
   classificationResultSchema,
   clampNumber,
@@ -125,8 +126,8 @@ export class ClassifierService extends BaseAIService {
       currentTimeInfo,
       chatHistoryBlock,
       inputLabel: mode === 'creative-writing' ? 'Author Direction' : 'Player Action',
-      userAction: context.userAction,
-      narrativeResponse: context.narrativeResponse,
+      userAction: stripPicTags(context.userAction),
+      narrativeResponse: stripPicTags(context.narrativeResponse),
       existingCharacters,
       existingLocations,
       existingItems,
@@ -403,7 +404,9 @@ export class ClassifierService extends BaseAIService {
           const t = e.metadata.timeStart
           timeInfo = ` (at Y${t.years}D${t.days} ${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')})`
         }
-        return `${prefix}${timeInfo} ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`
+        // Always strip pic tags for classification to avoid confusion
+        const cleanContent = stripPicTags(e.content)
+        return `${prefix}${timeInfo} ${cleanContent.slice(0, 500)}${cleanContent.length > 500 ? '...' : ''}`
       })
       .join('\n\n')
 
