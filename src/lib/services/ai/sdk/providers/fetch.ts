@@ -8,6 +8,7 @@
 import { ui } from '$lib/stores/ui.svelte'
 import { fetch as tauriHttpFetch } from '@tauri-apps/plugin-http'
 import { LLM_TIMEOUT_DEFAULT } from '$lib/constants/timeout'
+import { parseManualBody } from '$lib/services/ai/core/requestOverrides'
 
 function normalizeHeaders(headers: RequestInit['headers']): Record<string, string> {
   if (!headers) return {}
@@ -47,6 +48,7 @@ function patchResponseJson(json: Record<string, unknown>): Record<string, unknow
 export function createTimeoutFetch(
   timeoutMs = LLM_TIMEOUT_DEFAULT,
   serviceId: string,
+  manualBody: string = '',
   debugIdExternal?: string,
 ) {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -55,14 +57,31 @@ export function createTimeoutFetch(
 
     init?.signal?.addEventListener('abort', () => controller.abort())
     const startTime = Date.now()
-    let parsedBody: unknown = {}
+    let parsedBody: any = {}
     if (typeof init?.body === 'string') {
       try {
         parsedBody = JSON.parse(init.body)
       } catch {
-        parsedBody = { raw: init.body.slice(0, 200) }
+        throw new Error('Request body is not valid JSON')
       }
     }
+
+    const manual = parseManualBody(manualBody)
+    if (manual) {
+      const reservedKeys = new Set(['messages', 'tools', 'tool_choice', 'stream', 'model'])
+      for (const [key, value] of Object.entries(manual)) {
+        if (!reservedKeys.has(key)) {
+          parsedBody[key] = value
+        }
+      }
+    } else if (manualBody.trim()) {
+      console.log('[Fetch] Invalid manualBody JSON, skipping')
+    }
+
+    if (Object.keys(parsedBody).length === 0) {
+      parsedBody = undefined
+    }
+
     const debugId = ui.addDebugRequest(
       serviceId,
       {
@@ -73,7 +92,11 @@ export function createTimeoutFetch(
       debugIdExternal,
     )
     try {
-      const response = await tauriFetch(input, { ...init, signal: controller.signal })
+      const response = await tauriFetch(input, {
+        ...init,
+        signal: controller.signal,
+        body: parsedBody ? JSON.stringify(parsedBody) : undefined,
+      })
 
       if (!response.ok) {
         const error = await response.text()
@@ -228,7 +251,7 @@ export function createTimeoutFetch(
       const text = await response.text()
 
       let responsePayload
-      if (!(parsedBody as Record<string, unknown>).stream) {
+      if (parsedBody && !(parsedBody as Record<string, unknown>).stream) {
         try {
           responsePayload = JSON.parse(text)
         } catch {

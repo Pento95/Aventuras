@@ -14,7 +14,7 @@ import type {
   ImageGenerateResult,
   ImageModelInfo,
 } from './types'
-import { createLogger } from '../../core/config'
+import { createLogger } from '$lib/log'
 
 // Provider factory imports (lazy)
 import { createNanoGPTProvider } from './nanogpt'
@@ -24,6 +24,7 @@ import { createPollinationsProvider } from './pollinations'
 import { createGoogleProvider } from './google'
 import { createZhipuProvider } from './zhipu'
 import { createComfyProvider } from './comfy'
+import { createOpenRouterProvider } from './openrouter'
 
 const log = createLogger('ImageRegistry')
 
@@ -36,6 +37,7 @@ type ProviderFactory = (config: ImageProviderConfig) => ImageProvider
 const PROVIDER_FACTORIES: Record<ImageProviderType, ProviderFactory> = {
   nanogpt: createNanoGPTProvider,
   openai: createOpenAIProvider,
+  openrouter: createOpenRouterProvider,
   chutes: createChutesProvider,
   pollinations: createPollinationsProvider,
   google: createGoogleProvider,

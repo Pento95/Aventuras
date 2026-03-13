@@ -939,12 +939,7 @@
     emitUserInput(content, isCreativeMode ? 'direction' : forceFreeMode ? 'free' : actionType)
     await tick()
 
-    if (!settings.needsApiKey) await generateResponse(userActionEntry.id, content)
-    else
-      await story.addEntry(
-        'system',
-        'Please configure your API key in settings to enable AI generation.',
-      )
+    await generateResponse(userActionEntry.id, content)
   }
 
   async function handleStopGeneration() {
@@ -1013,12 +1008,10 @@
     await story.deleteEntry(error.errorEntryId)
     ui.clearGenerationError()
 
-    if (!settings.needsApiKey) {
-      await generateResponse(userActionEntry.id, userActionEntry.content, {
-        countStyleReview: false,
-        styleReviewSource: 'retry-error',
-      })
-    }
+    await generateResponse(userActionEntry.id, userActionEntry.content, {
+      countStyleReview: false,
+      styleReviewSource: 'retry-error',
+    })
   }
 
   function dismissError() {
@@ -1083,16 +1076,14 @@
     emitUserInput(backup.userActionContent, isCreativeMode ? 'direction' : backup.actionType)
     await tick()
 
-    if (!settings.needsApiKey) {
-      ui.setRetryingLastMessage(true)
-      try {
-        await generateResponse(userActionEntry.id, promptContent, {
-          countStyleReview: false,
-          styleReviewSource: 'retry-last-message',
-        })
-      } finally {
-        ui.setRetryingLastMessage(false)
-      }
+    ui.setRetryingLastMessage(true)
+    try {
+      await generateResponse(userActionEntry.id, promptContent, {
+        countStyleReview: false,
+        styleReviewSource: 'retry-last-message',
+      })
+    } finally {
+      ui.setRetryingLastMessage(false)
     }
   }
 
@@ -1179,7 +1170,6 @@
             bind:value={inputValue}
             use:autoResize={inputValue}
             onkeydown={handleKeydown}
-            disabled={ui.isGenerating}
             placeholder="Describe what happens next in the story..."
             class="text-surface-200 placeholder-surface-500 max-h-40 min-h-6 w-full resize-none border-none bg-transparent px-2 text-base leading-relaxed focus:ring-0 focus:outline-none sm:min-h-6"
             rows="1"
@@ -1250,7 +1240,6 @@
                     : 'What do you do?'}
             class="text-surface-200 placeholder-surface-500 max-h-[160px] min-h-[24px] w-full resize-none border-none bg-transparent px-2 text-base leading-relaxed focus:ring-0 focus:outline-none sm:min-h-[24px]"
             rows="1"
-            disabled={ui.isGenerating}
           ></textarea>
         </div>
         {#if ui.isGenerating}

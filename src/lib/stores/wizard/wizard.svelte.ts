@@ -395,6 +395,8 @@ export class WizardStore {
       name: replaceUserPlaceholders(e.name, protagonistName),
       description: replaceUserPlaceholders(e.description, protagonistName),
       keywords: e.keywords.map((k) => replaceUserPlaceholders(k, protagonistName)),
+      // To fix a regression issue where lorebooks from older versions didnt default to empty array when no aliases were set
+      aliases: e.aliases ?? [],
     }))
 
     const wizardData: WizardData = {

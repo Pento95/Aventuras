@@ -9,13 +9,50 @@ import { PROVIDERS, getBaseUrl } from './config'
 import type { ProviderType } from '$lib/types'
 
 /** Result from fetching models, including which ones support reasoning */
-export interface ModelFetchResult {
-  models: string[]
-  reasoningModels: string[]
+export interface TextModel {
+  id: string
+  reasoning?: boolean
+  structuredOutput?: boolean
+}
+
+export function dedupeTextModels(models: TextModel[]): TextModel[] {
+  const deduped = new Map<string, TextModel>()
+
+  for (const model of models) {
+    const id = model.id.trim()
+    if (!id) continue
+
+    const existing = deduped.get(id)
+    if (existing) {
+      deduped.set(id, {
+        ...existing,
+        reasoning: existing.reasoning || model.reasoning || undefined,
+        structuredOutput: existing.structuredOutput || model.structuredOutput || undefined,
+      })
+      continue
+    }
+
+    deduped.set(id, { ...model, id })
+  }
+
+  return Array.from(deduped.values())
 }
 
 /** URLs that don't require authentication for model fetching */
 const NO_AUTH_PATTERNS = ['nano-gpt.com', 'gen.pollinations.ai', '127.0.0.1', 'localhost']
+
+function normalizeBaseUrl(baseUrl?: string): string | undefined {
+  const trimmed = baseUrl?.trim()
+  return trimmed ? trimmed.replace(/\/$/, '') : undefined
+}
+
+function buildOpenRouterModelsUrl(baseUrl?: string): string {
+  const effectiveBase = normalizeBaseUrl(baseUrl) || 'https://openrouter.ai/api/v1'
+  if (effectiveBase.endsWith('/api')) {
+    return `${effectiveBase}/v1/models`
+  }
+  return `${effectiveBase}/models`
+}
 
 /**
  * Fetches available models from a provider.
@@ -24,9 +61,10 @@ export async function fetchModelsFromProvider(
   providerType: ProviderType,
   baseUrl?: string,
   apiKey?: string,
-): Promise<ModelFetchResult> {
+): Promise<TextModel[]> {
   // Provider-specific fetch logic
   if (providerType === 'nanogpt') return fetchNanogptModels(baseUrl)
+  if (providerType === 'openrouter') return fetchOpenRouterModels(baseUrl)
   if (providerType === 'google') return wrap(fetchGoogleModels(baseUrl, apiKey))
   if (providerType === 'anthropic') return wrap(fetchAnthropicModels(baseUrl, apiKey))
   if (providerType === 'chutes') return wrap(fetchChutesModels(baseUrl, apiKey))
@@ -35,7 +73,7 @@ export async function fetchModelsFromProvider(
   if (providerType === 'mistral') return wrap(fetchMistralModels(baseUrl, apiKey))
 
   // Standard OpenAI-compatible endpoint
-  const effectiveBaseUrl = baseUrl || getBaseUrl(providerType)
+  const effectiveBaseUrl = normalizeBaseUrl(baseUrl) || getBaseUrl(providerType)
   if (!effectiveBaseUrl) {
     throw new Error(`No base URL available for provider: ${providerType}`)
   }
@@ -56,32 +94,21 @@ export async function fetchModelsFromProvider(
   const data = await response.json()
 
   if (data.data && Array.isArray(data.data)) {
-    return {
-      models: [...new Set<string>(data.data.map((m: { id: string }) => m.id))],
-      reasoningModels: [],
-    }
+    return dedupeTextModels(data.data.map((m: { id: string }) => ({ id: m.id })))
   }
   if (Array.isArray(data)) {
     const entries = data as { id?: string; name?: string; reasoning?: boolean }[]
-    return {
-      models: [...new Set(entries.map((m) => m.id || m.name || '').filter(Boolean))],
-      reasoningModels: [
-        ...new Set(
-          entries
-            .filter((m) => m.reasoning)
-            .map((m) => m.id || m.name || '')
-            .filter(Boolean),
-        ),
-      ],
-    }
+    return dedupeTextModels(
+      entries.map((m) => ({ id: m.id || m.name || '', reasoning: m.reasoning })),
+    )
   }
 
   throw new Error('Unexpected API response format')
 }
 
-/** Wrap a plain string[] result into ModelFetchResult */
-function wrap(promise: Promise<string[]>): Promise<ModelFetchResult> {
-  return promise.then((models) => ({ models, reasoningModels: [] }))
+/** Wrap a plain string[] result into TextModel[] */
+function wrap(promise: Promise<string[]>): Promise<TextModel[]> {
+  return promise.then((models) => dedupeTextModels(models.map((id) => ({ id }))))
 }
 
 interface NanogptModelEntry {
@@ -90,7 +117,7 @@ interface NanogptModelEntry {
   capabilities?: string[]
 }
 
-async function fetchNanogptModels(baseUrl?: string): Promise<ModelFetchResult> {
+async function fetchNanogptModels(baseUrl?: string): Promise<TextModel[]> {
   // Use the detailed API to get capabilities including reasoning
   const effectiveBase = baseUrl?.replace(/\/v1\/?$/, '') || 'https://nano-gpt.com/api'
   const modelsUrl = effectiveBase.replace(/\/$/, '') + '/models?detailed=true'
@@ -105,18 +132,46 @@ async function fetchNanogptModels(baseUrl?: string): Promise<ModelFetchResult> {
   const data = await response.json()
   const textModels: Record<string, NanogptModelEntry> = data?.models?.text ?? {}
 
-  const modelSet = new Set<string>()
-  const reasoningSet = new Set<string>()
+  const models: TextModel[] = []
 
   for (const [key, entry] of Object.entries(textModels)) {
     const modelId = entry.model || key
-    modelSet.add(modelId)
-    if (Array.isArray(entry.capabilities) && entry.capabilities.includes('reasoning')) {
-      reasoningSet.add(modelId)
-    }
+    models.push({
+      id: modelId,
+      reasoning: entry.capabilities?.includes('reasoning'),
+      structuredOutput: entry.capabilities?.includes('structured-output'),
+    })
   }
 
-  return { models: [...modelSet], reasoningModels: [...reasoningSet] }
+  return dedupeTextModels(models)
+}
+
+async function fetchOpenRouterModels(baseUrl?: string): Promise<TextModel[]> {
+  // Use the detailed API to get capabilities including reasoning
+  const modelsUrl = buildOpenRouterModelsUrl(baseUrl)
+
+  const fetchFn = createTimeoutFetch(30000, 'model-fetch')
+  const response = await fetchFn(modelsUrl, { method: 'GET' })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch OpenRouter models: ${response.status} ${response.statusText}`)
+  }
+
+  const data = await response.json()
+  const textModels: { id: string; supported_parameters: string[] }[] = data?.data ?? []
+
+  const models: TextModel[] = []
+
+  for (const entry of textModels) {
+    const modelId = entry.id
+    models.push({
+      id: modelId,
+      reasoning: entry.supported_parameters?.includes('reasoning'),
+      structuredOutput: entry.supported_parameters?.includes('structured_outputs'),
+    })
+  }
+
+  return dedupeTextModels(models)
 }
 
 async function fetchAnthropicModels(baseUrl?: string, apiKey?: string): Promise<string[]> {
@@ -195,7 +250,7 @@ async function fetchChutesModels(baseUrl?: string, apiKey?: string): Promise<str
     throw new Error('Chutes requires an API key to fetch models')
   }
 
-  const effectiveBaseUrl = baseUrl || PROVIDERS.chutes.baseUrl
+  const effectiveBaseUrl = 'https://api.chutes.ai'
   const chutesUrl = effectiveBaseUrl.replace(/\/$/, '') + '/chutes/?include_public=true&limit=200'
 
   const fetchFn = createTimeoutFetch(30000, 'model-fetch')
@@ -216,7 +271,7 @@ async function fetchChutesModels(baseUrl?: string, apiKey?: string): Promise<str
         (r: { standard_template?: string; user?: { username: string } }) =>
           r.standard_template?.includes('llm') && r.user?.username === 'chutes',
       )
-      .map(({ slug }: { slug?: string }) => slug || '')
+      .map(({ name }: { name?: string }) => name || '')
   }
 
   throw new Error('Unexpected Chutes API response format')

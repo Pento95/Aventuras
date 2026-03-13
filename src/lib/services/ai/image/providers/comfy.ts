@@ -16,7 +16,7 @@ import type {
 import { ComfyApi, PromptBuilder, CallWrapper } from '@saintno/comfyui-sdk'
 import BasicTxt2ImgWorkflow from './comfyWorkflows/basic-txt2img-workflow.json'
 import LoraTxt2ImgWorkflow from './comfyWorkflows/lora-txt2img-workflow.json'
-import { parseImageSize } from '../imageUtils'
+import { parseImageSize } from '$lib/utils/image'
 
 const DEFAULT_BASE_URL = 'http://localhost:8188'
 
@@ -210,10 +210,6 @@ export function createComfyProvider(config: ImageProviderConfig): ImageProvider 
             ? [schedulerList]
             : [],
       }
-    },
-
-    supportsImg2Img(_modelId: string): boolean {
-      return true
     },
   }
 }
