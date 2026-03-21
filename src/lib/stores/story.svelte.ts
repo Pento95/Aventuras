@@ -44,14 +44,9 @@ import {
 } from '$lib/services/events'
 import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 import { aiService } from '$lib/services/ai'
+import { createLogger } from '$lib/log'
 
-const DEBUG = true
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[StoryStore]', ...args)
-  }
-}
+const log = createLogger('StoryStore')
 
 /**
  * Merge LLM-extracted inline runtime vars into entity metadata.runtimeVars.
@@ -4306,7 +4301,11 @@ class StoryStore {
 
     // Generate background image from opening scene
     if (data.openingScene && openingEntry && storyData.settings?.backgroundImagesEnabled) {
-      aiService.analyzeBackgroundChangeAndGenerateImage(storyId, [openingEntry])
+      aiService.analyzeBackgroundChangeAndGenerateImage(
+        storyId,
+        [openingEntry],
+        this.updateCurrentBackgroundImage.bind(this),
+      )
       log('Generated background image')
     }
 
