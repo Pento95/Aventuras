@@ -2474,6 +2474,19 @@ class SettingsStore {
   }
 
   // Wizard settings methods
+  /** Persist main narrative API settings (temperature, max tokens, reasoning) to the database. */
+  async saveApiSettings() {
+    await Promise.allSettled([
+      database.setSetting('temperature', this.apiSettings.temperature.toString()),
+      database.setSetting('max_tokens', this.apiSettings.maxTokens.toString()),
+      database.setSetting('main_reasoning_effort', this.apiSettings.reasoningEffort),
+      database.setSetting('enable_thinking', this.apiSettings.enableThinking.toString()),
+      database.setSetting('default_model', this.apiSettings.defaultModel),
+      database.setSetting('main_narrative_profile_id', this.apiSettings.mainNarrativeProfileId),
+      database.setSetting('main_manual_body', this.apiSettings.manualBody),
+    ])
+  }
+
   async saveWizardSettings() {
     await database.setSetting('wizard_settings', JSON.stringify(this.wizardSettings))
   }

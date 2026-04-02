@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import { settings } from '$lib/stores/settings.svelte'
   import { Cpu, AlertTriangle } from 'lucide-svelte'
   import { fetchModelsFromProvider } from '$lib/services/ai/sdk/providers'
@@ -18,6 +19,26 @@
 
   let isLoadingModels = $state(false)
   let modelError = $state<string | null>(null)
+
+  // Debounced save for sliders
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+  function debouncedSave() {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      settings.saveApiSettings()
+    }, 300)
+  }
+
+  function flushSave() {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+      settings.saveApiSettings()
+    }
+  }
+
+  onDestroy(() => flushSave())
 
   async function handleSetMainNarrativeProfile(profileId: string | null) {
     if (!profileId) return
@@ -91,10 +112,23 @@
       maxTokens={settings.apiSettings.maxTokens}
       reasoningEffort={settings.apiSettings.reasoningEffort}
       onProfileChange={handleSetMainNarrativeProfile}
-      onModelChange={(m) => settings.setDefaultModel(m)}
-      onTemperatureChange={(v) => settings.setTemperature(v)}
-      onMaxTokensChange={(v) => settings.setMaxTokens(v)}
-      onReasoningChange={(v) => settings.setMainReasoningEffort(v)}
+      onModelChange={(m) => {
+        settings.setDefaultModel(m)
+        debouncedSave()
+      }}
+      onTemperatureChange={(v) => {
+        settings.apiSettings.temperature = v
+        debouncedSave()
+      }}
+      onMaxTokensChange={(v) => {
+        settings.apiSettings.maxTokens = v
+        debouncedSave()
+      }}
+      onReasoningChange={(v) => {
+        settings.apiSettings.reasoningEffort = v
+        settings.apiSettings.enableThinking = v !== 'off'
+        debouncedSave()
+      }}
       onRefreshModels={fetchModelsToProfile}
       isRefreshingModels={isLoadingModels}
       isManualMode={settings.advancedRequestSettings.manualMode}

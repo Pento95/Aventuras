@@ -127,7 +127,7 @@
 
   function toggleNumericOverride() {
     if (showNumericOverride) {
-      // closing: snap slider to nearest TOKEN_STEP
+      // closing: snap slider to nearest TOKEN_STEP if within range
       showNumericOverride = false
       const snapped = TOKEN_STEPS[snapToSliderIndex(numericValue.value)]
       numericValue.value = snapped
@@ -139,6 +139,8 @@
   // ============================================================================
   // Reasoning
   // ============================================================================
+
+  let effectiveProfileId = $derived(profileId || settings.getDefaultProfileIdForProvider())
 
   const REASONING_LEVELS: ReasoningEffort[] = ['off', 'low', 'medium', 'high']
   const REASONING_LABELS: Record<ReasoningEffort, string> = {
@@ -160,40 +162,45 @@
   let reasoningValue = $derived(getReasoningIndex(reasoningEffort))
 
   let modelReasoningCapability = $derived.by<'enforced' | 'supported' | 'unsupported'>(() => {
-    if (!profileId) return 'unsupported'
-    const profile = settings.getProfile(profileId)
-    if (!profile) return 'unsupported'
-    if (!model) return 'unsupported'
-    const m = settings.getProfileModels(profileId).find((x) => x.id === model)
+    const profile = settings.getProfile(effectiveProfileId)
+    if (!profile || !model) return 'unsupported'
+    const m = settings.getProfileModels(effectiveProfileId).find((x) => x.id === model)
     if (!!m?.reasoning && profile.providerType === 'nanogpt') return 'enforced'
     if (!!m?.reasoning) return 'supported'
     return 'unsupported'
   })
 
   let globalProviderReasoningCapability = $derived.by(() => {
-    if (!profileId) return false
-    const profile = settings.getProfile(profileId)
+    const profile = settings.getProfile(effectiveProfileId)
     if (!profile || !model) return false
     return supportsReasoning(profile.providerType)
   })
 
   let providerModelCapabilityFetching = $derived.by(() => {
-    if (!profileId) return false
-    const profile = settings.getProfile(profileId)
+    const profile = settings.getProfile(effectiveProfileId)
     if (!profile) return false
     return supportsCapabilityFetch(profile.providerType)
   })
 
   let binaryReasoningProvider = $derived.by(() => {
-    if (!profileId) return false
-    const profile = settings.getProfile(profileId)
+    const profile = settings.getProfile(effectiveProfileId)
     if (!profile) return false
     return supportsBinaryReasoning(profile.providerType)
   })
 
-  // Reset reasoning to off when the provider/model stops supporting it
+  // 1. Reset reasoning to off when the provider/model stops supporting it
+  // 2. Force high reasoning for NanoGPT models that require it
   $effect(() => {
-    const _model = model // explicit tracking
+    const _model = model // track model
+    const _profile = effectiveProfileId // track profile
+
+    // Enforcement (NanoGPT)
+    if (settings.shouldForceHighReasoning(_profile, _model) && reasoningEffort === 'off') {
+      onReasoningChange('high')
+      return
+    }
+
+    // Capability check
     const reasoningSupported =
       globalProviderReasoningCapability &&
       (!providerModelCapabilityFetching || modelReasoningCapability !== 'unsupported')
@@ -203,13 +210,11 @@
   })
 
   // ============================================================================
-  // Model change with NanoGPT auto-reasoning
+  // Model change logic
   // ============================================================================
 
   function handleModelChange(newModel: string) {
-    if (settings.shouldForceHighReasoning(profileId, newModel) && reasoningValue === 0) {
-      onReasoningChange('high')
-    }
+    // Enforcement logic is now handled in the $effect above
     onModelChange(newModel)
   }
 </script>
