@@ -10,6 +10,7 @@ import { Check, ChevronDown, ChevronDownIcon, ChevronUpIcon } from 'lucide-react
 import * as React from 'react'
 import {
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -105,11 +106,13 @@ function PhoneSheetPanel({
   children,
   sheetSize,
   label,
+  tailAction,
 }: {
   className?: string
   children?: React.ReactNode
   sheetSize: ContentSheetSize
   label?: string
+  tailAction?: { label: string; onPress: () => void }
 }) {
   const { onOpenChange } = SelectBase.useRootContext()
   const insets = useSafeAreaInsets()
@@ -198,6 +201,12 @@ function PhoneSheetPanel({
           <ScrollView className="flex-1">
             <SelectBase.Viewport>{children}</SelectBase.Viewport>
           </ScrollView>
+          {tailAction != null ? (
+            <>
+              <View className="-mx-4 h-px bg-border" />
+              <TailActionRow label={tailAction.label} onPress={tailAction.onPress} />
+            </>
+          ) : null}
         </SelectBase.Content>
       </TextClassContext.Provider>
     </NativeOnlyAnimatedView>
@@ -210,12 +219,14 @@ function PhoneSheetContent({
   sheetSize = 'short',
   portalHost,
   label,
+  tailAction,
 }: {
   className?: string
   children?: React.ReactNode
   sheetSize?: ContentSheetSize
   portalHost?: string
   label?: string
+  tailAction?: { label: string; onPress: () => void }
 }) {
   return (
     <SelectBase.Portal hostName={portalHost}>
@@ -238,7 +249,12 @@ function PhoneSheetContent({
               style={Platform.select({ native: StyleSheet.absoluteFill })}
             />
           </NativeOnlyAnimatedView>
-          <PhoneSheetPanel className={className} sheetSize={sheetSize} label={label}>
+          <PhoneSheetPanel
+            className={className}
+            sheetSize={sheetSize}
+            label={label}
+            tailAction={tailAction}
+          >
             {children}
           </PhoneSheetPanel>
         </View>
@@ -252,10 +268,12 @@ function PopoverContent({
   children,
   position = 'popper',
   portalHost,
+  tailAction,
   ...props
 }: React.ComponentProps<typeof SelectBase.Content> & {
   className?: string
   portalHost?: string
+  tailAction?: { label: string; onPress: () => void }
 }) {
   const { height: screenHeight } = useWindowDimensions()
   const nativeMaxHeight = Math.floor(screenHeight * 0.5)
@@ -284,8 +302,15 @@ function PopoverContent({
                     position === 'popper' &&
                       cn(
                         'w-full',
+                        // Lock viewport width to the trigger so rich
+                        // content (chips, multi-line rows) can't
+                        // overflow past the anchor and overlap
+                        // adjacent layout (e.g. summary panels in
+                        // side-by-side hosts). Plain-label Select
+                        // usage was already content-narrower than
+                        // trigger, so this is a no-op there.
                         Platform.select({
-                          web: 'h-[var(--radix-select-trigger-height)] min-w-[var(--radix-select-trigger-width)]',
+                          web: 'h-[var(--radix-select-trigger-height)] w-[var(--radix-select-trigger-width)]',
                         }),
                       ),
                   )}
@@ -297,6 +322,12 @@ function PopoverContent({
                   )}
                 </SelectBase.Viewport>
                 <ScrollDownButton />
+                {tailAction != null ? (
+                  <>
+                    <View className="h-px bg-border" />
+                    <TailActionRow label={tailAction.label} onPress={tailAction.onPress} />
+                  </>
+                ) : null}
               </SelectBase.Content>
             </NativeOnlyAnimatedView>
           </TextClassContext.Provider>
@@ -309,12 +340,14 @@ function PopoverContent({
 function Content({
   sheetSize,
   label,
+  tailAction,
   ...props
 }: React.ComponentProps<typeof SelectBase.Content> & {
   className?: string
   portalHost?: string
   sheetSize?: ContentSheetSize
   label?: string
+  tailAction?: { label: string; onPress: () => void }
 }) {
   const tier = useTier()
   // Sheet shape is a touch idiom (large pull-down picker on a small
@@ -324,12 +357,43 @@ function Content({
   const usesSheet = Platform.OS !== 'web' && tier === 'phone'
   if (usesSheet) {
     return (
-      <PhoneSheetContent className={props.className} sheetSize={sheetSize} label={label}>
+      <PhoneSheetContent
+        className={props.className}
+        sheetSize={sheetSize}
+        label={label}
+        tailAction={tailAction}
+      >
         {props.children}
       </PhoneSheetContent>
     )
   }
-  return <PopoverContent {...props} />
+  return <PopoverContent tailAction={tailAction} {...props} />
+}
+
+// Pressable row pinned at the bottom of the popover / sheet — the
+// `Manage in Vault →` style escape hatch surfaced via Select's
+// `tailAction` prop. Closes the dropdown on press in addition to
+// firing the caller's handler so navigation can take over without
+// the popover lingering.
+function TailActionRow({ label, onPress }: { label: string; onPress: () => void }) {
+  const { onOpenChange } = SelectBase.useRootContext()
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={() => {
+        onOpenChange(false)
+        onPress()
+      }}
+      className={cn(
+        'flex-row items-center justify-between px-row-x-md py-row-y-md active:bg-tint-press',
+        Platform.select({ web: 'cursor-pointer hover:bg-tint-hover' }) ?? '',
+      )}
+    >
+      <Text size="sm" className="font-medium">
+        {label}
+      </Text>
+    </Pressable>
+  )
 }
 
 function Label({ className, ...props }: React.ComponentProps<typeof SelectBase.Label>) {
@@ -344,30 +408,54 @@ function Label({ className, ...props }: React.ComponentProps<typeof SelectBase.L
 function Item({
   className,
   children,
+  customContent,
   ...props
-}: React.ComponentProps<typeof SelectBase.Item> & { children?: React.ReactNode }) {
-  // Tier-conditional row treatment: when the Item lives inside the
-  // bottom Sheet (PhoneSheetContent — native phone only), it needs
-  // touch-sized min-height (`control-lg`), an edge-to-edge bleed
-  // (`-mx-4` cancels Sheet panel's p-4 so dividers run full width),
-  // a top border on the first row + closing border on the last so
-  // the list visually anchors against the surrounding Sheet chrome,
-  // and `pl-8` so option text doesn't sit cropped against the
-  // screen edge. `w-auto` overrides the base `w-full` so the
-  // negative margin extends symmetrically.
-  // Desktop / tablet popover (and web at any width — sheet is gated
-  // to native-phone only) keeps the original tighter chrome:
-  // hairline borders between rows + `last:border-b-0` since the
-  // popover's own outer border closes the list.
+}: React.ComponentProps<typeof SelectBase.Item> & {
+  children?: React.ReactNode
+  /**
+   * When true, the default `<ItemText />` is suppressed and the
+   * selection-indicator wrapper repositions to the LEFT of the row
+   * (`absolute left-2`) so caller-rendered content can occupy the
+   * trailing edge for chips, badges, etc. Caller is responsible for
+   * the visible text — Item's `label` prop still drives the
+   * accessible-name + value semantics.
+   */
+  customContent?: boolean
+}) {
+  // Tier-conditional row treatment: phone-tier Sheet rows need
+  // touch-sized min-height (`control-lg`) and a top border on the
+  // first row so the list visually anchors against the Sheet chrome.
+  // Both phone and tablet/desktop variants render INSET inside the
+  // panel — no `-mx-4` edge-to-edge bleed. The earlier bleed pattern
+  // forced `pl-8` / `pr-10` gymnastics to keep content off the panel
+  // edges, and broke down for `customContent` rows where rich content
+  // wanted the trailing edge for chips. Inset rows leave the panel's
+  // padding cushion intact, the selected-bg reads as a clean inset
+  // highlight rather than fighting the rounded corners, and the row
+  // contract no longer differs between phone and other tiers.
   const tier = useTier()
   const isPhone = Platform.OS !== 'web' && tier === 'phone'
   return (
     <SelectBase.Item
       className={cn(
-        'group relative flex w-full flex-row items-center gap-2 rounded-sm border-b border-b-border py-row-y-md pl-row-x-md pr-10 active:bg-bg-sunken',
-        isPhone
-          ? '-mx-4 min-h-control-lg w-auto pl-8 first:border-t first:border-t-border'
-          : 'last:border-b-0',
+        'group relative flex w-full flex-row items-center gap-2 rounded-sm border-b border-b-border py-row-y-md active:bg-bg-sunken',
+        // Reserve gutter only on the default-content path: the
+        // selected check sits at `right-3` and needs `pr-10` to keep
+        // text from overlapping. `customContent` rows drop the check
+        // entirely (bg-tint signals selection — see below) so the
+        // row uses standard horizontal padding on both sides.
+        customContent ? 'px-row-x-md' : 'pl-row-x-md pr-10',
+        isPhone ? 'min-h-control-lg first:border-t first:border-t-border' : 'last:border-b-0',
+        // Selected-row affordance:
+        // - Default content: the absolute Check icon is the signal.
+        // - Custom content: rich rows often carry their own
+        //   trailing chips/badges; an extra check competes for the
+        //   left edge, and surface tint reads cleaner. Use Radix's
+        //   `data-state="checked"` attribute (web) /
+        //   `accessibilityState.selected` mapping (native) — which
+        //   the rn-primitives wrapper drives — to drop the bg tint
+        //   on the selected row.
+        customContent && 'data-[state=checked]:bg-bg-sunken',
         Platform.select({
           web: 'cursor-default outline-none hover:bg-bg-sunken focus:bg-bg-sunken data-[disabled]:pointer-events-none [&_svg]:pointer-events-none',
         }),
@@ -376,12 +464,16 @@ function Item({
       )}
       {...props}
     >
-      <View className="absolute right-3 flex size-5 items-center justify-center">
-        <SelectBase.ItemIndicator>
-          <Icon as={Check} size="md" className="shrink-0" />
-        </SelectBase.ItemIndicator>
-      </View>
-      <SelectBase.ItemText className="select-none text-base text-fg-primary" />
+      {customContent ? null : (
+        <>
+          <View className="absolute right-3 flex size-5 items-center justify-center">
+            <SelectBase.ItemIndicator>
+              <Icon as={Check} size="md" className="shrink-0" />
+            </SelectBase.ItemIndicator>
+          </View>
+          <SelectBase.ItemText className="select-none text-base text-fg-primary" />
+        </>
+      )}
       {children as React.ReactNode}
     </SelectBase.Item>
   )
@@ -490,6 +582,38 @@ export type SelectProps = {
   label?: string
   disabled?: boolean
   className?: string
+
+  /**
+   * Custom row renderer for `dropdown` mode. When provided, replaces
+   * the default `<ItemText />` rendering for each option — used by
+   * compounds (e.g. `CalendarPicker`) that need rich two-line rows
+   * with chips, sub-line tier paths, etc. Selection indicator
+   * automatically flips to the row's left edge so caller-supplied
+   * trailing content (chips, badges) doesn't clash. Ignored for
+   * `segment` and `radio` modes.
+   */
+  renderRow?: (args: { option: SelectOption; selected: boolean }) => React.ReactNode
+
+  /**
+   * Custom trigger content for `dropdown` mode. Replaces the
+   * default `<Value placeholder=… />` rendering. Used by compounds
+   * that need to display the selected option with auxiliary content
+   * (chips, badges, secondary labels). The chevron remains at the
+   * right edge regardless. Ignored for `segment` and `radio` modes.
+   */
+  renderTrigger?: (args: {
+    selected: SelectOption | undefined
+    placeholder: string | undefined
+  }) => React.ReactNode
+
+  /**
+   * Optional fixed action surfaced at the bottom of the popover /
+   * sheet, after the option list. Closes the dropdown on press in
+   * addition to firing the caller's handler. Used for
+   * `Manage in Vault →` style escape hatches that route the user
+   * out of selection. Ignored for `segment` and `radio` modes.
+   */
+  tailAction?: { label: string; onPress: () => void }
 }
 
 function resolveMode(
@@ -508,6 +632,29 @@ function autoSheetSize(options: SelectOption[]): ContentSheetSize {
   if (options.some((o) => o.group)) return 'medium'
   if (options.length > 6) return 'medium'
   return 'short'
+}
+
+// Bucket options into ordered groups, preserving first-seen order
+// of group names and option order within each group. Ungrouped
+// options collect under a `null` key and surface without a Label
+// in the rendered list.
+function groupOptions(options: SelectOption[]): {
+  name: string | null
+  options: SelectOption[]
+}[] {
+  const groups: { name: string | null; options: SelectOption[] }[] = []
+  const byName = new Map<string | null, SelectOption[]>()
+  for (const opt of options) {
+    const key = opt.group ?? null
+    let bucket = byName.get(key)
+    if (!bucket) {
+      bucket = []
+      byName.set(key, bucket)
+      groups.push({ name: key, options: bucket })
+    }
+    bucket.push(opt)
+  }
+  return groups
 }
 
 function SegmentBranch({ options, value, onValueChange, disabled, className }: SelectProps) {
@@ -614,6 +761,9 @@ function DropdownBranch({
   placeholder,
   label,
   className,
+  renderRow,
+  renderTrigger,
+  tailAction,
 }: SelectProps) {
   const selected = options.find((o) => o.value === value)
   const resolvedSheetSize: ContentSheetSize =
@@ -626,15 +776,48 @@ function DropdownBranch({
       }}
       disabled={disabled}
     >
-      <Trigger className={className}>
-        <Value placeholder={placeholder} />
+      <Trigger className={className} disabled={disabled}>
+        {renderTrigger != null ? (
+          renderTrigger({ selected, placeholder })
+        ) : (
+          <Value placeholder={placeholder} />
+        )}
       </Trigger>
-      <Content sheetSize={resolvedSheetSize} label={label}>
-        <Group>
-          {options.map((opt) => (
-            <Item key={opt.value} value={opt.value} label={opt.label} disabled={opt.disabled} />
-          ))}
-        </Group>
+      <Content
+        sheetSize={resolvedSheetSize}
+        label={label}
+        tailAction={tailAction}
+        // Rich custom rows are roughly twice the height of label-only
+        // rows; the default `max-h-52` (208 px) clips at ~3 rows on
+        // the popover. Lift to `max-h-96` (384 px) when `renderRow`
+        // is set. **Web only** — native phone takes the Sheet branch
+        // where `sheetSize` controls height; passing a max-h here
+        // would cap the sheet panel below `sheetSize` and leave a
+        // visible gap below it on the screen.
+        className={
+          renderRow != null ? (Platform.select({ web: 'max-h-96' }) ?? undefined) : undefined
+        }
+      >
+        {groupOptions(options).map((group) => (
+          <Group key={group.name ?? '__ungrouped__'}>
+            {group.name != null ? <Label>{group.name}</Label> : null}
+            {group.options.map((opt) =>
+              renderRow != null ? (
+                <Item
+                  key={opt.value}
+                  value={opt.value}
+                  label={opt.label}
+                  disabled={opt.disabled}
+                  customContent
+                >
+                  {renderRow({ option: opt, selected: opt.value === value })}
+                </Item>
+              ) : (
+                <Item key={opt.value} value={opt.value} label={opt.label} disabled={opt.disabled} />
+              ),
+            )}
+          </Group>
+        ))}
       </Content>
     </Root>
   )
