@@ -73,13 +73,13 @@ for the rule.
 | EntityKindIcon | `components/entity/`    | 22×22 box, Lucide glyph centered (User / MapPin / Package / Flag). Color inherits via `TextClassContext`.                                                                          |
 | FormRow        | `components/compounds/` | Container-keyed stacked-vs-2-col layout (label / hint / error / required slot). Library-agnostic — caller pipes the error string.                                                  |
 | ListRow        | `components/compounds/` | Pan-domain row carrying four indicator channels: lead-badge (slot), status-pill (slot), scene-presence (typed left-edge stripe), recently-classified (typed background-tint enum). |
+| SaveBar        | `components/compounds/` | Save-session footer — dirty-note left, Discard / Save right. Bg derived from `--warning` at 12% via overlay-View (cross-platform). `⌘/Ctrl-S` shortcut on web only.                |
 | SwitchRow      | `components/compounds/` | Label + description + toggle, three-peer row.                                                                                                                                      |
 
 ### Compounds — build-ready
 
 | Compound       | Folder                  | Spec                                                                                       | Notes                                                                                                     |
 | -------------- | ----------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| SaveBar        | `components/compounds/` | [save-sessions.md → Save bar](./patterns/save-sessions.md#save-bar--the-visible-ui)        | Composition; pairs with the `useNavGuard` hook (lives in `hooks/`, not here).                             |
 | CalendarPicker | `components/compounds/` | [calendar-picker.md](./patterns/calendar-picker.md)                                        | Hosted in App Settings / Story Settings / Wizard. Spec covers all three host adaptations + swap warnings. |
 | JSONViewer     | `components/compounds/` | [data.md → Raw JSON viewer](./patterns/data.md#raw-json-viewer--shared-modal-pattern)      | Modal-shaped read-out.                                                                                    |
 | Importer       | `components/compounds/` | [data.md → Import counterparts](./patterns/data.md#import-counterparts--file-based--vault) | File picker + Vault picker.                                                                               |
