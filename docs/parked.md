@@ -24,6 +24,38 @@ commit that resolves an item carries the resolution narrative.
 
 ### Data-model (post-v1)
 
+#### Zod schemas as source of truth for typed-enum unions
+
+Several compound APIs duplicate enum unions from the data-model
+spec by hand:
+
+- `DeltaLogRow.source` mirrors `deltas.source` per the
+  [DeltaLogRow pattern](./ui/patterns/delta-log-row.md#compound-api).
+- `DeltaLogRow.op` mirrors `deltas.op`.
+- `EntryCard.kind` mirrors `story_entries.kind` per the
+  [EntryCard pattern](./ui/patterns/entry-card.md#compound-api).
+- `StoryCard.story.mode` mirrors `stories.mode` per the
+  [StoryCard pattern](./ui/patterns/story-card.md#compound-api).
+
+Today each compound types its own union, manually kept in sync
+with the data-model spec. Drift risk is small but real.
+
+The fix lands when centralized Zod schemas for the data model
+exist (Zod isn't currently a dependency; no code imports it
+yet). Once Zod schemas are the runtime+typing source of truth
+for the data model, compound API unions should derive via
+`z.infer<typeof xSchema>['source']` (or equivalent) rather than
+re-typing the enum independently. Eliminates the duplication
+without changing compound shapes.
+
+Lands: alongside whichever first body of work introduces Zod as
+a dep — likely the import / export validation surfaces (already
+hinted at in the
+[Importer needs-design row](./ui/component-inventory.md#compounds--needs-design)
+as "zod-validated parse"). At that point the data-model schemas
+get authored as Zod, and the compound APIs that mirror them
+switch to inferred types.
+
 #### Vault content storage pattern
 
 When Vault gets wireframed (currently deferred per
@@ -832,10 +864,12 @@ The [calendar picker pattern's](./ui/patterns/calendar-picker.md)
 popover gains an inline search/filter bar at some option-count
 threshold (rough lean: ≥ 8). Pick the actual number once we have
 real preset catalogs to test against — speculative until the
-catalog size is concrete enough to validate against. Pairs with
-the active
-[Calendar picker primitive — Select-extension vs Picker-fork](./followups.md#calendar-picker-primitive--open-shape-decisions)
-followup.
+catalog size is concrete enough to validate against. The picker's
+open-shape question (Select-extension vs Picker-fork) was
+resolved during the calendar-picker build pass — picker extends
+Select via the `renderRow` / `renderTrigger` / `tailAction` hooks
+documented in
+[`forms.md → Select primitive`](./ui/patterns/forms.md#select-primitive).
 
 #### Chip input vs comma-separated string
 
