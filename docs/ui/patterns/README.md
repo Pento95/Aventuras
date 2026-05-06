@@ -49,5 +49,10 @@ The split heuristic + when-to-add rules live in
   selector shared across App Settings, Story Settings, and Wizard:
   rich rows, summary panel, swap warnings (origin / eras / display),
   edit-restrictions gating.
+- [`toolbar.md`](./toolbar.md) — list-pane chrome compound: search
+  with scope, filter chips, conditional sort. Cross-tier overflow
+  rule (search-on-own-row at narrow tiers, single horizontal row
+  at desktop). Used across Story List, World, Plot, Reader Browse
+  rail.
 - [`data.md`](./data.md) — raw JSON viewer, import counterparts
   (file-based + Vault).
