@@ -8,7 +8,6 @@ import {
 } from 'react-native'
 
 import { Tag } from '@/components/ui/tag'
-import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/utils'
 
 type TagInputProps = {
@@ -212,12 +211,7 @@ export function TagInput({
     <View className={wrapperClasses}>
       {value.map((tag, idx) => (
         <Tag key={tag} removable onRemove={() => removeAt(idx)} disabled={disabled}>
-          {/* `leading-none` forces line-height: 1 so the glyph fills
-              its text box, eliminating the implicit text-xs leading
-              that Storybook's vite RN-Web build renders asymmetrically.
-              Tag's TextClassContext provides the inherited text-xs +
-              color; this override merges with it via cn. */}
-          <Text className="leading-none">{tag}</Text>
+          {tag}
         </Tag>
       ))}
       <TextInput
