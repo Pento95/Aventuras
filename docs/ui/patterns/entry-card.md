@@ -33,7 +33,7 @@ type EntryCardProps = {
   onDelete?: () => void // not for opening (block-delete) or system/streaming
 
   // AI / opening:
-  meta?: { tokens: { reply: number; reasoning?: number }; model?: string }
+  meta?: { tokens: { reply: number; reasoning?: number } }
   reasoning?: string
   onRegen?: () => void // ai only
   onBranch?: () => void // ai, opening
@@ -82,7 +82,7 @@ Two structural choices:
 | Content                    | prose (or textarea if `editing`) | prose                                     | prose                                  | error description with inline action buttons | partial prose tokens                  |
 | Action cluster (top-right) | edit, `[flip era]`, delete       | edit, regen, branch, `[flip era]`, delete | edit, branch, `[flip era]` (no delete) | — (uses inline buttons)                      | —                                     |
 | World-time footer          | shown                            | shown                                     | shown                                  | hidden                                       | hidden                                |
-| Bubble styling             | `bg-highlight border-line-soft`  | `bg-region border-line`                   | same as ai                             | warn-tinted                                  | ai styling plus dashed border         |
+| Bubble styling             | `bg-bg-sunken border-border`     | `bg-bg-raised border-border`              | same as ai                             | `bg-bg-base border-warning`                  | ai styling plus `border-dashed`       |
 
 `opening` renders identically to `ai` for visual treatment; the
 discriminator only affects available actions. See
@@ -100,7 +100,13 @@ Brain icon renders only when `reasoning` is present, or when
 **State:** internal `expanded: boolean`, default `false`. Click
 brain toggles. No external override prop.
 
-**Animation:**
+**Animation (deferred to a polish pass):**
+
+The v1 implementation toggles render via `display: none` — instant
+show/hide. The animation specs below are the target for the polish
+pass; the contract for parent virtualization (deterministic layout
+transition, measurable) holds either way because instant is also
+deterministic.
 
 - Web: `transition: max-height 200ms ease-out` with
   measured-height clamp.
@@ -127,10 +133,14 @@ When `editing === true`:
   instead of prose `<Text>`.
 - Textarea seeded with current `content`.
 - `onContentChange(next)` fires on each keystroke.
-- `<SaveBar>` is NOT rendered inside EntryCard. Host wires the
-  existing [save-session pattern](./save-sessions.md) at
-  detail-pane level; EntryCard exposes
-  `onCommitEdit / onCancelEdit` for the host to bind.
+- **Inline Save / Cancel buttons** render right-aligned below the
+  textarea, wired to `onCommitEdit` / `onCancelEdit`. Esc-to-cancel
+  also bound on the textarea.
+- The full [`<SaveBar>` compound](./save-sessions.md) is NOT
+  rendered inside EntryCard — that's the page-level sticky
+  pattern, not a per-entry control. A host that needs cross-entry
+  dirty-state tracking can mount its own SaveBar at detail-pane
+  level in parallel.
 - Brain, reasoning body, and action cluster are hidden during
   edit. The entry is in edit-mode focus.
 - Reasoning text is NOT editable. Only `content`. Reasoning is
@@ -140,6 +150,13 @@ When `editing === true`:
 full content width. Mobile keyboard pushes the textarea up via
 existing form-row patterns. No sheet, no modal — keeps the edit
 in narrative flow.
+
+**Mobile contract:** the host's `<ScrollView>` MUST set
+`keyboardShouldPersistTaps="handled"`. Without it, the first tap
+on Save / Cancel only dismisses the soft keyboard and the user
+needs a second tap to fire the button — RN's default
+`"never"` consumes the dismissal tap. The compound can't fix this
+on its own; the behavior is owned by the parent ScrollView.
 
 ## World-time footer
 

@@ -72,11 +72,11 @@ lives.
 
 Left-anchored, ~10-12 px dot or short pill. Color-keyed:
 
-| op       | Color slot                      |
-| -------- | ------------------------------- |
-| `create` | `text-success-fg bg-success-bg` |
-| `update` | `text-accent-fg bg-accent-bg`   |
-| `delete` | `text-danger-fg bg-danger-bg`   |
+| op       | Color slot                   |
+| -------- | ---------------------------- |
+| `create` | `bg-success text-success-fg` |
+| `update` | `bg-accent text-accent-fg`   |
+| `delete` | `bg-danger text-danger-fg`   |
 
 The op label renders inside the badge at `text-xs font-medium`.
 

@@ -80,11 +80,19 @@ opacity applies.
 
 - **Left-edge accent strip (4 px).** Color: `accent_color`
   override on the story row; falls back to mode-derived
-  (Adventure blue, Creative purple).
-- **Overflow menu (`⋯`).** Absolute top-right. Opens a Popover
-  (desktop, tablet) or Sheet (phone) per
-  [layout.md → Surface bindings](../foundations/mobile/layout.md#surface-bindings--existing-app-surfaces).
-  Actions: Archive/Unarchive, Edit info, Duplicate, Export, Delete
+  (Adventure blue, Creative purple). The fallback is currently
+  pinned in the compound as `#3b82f6` (adventure) / `#a855f7`
+  (creative). When the visual identity session lands proper
+  themed tokens, the compound swaps the inline hex for var()
+  references.
+- **Overflow menu (`⋯`).** Absolute top-right. Opens a Popover on
+  every tier — matches the
+  [`ImporterMenu`](./data.md#import-counterparts--file-based--vault)
+  precedent and the
+  [`Toolbar.Search` scope-help](./toolbar.md#toolbarsearch). Sheet
+  was considered for phone but felt heavy for a 5-action menu and
+  inconsistent with the project's other compound menus. Actions:
+  Archive/Unarchive, Edit info, Duplicate, Export, Delete
   (destructive last).
 - **Genre overline.** Uppercase label above the title,
   newspaper-section style. Accent-colored (matches the strip).
@@ -101,25 +109,34 @@ opacity applies.
 
 ## Favorite star — visibility exception
 
-The favorite star does NOT follow the
-[icon-actions visibility rule](./icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover).
-Deliberate visual-hierarchy management:
+The favorite star follows the
+[icon-actions color-tier rule](./icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover)
+but with a darker rest tier than the default — deliberate
+visual-hierarchy management:
 
-| State                 | Opacity at rest       | On hover/focus                    |
-| --------------------- | --------------------- | --------------------------------- |
-| Favorited             | 100% (gold filled)    | unchanged                         |
-| Not favorited (web)   | ~25% (outline, muted) | 100% (outline, full color)        |
-| Not favorited (touch) | ~25% (outline, muted) | tap fires toggle (no hover state) |
+| State                 | Color at rest                 | On hover/focus                             |
+| --------------------- | ----------------------------- | ------------------------------------------ |
+| Favorited             | `text-warning` (gold, filled) | unchanged                                  |
+| Not favorited (web)   | `text-fg-muted` (outline)     | `text-fg-primary` (outline, full color)    |
+| Not favorited (touch) | `text-fg-muted` (outline)     | tap fires toggle directly (no hover state) |
 
 **Why:** the star sits inline in the title row, not in a separate
-action cluster. Always-visible-muted (the icon-actions default)
-would compete with the title's bold weight. 25% rest opacity
-keeps the title clean; hover/focus reveals it for action discovery
-on desktop. Touch users tap a visible-but-muted star directly.
+action cluster. Always-visible at `text-fg-secondary` (the
+icon-actions default) would compete with the title's bold weight.
+The deeper-muted rest tier keeps the title clean; hover/focus
+brightens it for action discovery on desktop. Touch users tap the
+muted star directly.
+
+**Why color tiers, not opacity tiers** — an earlier draft used
+`opacity-25 → opacity-100` on hover, but cssInterop strips
+`opacity` to a style prop on RN-Web that doesn't compose with
+`hover:` modifiers (the same trap icon-actions hit). Color tiers
+deliver the same visual hierarchy through a property that does
+compose.
 
 This is the canonical exception to icon-actions; new inline
 single-icon affordances inside content (not action clusters)
-should consider the same exception.
+should consider the same darker-rest-tier treatment.
 
 ## Status badges (Chip primitives)
 
