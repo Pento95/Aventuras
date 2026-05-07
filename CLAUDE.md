@@ -16,6 +16,9 @@ vars, no BaaS.
 - [`docs/data-model.md`](./docs/data-model.md) — schema + decisions.
 - [`docs/architecture.md`](./docs/architecture.md) — pipeline,
   state, retrieval, translation.
+- [`docs/memory.md`](./docs/memory.md) — memory pipeline: cadence
+  layers, embedding infrastructure, retrieval queries, pinning,
+  per-type budgets.
 - [`docs/ui/`](./docs/ui/README.md) — UI design (principles +
   per-screen wireframes & docs).
 - [`docs/followups.md`](./docs/followups.md) — active outstanding

@@ -12,6 +12,11 @@ implementation, and the open questions tracked across the project.
 - **[data-model.md](./data-model.md)** — schema, decisions, the
   `entities` / `lore` / `threads` / `happenings` shapes. What's
   stored.
+- **[memory.md](./memory.md)** — how prose and structured world state
+  stay consistent turn by turn, what gets injected into each
+  generation call, how older content ranks against current scene
+  context. Cadence, embedding infrastructure, retrieval queries,
+  pinning.
 - **[calendar-systems/](./calendar-systems/README.md)** — tiered-counter
   primitive for in-world date-time display, classifier vocabulary,
   and (eventually) user-authored fictional calendars. Design spec,
