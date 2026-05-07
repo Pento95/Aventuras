@@ -160,6 +160,55 @@ Same design pass as the lore-management agent shape above —
 chapter-close lore-mgmt is one of the agents whose write contract
 this section locks down.
 
+### Delta diff cache for history surfaces
+
+The [`deltas`](./data-model.md#diagram) table stores `undo_payload` —
+the data needed to reverse a change — but not the post-state. To
+render the host-formatted `summary` strings the
+[DeltaLogRow pattern](./ui/patterns/delta-log-row.md) takes opaque
+(e.g., `Added "former soldier"; was ["brave", "loyal"]`), the host
+needs both the OLD value (in `undo_payload`) and the NEW value
+(absent). Walking the deltas chain forward to derive each
+post-state on read is fine for a single per-target history view,
+but expensive for the cross-cutting global delta-log surface.
+
+Direction agreed (informal — pending design pass for schema and
+SQL shape):
+
+- **Cache shape: post-state JSON, separate table.** Mirror the
+  shape of `undo_payload` but for the new value, in a separate
+  cache table (e.g., `delta_redo` or `delta_snapshots`). Keeps
+  the `deltas` table narrow as the canonical reversal log; cache
+  is fully disposable + rebuilable from `deltas` + current target
+  state.
+- **Per-field, not full row.** Match `undo_payload`'s scope —
+  only the touched fields. Tiny edits don't blow up to full-row
+  snapshots.
+- **Lazy population.** Fill on first view of a target chain;
+  history surfaces sort newest → oldest so a user typically only
+  pages a small window before navigating away. Write-time
+  population was rejected because most deltas are never browsed.
+- **Display layer formats prose at render time** from `(old, new)`
+  diff inputs. Keeps the cache language- and format-agnostic;
+  translation and prose-tuning don't need cache rebuilds.
+
+Decisions deferred to the design session:
+
+- Concrete table schema (PK shape, indexes, branch-scoping).
+- Eviction / bounded-size policy, or unbounded with vacuum on
+  manual command.
+- Cold-read strategy for the global delta-log surface — does it
+  precompute on idle, constrain to the most recent N deltas with
+  on-demand expansion, or accept the first-paint cost?
+- Backfill / rebuild ergonomics — single command, branch-scoped,
+  per-target?
+- Concurrency between an in-progress walk and a fresh delta write
+  on the same target (single-writer SQLite makes this less
+  fraught, but the policy still needs to be named).
+
+Lands before any history surface goes interactive in v1
+(World history tab, Plot history tab, future global delta-log).
+
 ---
 
 ## UX
