@@ -435,12 +435,10 @@ Three fields, top-down:
 - **`priority`** (integer input, narrow). Default `0`. Tooltip
   explains the working model: "Higher priority is preferred when
   retrieval is token-budget-constrained. Ties break by recency.
-  Semantics will firm up alongside the retrieval-agent design
-  pass." The tooltip is honest about the spec gap; the field is
-  editable but its precise effect is gated. Open question folded
-  into the
-  [`Lore-management agent shape`](../../../followups.md#lore-management-agent-shape)
-  followup.
+  Semantics firmed up in the memory design pass: priority is 0-100,
+  integrated into the ranker as
+  `sim_blend × (priority/100) + kw_boost`. See
+  [`docs/memory/retrieval.md → The ranker`](../../../memory/retrieval.md#the-ranker).
 - **`tags`** (chip row with `+ add`): edit destination for tags
   surfaced read-only on glance / search. Same shape as entity tags.
 

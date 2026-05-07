@@ -309,7 +309,7 @@ Things considered, with verdicts:
 - **Mobile.** Chrome `Flip era…` link adapts to mobile reader
   chrome (tap target sizing); Actions menu adapts as the existing
   mobile pattern does; per-entry icon already follows
-  [icon-actions cross-device rules](../ui/patterns/icon-actions.md#visibility--always-rendered-muted-default-brighten-on-hover).
+  [icon-actions cross-device rules](../ui/patterns/icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover).
   Modal already works the same on mobile. Out of scope here in the
   same way the existing wireframes are: desktop-first.
 - **Translation.** Era names are **not subject to translation** —

@@ -244,10 +244,10 @@ delta-exemption rule and "Opening entry" for opening invariants.
 
 **Background-agent declaration interface.**
 
-Future background agents (style-review, future standalone
-memory-compaction, etc.) declare their gate behavior at their own
-design pass. The principle here owns the declaration shape; the
-agent's design pass picks values.
+Background agents (the periodic classifier; future style-review,
+etc.) declare their gate behavior at their own design pass. The
+principle here owns the declaration shape; the agent's design pass
+picks values.
 
 | Field            | Values                                                         |
 | ---------------- | -------------------------------------------------------------- |
@@ -261,12 +261,35 @@ agent's design pass picks values.
 only the agent's `writeSet` (machinery lands when the first agent
 uses it). `'no-gate'` runs without restricting user editing —
 appropriate when `writeSet` is genuinely disjoint from anything
-user-editable (style-review writing to its own output store).
-`conflictPolicy` defines what happens when a per-turn or
-chapter-close pipeline starts while this agent is mid-run; no
-default — wrong choice either burns provider budget
-(`'abort-self'` on a long agent every turn) or blocks the user
-(`'block-pipeline'` on a slow agent).
+user-editable (the periodic classifier writes happenings + awareness
+
+- status flips, all field-disjoint from per-turn user edits).
+  `conflictPolicy` defines what happens when a per-turn or
+  chapter-close pipeline starts while this agent is mid-run; no
+  default — wrong choice either burns provider budget
+  (`'abort-self'` on a long agent every turn) or blocks the user
+  (`'block-pipeline'` on a slow agent).
+
+**First real consumer: the periodic classifier** (per
+[`docs/memory/classifier.md`](./memory/classifier.md)) declares
+`gateBehavior: 'no-gate'`, `conflictPolicy: 'concurrent-allowed'`,
+`affordance: 'pill-only'` (or `'invisible'`; UI surface design TBD).
+`'concurrent-allowed'` works because the classifier's write set is
+disjoint from piggyback's at field-level granularity (status +
+description vs. visual + location + inventory) — see
+[`docs/memory/cadence.md → Concurrency`](./memory/cadence.md#concurrency).
+Chapter-close lifts the concurrency for its own duration: the
+periodic classifier doesn't start a new pass while chapter-close is
+in flight.
+
+**Single-writer-per-write-set in v1.** With the periodic classifier
+running concurrent with per-turn pipelines, the original
+"single-writer" invariant relaxes — but only at the field-set
+boundary the agents declare. User edits still respect the gate
+during pipeline runs; piggyback can't be in flight during
+chapter-close because chapter-close runs between turns by
+construction. See
+[`docs/memory/cadence.md → Single-writer-per-write-set`](./memory/cadence.md#single-writer-per-write-set-in-v1).
 
 **`readSet` is intentionally absent.** Per
 [The single-context principle](#the-single-context-principle),
@@ -659,19 +682,36 @@ wipes everything. The delta log carries the history.
 
 ## Agent orchestration
 
-Three background-ish agents run in this app. Each has a clear cadence
-trigger and clear scope.
+Memory-state writes split across three time scales per the cadence
+stratification in [`docs/memory/cadence.md`](./memory/cadence.md):
 
-| Agent                       | Trigger                              | Scope                                                                                                                                     |
-| --------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Classifier**              | Every AI reply (in-pipeline)         | Extract world-state changes from narrative → emit deltas for entities, happenings, awareness links, and the new entry's `metadata` fields |
-| **Lore-management agent**   | Chapter close only (out-of-pipeline) | Promote staged entities, update/create lore from chapter events                                                                           |
-| **Memory-compaction agent** | Chapter close only (out-of-pipeline) | Consolidate low-salience `happening_awareness` rows into summary happenings                                                               |
+| Layer                      | Trigger                                                                 | Scope                                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Piggyback**              | Every AI reply, inline on the narrative call (capability-gated)         | Scene-local fast-mutating state — `sceneEntities`, `currentLocationId`, `worldTime`, visual mutations, item transfers    |
+| **Periodic classifier**    | Background, configurable cadence (`stories.settings.classifierCadence`) | Multi-turn batch extractions — happenings, involvements, awareness, entity status flips, first-introduction descriptions |
+| **Chapter-close pipeline** | Token threshold crossed OR user-triggered                               | 5-phase pipeline: catch-up classifier, boundary, metadata, lore-mgmt (5 sub-jobs), lifecycle review                      |
 
-**Classifier** is the only per-reply agent. Old app's "post-generation
-phase with lore-management" ran after every reply but actually gated
-lore-mgr on chapter-create events — we make that explicit in v2 by
-moving lore-mgr out of the main pipeline entirely.
+Two agents from the prior design were collapsed:
+
+- **Memory-compaction agent** subsumed by chapter-close lore-mgmt
+  (phase 3d awareness pin tuning + phase 3e happenings consolidation).
+  Eager "summarize low-salience rows into summaries" was replaced by
+  upsert-at-write (UNIQUE constraint on awareness rows) plus
+  semantic-cluster consolidation at chapter close. See
+  [`docs/memory/chapter-close.md → Phase 3`](./memory/chapter-close.md#phase-3--lore-management).
+- **Per-reply classifier** split into piggyback (when
+  `piggybackMode='on'` and the narrative model has structured-output
+  capability) + periodic classifier (background; handles the larger
+  multi-turn batch). Either path covers the same write set; mode
+  toggle is at `stories.settings.piggybackMode`.
+
+Detailed contracts for each layer in
+[`docs/memory/piggyback.md`](./memory/piggyback.md),
+[`docs/memory/classifier.md`](./memory/classifier.md), and
+[`docs/memory/chapter-close.md`](./memory/chapter-close.md). The
+periodic classifier is the first agent that exercises the
+`'concurrent-allowed'` `conflictPolicy` declared in
+[Generation transactions and edit gating](#generation-transactions-and-edit-gating).
 
 **Classifier contract — `metadata` fields.** Alongside entity/happening/
 awareness deltas, the classifier populates the new entry's metadata:
@@ -711,19 +751,15 @@ downstream feature. See
 [`data-model.md → Opening entry`](./data-model.md#opening-entry) for
 the full opening contract.
 
-**Chapter-close** is its own sub-pipeline, triggered when the token
-threshold is crossed (per-story setting) or the user explicitly closes.
-Phases:
-
-1. **Boundary selection** — LLM picks a natural ending entry within the
-   open region
-2. **Chapter metadata** — LLM generates title, summary, theme, keywords
-3. **Lore management** — promotes/updates/creates lore based on closed
-   range
-4. **Memory compaction** — consolidates awareness rows
-
-All four emit deltas under one `action_id`. A single CTRL-Z from the
-user reverses the entire chapter-close if they change their mind.
+**Chapter-close** is its own sub-pipeline. Five phases under one
+`action_id` (catch-up classifier, boundary selection, metadata,
+lore-mgmt with five sub-jobs, lifecycle review). A single CTRL-Z
+from the user reverses the entire chapter-close. Full design in
+[`docs/memory/chapter-close.md`](./memory/chapter-close.md). The
+chapter-close transaction holds the gate per
+[Generation transactions and edit gating](#generation-transactions-and-edit-gating);
+the periodic classifier is blocked from starting a new pass while
+chapter-close is in flight (one-direction lock).
 
 ---
 
@@ -793,83 +829,69 @@ emerges. Translation is strictly a display-time surface.
 
 ## Retrieval / injection phase
 
-Fills the prompt's entity / lore / happening / thread slices given
-token budget, injection modes, scene presence, and POV-awareness.
-Detailed design pending (ranking strategy, agent shape, token
-budgeting); the load-bearing contracts this phase must honor are
-locked in.
+Fills the prompt's entity / lore / happening / thread / chapter-
+summary slices given token budget, injection modes, scene presence,
+and POV-awareness. The full design — embedding infrastructure, query
+construction, candidate pools, hybrid retrieval per type, the ranker
+(scoring + MMR + budget-fill + bypass + chapter-match boost), and
+pinning (`decay_resistance`) — lives in
+[`docs/memory/retrieval.md`](./memory/retrieval.md). This section
+captures the architecture-level invariants the rest of the pipeline
+depends on.
 
-### Recent buffer — chapter-boundary spillover
+### Structural floor — always inject
 
-`stories.settings.recentBuffer` (default 10) governs the
-chapter-boundary handoff, not steady-state. The current chapter's
-entries are **always** injected verbatim regardless of the buffer
-value. The buffer fills the remaining slots with verbatim entries
-from the **previous chapter**:
+These structural injects bypass the ranker; they consume budget
+unconditionally before per-type retrieval allocates the remainder:
 
-- Entry 5 of a new chapter, `recentBuffer: 10` → those 5 + the last
-  5 of the previous chapter (5 + 5 = 10 verbatim).
-- Entry 20 of the same chapter → only those 20 (the previous
-  chapter has been absorbed).
-- Within a chapter where entry-count already exceeds the buffer,
-  the previous chapter contributes nothing.
+- **Recent buffer.** Last `stories.settings.recentBuffer` entries
+  verbatim, regardless of chapter boundaries. With
+  `fullChapterInBuffer=true`, the current chapter is also verbatim
+  in addition. See
+  [`docs/memory/cadence.md → User-tunable knobs`](./memory/cadence.md#user-tunable-knobs).
+- **Active + in-scene entities.** `entities.status='active' AND id ∈
+metadata.sceneEntities` are ALWAYS injected, regardless of
+  `injection_mode`. `currentLocationId` gets the same treatment.
+- **Active threads.** `threads.status='active'` must-inject as
+  structural framing.
+- **`injection_mode='always'` rows** across entities / lore /
+  threads — user-intent override.
 
-Why the knob: the early entries of a fresh chapter need anchoring
-context from what just happened — but only briefly. The buffer
-makes that handoff explicit and tunable; once the new chapter has
-established itself, retrieval takes over for older context.
+Rationale for the active+in-scene invariant: the entity IS what the
+current narrative revolves around. Excluding one on a user-set
+`disabled` flag would produce broken prompts ("who is this person
+the narrator keeps addressing?"). The mode setting is respected
+everywhere the entity isn't structurally necessary.
 
-### Active + in-scene invariant — structural override of `injection_mode`
+### Injection mode — non-structural cases
 
-**Entities with `status='active'` AND presence in the current entry's
-`metadata.sceneEntities` are ALWAYS injected, regardless of
-`entities.injection_mode`.** The mode check is short-circuited.
+After the structural floor seats, remaining candidate rows (lore,
+non-scene entities, threads, chapter summaries, happenings via
+awareness) are filtered by `injection_mode`:
 
-`always` / `keyword_llm` / `disabled` only apply to entities that are
-NOT structurally required — staged, retired, or active-but-off-scene.
-
-Rationale: an active in-scene entity IS what the current narrative
-revolves around. Excluding one on a user-set `disabled` flag
-produces broken prompts ("who is this person the narrator keeps
-addressing?"). The mode setting is respected everywhere the entity
-isn't structurally necessary.
-
-`metadata.currentLocationId` gets the same treatment — the scene's
-current location always injects as an active entity.
-
-### Injection mode semantics (non-structural cases)
-
-After the structural override applies, remaining candidate rows
-(lore, non-scene entities, threads) are filtered by
-`injection_mode`:
-
-- `always` — unconditional include.
-- `keyword_llm` — included if either (a) a keyword heuristic
-  matches recent narrative (cheap, deterministic) OR (b) the
-  retrieval agent's LLM pass selects it (richer, token-budgeted).
-  Default for new rows.
+- `always` — unconditional include in candidate pool.
+- `auto` — let the retrieval pipeline decide via keyword + embedding
+  - LLM-fallback. Default for new rows. Renamed from `keyword_llm`;
+    see [`data-model.md → Injection modes`](./data-model.md#injection-modes--unified-enum--structural-invariant).
 - `disabled` — skip entirely unless structurally required (which
   `disabled` cannot suppress).
-
-### POV-awareness filtering (adventure mode only)
-
-For stories with `mode='adventure'` and a set `leadEntityId`,
-retrieval filters `happenings` by the lead character's awareness
-links — the prompt surfaces only what the character knows.
-Creative-mode skips this filter (director POV has no
-"character awareness"). Wired via a Liquid filter like
-`happenings | known_to: leadEntity` (see "Custom filters: Selectors").
 
 Happenings don't carry `injection_mode` at all — the awareness graph
 (`happening_awareness`) IS the injection rule. Common-knowledge
 happenings (`happenings.common_knowledge=1`) bypass awareness
-filtering entirely.
+entirely and rank in their own pool by `sim_blend + kw_boost` only;
+see
+[`docs/memory/retrieval.md → Common-knowledge happenings`](./memory/retrieval.md#common-knowledge-happenings--special-case).
 
-**Token budgeting** is a sub-concern of the retrieval-agent design
-and is tracked alongside ranking + agent shape in the deferral list
-below. The structural floor is fixed (recent buffer + required
-injections); what's deferred is the policy that allocates the
-remainder.
+### POV-awareness — union, both modes
+
+Retrieval queries the awareness graph as the **union of all in-scene
+characters' awareness rows** in both adventure and creative modes,
+not lead-only. Detached-POV moments (a non-lead character acquiring
+knowledge in a side scene) need the wider scope; the `narration`
+setting is the lever for POV-constraint via prompt, not retrieval.
+See
+[`docs/memory/retrieval.md → POV-awareness scope`](./memory/retrieval.md#pov-awareness-scope).
 
 ---
 
@@ -885,11 +907,11 @@ Flag for future sessions:
 - **Platform boundaries** — Electron main vs renderer, filesystem access
   patterns, IPC, what's RN-native-only, asset directory resolution per
   platform
-- **Retrieval — ranking + agent shape** — the scaffold is in place
-  (recent buffer, active+in-scene invariant, injection modes, POV
-  filtering); what's still TBD is the ranking strategy, the LLM-
-  powered retrieval agent's prompt + parse shape, and concrete
-  token-budgeting policy
+- **Retrieval — ranking + scoring** — substantially designed in
+  [`docs/memory/retrieval.md`](./memory/retrieval.md). What remains
+  is empirical tuning (decay rates, similarity thresholds, MMR
+  diversity, budget defaults) per the
+  [v1-blocking threshold-tuning followup](./memory/followups.md#v1-blocking).
 - **Streaming resilience** — mid-stream failure handling, partial-content
   persistence, retry strategy
 - **Error handling** — recoverable vs fatal at each layer; user-facing

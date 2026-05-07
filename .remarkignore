@@ -1,0 +1,7 @@
+superpowers/
+node_modules/
+.expo/
+dist/
+release/
+storybook-static/
+electron/dist/

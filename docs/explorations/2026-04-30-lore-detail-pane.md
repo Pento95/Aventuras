@@ -145,7 +145,7 @@ Three fields, top-down:
   The tooltip is honest about the spec gap; the field is editable
   but its precise effect is gated. Open question folded into the
   existing
-  [`Lore-management agent shape`](../followups.md#lore-management-agent-shape)
+  [`Memory architecture — design landed`](../followups.md#memory-architecture--design-landed)
   followup (lore-mgmt + retrieval are paired in that followup; priority
   semantics belong there rather than spawning a sibling entry).
 - **`tags`** (chip row with `+ add`): edit destination for tags
@@ -335,7 +335,7 @@ What we tried to break:
 - **Lore-mgmt agent / category interaction.** When the agent creates
   a new lore at chapter close, what category does it set? Open. Not
   this design's scope — folds into the existing
-  [`Lore-management agent shape`](../followups.md#lore-management-agent-shape)
+  [`Memory architecture — design landed`](../followups.md#memory-architecture--design-landed)
   followup along with the priority-semantics gap.
 
 What we did **not** verify:
@@ -369,7 +369,7 @@ from `followups.md`).
 
 **Followups introduced:** none new. Priority-semantics gap folds
 into the existing
-[Lore-management agent shape](../followups.md#lore-management-agent-shape)
+[Memory architecture — design landed](../followups.md#memory-architecture--design-landed)
 entry by extending its bullet list with "lore.priority retrieval
 semantics."
 

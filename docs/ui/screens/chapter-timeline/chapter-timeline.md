@@ -396,15 +396,15 @@ end-entry picker in-flow inside it.
 
 ## Screen-specific open questions
 
-- **Re-run compaction / lore-mgmt for a closed chapter.** The
-  Regenerate summary action only re-runs the metadata layer.
-  Re-running lore-mgmt + memory compaction would overwrite
-  consolidated state; that's destructive and gated on the
-  long-deferred compaction philosophy work (see
-  [followups → Top-K-by-salience retrieval](../../../parked.md#top-k-by-salience-retrieval--long-term-memory-implications)).
-  Defer until the compaction session lands; the eventual answer
-  will probably be "available, but only via an explicit
-  consent-modal heavy enough that users don't fire it casually."
+- **Re-run lore-mgmt for a closed chapter.** The Regenerate summary
+  action only re-runs the metadata layer. Re-running lore-mgmt
+  (Phase 3 of the chapter-close pipeline — lore creation, identity
+  compaction, awareness pin tuning, happenings consolidation) would
+  overwrite consolidated state; that's destructive and gated.
+  Likely answer: "available, but only via an explicit consent-modal
+  heavy enough that users don't fire it casually." See
+  [`docs/memory/chapter-close.md`](../../../memory/chapter-close.md)
+  for the phase contract.
 - **Bulk chapter operations.** Multi-select to delete or
   re-generate-summary multiple chapters at once. Defer; matches
   the

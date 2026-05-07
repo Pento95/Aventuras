@@ -90,61 +90,45 @@ Both questions live with the broader backup design pass — see
 [Backup / export consistency](#backup--export-consistency) for the
 gating concerns that share the same pass.
 
-#### Top-K-by-salience retrieval — long-term memory implications
+#### Multi-axis salience — long-term memory revisit
 
-Per [Happenings & character knowledge](./data-model.md#happenings--character-knowledge):
-"character awareness lists grow unbounded. This is handled at
-injection time (retrieve top-K by salience + scene relevance, not
-full history) and by periodic compaction at chapter close." Top-K
-is fine as a default for short or medium stories. For genuinely
-long-running stories (year-of-narrative spans, dozens of chapters)
-the model has known failure modes worth ironing out before a real
-user hits them.
+Most of the original "Top-K-by-salience" failure modes are now
+addressed by the memory design pass in
+[`docs/memory/`](./memory/README.md):
 
-- **Single-axis salience conflates orthogonal relevance.** "Aria's
-  mother died in chapter 2" is high-salience for emotional /
-  family-drama scenes, near-zero for chapter-50 combat. One
-  salience number can't be both. Top-K drops the wrong things in
-  the wrong scene.
-- **Decay-then-drop loses load-bearing facts.** Compaction decays
-  salience over time and may consolidate low-salience rows into
-  summary happenings (per the
-  [Chapters / memory system](./data-model.md#chapters--memory-system)
-  decision — exact behavior TBD). A pivotal chapter-1 plot point
-  can decay by chapter 20, get summarized (losing detail), and
-  drop out of top-K entirely by chapter 40. Reversible via
-  rollback, but on a long story rollback is impractical.
-- **K is a hard cutoff.** No soft middle ground for
-  medium-relevance background. Two happenings tied at salience
-  with K-1 slots above them — one gets in, one doesn't, no signal
-  which.
-- **Compaction summaries carry their own provenance.** When the
-  classifier writes a new happening referring back to an earlier
-  event, does it reach the original happening or the summary?
-  Reference fields (`occurred_at_entry`, awareness
-  `learned_at_entry`) point at originals — but if compaction
-  deleted the original in favor of a summary, those references
-  go stale.
+- **"Decay-then-drop loses load-bearing facts"** — addressed by the
+  high-similarity bypass in the ranker
+  ([`retrieval.md → High-similarity bypass`](./memory/retrieval.md#high-similarity-bypass--revival-of-decayed-memories)),
+  which surfaces decayed rows when they're extremely relevant to
+  the current scene.
+- **"K is a hard cutoff"** — addressed by per-type token budgets +
+  MMR diversity + score-threshold termination
+  ([`retrieval.md → Budget-fill termination`](./memory/retrieval.md#budget-fill-termination)),
+  not a fixed-K cutoff.
+- **"Compaction summaries carry their own provenance"** — addressed
+  by replacing eager summarize-and-delete with upsert-at-write
+  (UNIQUE constraint on awareness rows) plus chapter-close
+  semantic-cluster consolidation that preserves provenance via
+  composite descriptions and earliest `learned_at_entry`. See
+  [`chapter-close.md → 3e happenings consolidation`](./memory/chapter-close.md#3e--happenings-consolidation).
+- **"Pinned forever" override** — `decay_resistance` on
+  `happening_awareness` (user toggle, classifier severity at
+  extraction, lore-mgmt at chapter close). See
+  [`retrieval.md → Pinning`](./memory/retrieval.md#pinning--decay_resistance).
+- **"Memory probe" affordance** — bumped to v1-blocking; see
+  [`memory/followups.md → v1-blocking`](./memory/followups.md#v1-blocking).
 
-Decisions needed:
+**What's still parked:**
 
-- Salience model — single number vs. multi-axis (per-thread /
-  per-entity / per-tone)?
-- Compaction philosophy — does the original happening survive
-  with low salience, occasionally retrieved? Or is it deleted in
-  favor of the summary?
-- "Pinned forever" override — a way for users (or the
-  lore-management agent) to mark a happening_awareness row as
-  load-bearing and exempt it from decay. Today,
-  `injection_mode = always` exists on `lore` / `entities` /
-  `threads` but NOT on `happening_awareness` rows; worth
-  considering whether it should.
-- Retrieval shape beyond hard top-K — tiered (must-include +
-  top-K + sampled-from-rest), salience-weighted sampling rather
-  than cutoff, etc.
-- "Memory probe" affordance for users to inspect what the model
-  is actually seeing on a given turn — debug tool to surface the
-  dropped happenings.
+- **Multi-axis salience.** Single-number `decay_resistance`
+  collapses orthogonal relevance dimensions ("emotionally resonant"
+  vs. "plot-relevant" vs. "character-defining"). Real signal where
+  retrieval misses load-bearing facts in scene-mismatched contexts
+  triggers the design. Tracked alongside the v1 limitations in
+  [`memory/edge-cases.md → v1 limitations`](./memory/edge-cases.md#v1-limitations).
+- **Pin contradiction reconciliation.** Auto-detection that a
+  `death` pin is invalidated by a later "actually alive" reveal.
+  v1 floor: manual unpin.
 
 ### UX (post-v1)
 
@@ -945,26 +929,33 @@ addresses this:
 
 Decision lands at scoped-gate's own design pass.
 
-#### Concurrent pipeline / agent coordination
+#### Concurrent pipeline / agent coordination — first consumer landed
 
+The single-writer invariant in
 [`ui/principles.md → Edit restrictions during in-flight generation`](./ui/principles.md#edit-restrictions-during-in-flight-generation)
-holds a single-writer invariant: at most one pipeline transaction
-in flight at a time. v1 satisfies this by construction
-(chapter-close runs only between turns; no overlap surface). When
-background agents enter the picture (style-review or future
-standalone memory-compaction), overlap becomes possible:
+relaxes to **single-writer-per-write-set** with the periodic
+classifier landing as the first `'concurrent-allowed'` consumer of
+the gate-declaration shape. See
+[`docs/memory/cadence.md → Concurrency`](./memory/cadence.md#concurrency)
+and
+[`docs/memory/classifier.md`](./memory/classifier.md).
 
-- Background agent + per-turn pipeline simultaneously — abort the
-  agent, block the pipeline, or run side-by-side (only safe if
-  write sets are disjoint)?
-- Two background agents simultaneously — same questions, with the
-  agents' `conflictPolicy` declarations creating cascading
-  decisions.
+The piggyback agent and the periodic classifier write to disjoint
+field sets; per-field UPDATEs (no row-level read-modify-write)
+keep their writes independent at the SQLite level. Chapter-close
+holds the gate for its own duration and locks out the periodic
+classifier (one-direction lock).
 
-Owned by the first design pass that introduces a concurrent agent.
-Worth flagging that aborting an expensive agent on every per-turn
-start can starve agents whose work spans many turns and burns
-provider quota; abort-self isn't a safe default for everything.
+What stays parked:
+
+- **Two future background agents simultaneously** (style-review +
+  standalone memory-compaction or similar). The cascading
+  `conflictPolicy` decisions when multiple non-pipeline agents
+  overlap aren't covered by the periodic classifier alone. Owned by
+  the first design pass that introduces a second concurrent agent.
+- **Style-review specifically.** Mentioned in the gate-declaration
+  table as a future consumer; its `writeSet` / `gateBehavior` /
+  `conflictPolicy` get picked when style-review is designed.
 
 #### Backup / export consistency
 

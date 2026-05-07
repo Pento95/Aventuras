@@ -19,6 +19,7 @@ erDiagram
     branches ||--o{ chapters : "segments into"
     branches ||--o{ branch_era_flips : "tracks era flips"
     branches ||--o{ translations : "owns snapshot of"
+    branches ||--o{ embeddings : "owns snapshot of"
     branches ||--o{ deltas : "logs changes in"
     story_entries ||--o{ deltas : "triggers"
     story_entries }o--|| chapters : "belongs to (once chaptered)"
@@ -73,8 +74,9 @@ erDiagram
         text name
         text description
         text status "staged | active | retired"
-        text retired_reason "free-form; only meaningful when status=retired (e.g. 'killed by Kael', 'wandered off', 'temple destroyed in quake', 'faction disbanded after coup')"
-        text injection_mode "always | keyword_llm | disabled; short-circuited by active+in-scene invariant"
+        text retired_reason "free-form; only meaningful when status=retired. Hard-finality only — e.g. 'killed by Kael', 'temple destroyed in quake', 'faction disbanded after coup', 'exiled to the southern wastes'. Off-screen-but-alive characters stay status=active with stale lastSeenAt; see docs/memory/edge-cases.md → Retirement"
+        text injection_mode "always | auto | disabled; short-circuited by active+in-scene invariant"
+        integer name_collision_flag "0 | 1; 1 = same-name collision detected at classifier extraction; surfaces in World panel for review. See docs/memory/edge-cases.md → Name collision"
         json state "typed per kind"
         json tags
         integer created_at
@@ -88,8 +90,9 @@ erDiagram
         text body
         text category "free-form user label — e.g. magic-system / religion / cosmology"
         json tags
-        text injection_mode "always | keyword_llm | disabled"
-        integer priority
+        json keywords "string[]; user-authored at create OR lore-mgmt-emitted at chapter close. Drives keyword retrieval pathway alongside embedding similarity. See docs/memory/retrieval.md → Hybrid retrieval per type"
+        text injection_mode "always | auto | disabled"
+        integer priority "0..100; higher = more weight in retrieval ranker. See docs/memory/retrieval.md → The ranker"
         integer created_at
         integer updated_at
     }
@@ -102,7 +105,7 @@ erDiagram
         text category "free-form user label — e.g. quest / arc / prophecy"
         text icon "string key from preset icon catalog"
         text status "pending | active | resolved | failed"
-        text injection_mode "always | keyword_llm | disabled"
+        text injection_mode "always | auto | disabled"
         integer triggered_at_entry
         integer resolved_at_entry
         integer created_at
@@ -134,9 +137,11 @@ erDiagram
         text happening_id FK
         text character_id FK "entity where kind=character"
         integer learned_at_entry "when this character learned it"
-        real salience "retrieval ranking; decays over time"
+        real decay_resistance "0..1; scales recency decay (1=no decay, 0=normal). Set by classifier severity at extraction; tunable by user toggle and lore-mgmt at chapter close. See docs/memory/retrieval.md → Pinning"
+        integer retrieval_count "incremented by ranker on injection (post budget-fill); per-chapter counter, reset at chapter close after lore-mgmt phase 3d. Delta-logged so rollback reverses retrieval-driven counts. See docs/memory/chapter-close.md → 3d awareness pin tuning"
         text source "free-form LLM-authored descriptor — e.g. 'overheard in tavern' / 'told by Jorin' / 'witnessed firsthand'; used verbatim in prompts"
     }
+    %% UNIQUE(branch_id, character_id, happening_id) — upsert semantics in classifier and user-edit paths; duplicates can't accumulate at the DB level
 
     chapters {
         text id PK
@@ -191,6 +196,21 @@ erDiagram
         integer updated_at
     }
 
+    embeddings {
+        text id PK
+        text branch_id FK "composite PK with id; embeddings fork with branches"
+        text target_kind "entity | lore | happening | thread | chapter"
+        text target_id "id in the target table; polymorphic FK (no DB constraint)"
+        text field "embedded field name (description, body, composite, etc.)"
+        text model_id "canonical embedding model id"
+        integer dim "vector dimension"
+        blob vector "packed float32/float16 vector"
+        text source_hash "xxhash of source field at embed time; drives lazy staleness detection at retrieval"
+        integer updated_at
+    }
+    %% UNIQUE(branch_id, target_kind, target_id, field, model_id)
+    %% Not delta-logged — embeddings are deterministic from source content; hash-mismatch triggers re-embed at retrieval. See docs/memory/retrieval.md → Embedding infrastructure
+
     deltas {
         text id PK
         text branch_id FK
@@ -221,6 +241,7 @@ erDiagram
         json assignments "Record<agentId, profileId>; which profile each agent uses by default"
         text default_provider_id "FK into providers[].id; seeds Narrative + 'Reset to defaults'"
         json default_models "Record<agentId, { providerId, modelId }>; resolver fallback for un-overridden story.settings.models"
+        text embedding_model_id "canonical embedding model id; used for the bundled local embedder OR a provider-side embedding endpoint. See docs/memory/retrieval.md → Embedding infrastructure"
         json default_story_settings "see 'Story settings shape' — copy-at-creation source for new stories"
         text default_calendar_id "id into the merged calendar registry (built-ins from code + vault_calendars rows); seeds new stories' calendarSystemId"
         json appearance "{ themeId, readerFontScale, accentOverride?, density } — density: 'default'|'compact'|'regular'|'comfortable' (sentinel 'default' resolves per tier; see ui/foundations/spacing.md#density-toggle)"
@@ -358,9 +379,9 @@ per-chapter evolution.
 revisions) is deferred. Until it ships, classifier never updates
 description after first introduction; user is the only ongoing editor.
 Stale descriptions are the user's problem until they edit — acceptable
-v1 floor. The suggestion-queue UI design folds into the
-[Lore-management agent shape](./followups.md#lore-management-agent-shape)
-followup.
+v1 floor. The suggestion-queue UI is a separate UX design pass; the
+broader memory-mgmt design landed in
+[`docs/memory/`](./memory/README.md).
 
 #### `CharacterState` shape
 
@@ -744,11 +765,23 @@ omniscient-narrator ensemble case).
 
 ```ts
 stories.settings: {
-  // Memory — defaults copied from App Settings → Story Defaults at creation
+  // Memory — defaults copied from App Settings → Story Defaults at creation.
+  // Full design in docs/memory/cadence.md and docs/memory/retrieval.md.
   chapterTokenThreshold: number     // default 24000
   chapterAutoClose: boolean         // auto-close at threshold; off = threshold is guidance only, user wraps manually; default true
-  recentBuffer: number              // entries always injected verbatim before retrieval; default 10
-  compactionDetail: string          // one-line focus directive for memory-compaction agent
+  recentBuffer: number              // last N entries verbatim in LLM context, regardless of chapter boundaries; default 10
+  fullChapterInBuffer: boolean      // current chapter always verbatim in LLM context, in addition to recentBuffer; default false
+  classifierCadence: { mode: 'turns' | 'token-trigger', value: number }  // when the periodic classifier runs in the background
+  piggybackMode: 'on' | 'off'       // capability-gated; on = narrative emits structured trailing block; off = separate per-turn classifier pass
+  embeddingBackend: 'provider' | 'local'   // embedding runtime (provider endpoint OR bundled local ONNX); both produce identical retrieval algorithm
+  retrievalMode: 'embedding' | 'llm-only'  // set at story creation, immutable thereafter; llm-only is the embedding-unavailable fallback regime
+  retrievalBudgets: {                // per-type token budgets, hard partitions in v1 (no spillover); see docs/memory/retrieval.md → Per-type retrieval budgets
+    entities: number
+    lore: number
+    happenings: number
+    threads: number
+    chapters: number                 // chapter summaries pool
+  }
 
   // Composer
   composerModesEnabled: boolean     // adventure-only; creative ignores
@@ -774,14 +807,15 @@ stories.settings: {
   // assignments registry (single source of truth, evolves over time);
   // narrative is the always-present storyteller slot. Image generation is
   // deferred past v1 — `imageGen` returns when the feature lands.
+  // `memory-compaction` was dropped — chapter-close lore-mgmt subsumes its
+  // role per the cadence stratification; see docs/memory/chapter-close.md.
   models: {
     narrative?: string              // absent = use current global app-settings default at render time
     classifier?: string
     translation?: string
     suggestion?: string
     'lore-mgmt'?: string             // kebab-case agent ids match the UI labels in app-settings + story-settings Models tabs
-    'memory-compaction'?: string
-    retrieval?: string
+    retrieval?: string               // mode-3 LLM-only retrieval agent OR keyword_llm fallback consumer
   }
 
   // Pack
@@ -789,6 +823,14 @@ stories.settings: {
   packVariables: Record<string, unknown>  // values keyed by variable name; zod-validated per active pack's declared schema
 }
 ```
+
+`compactionDetail` (a freeform user prose directive on the prior
+schema) is **dropped** in this design pass. The original
+"memory-compaction agent" it directed no longer exists — chapter-
+close lore-mgmt subsumes its role per
+[docs/memory/chapter-close.md](./memory/chapter-close.md). Power
+users can author packs that bias prompts more rigorously than a
+one-line soft hint.
 
 #### Genre + tone preset+prose hybrid
 
@@ -1304,26 +1346,30 @@ swap UX warns about this case.
 
 **Decided:** `lore`, `entities`, and `threads` all carry an
 `injection_mode` column with the same enum:
-`always | keyword_llm | disabled`.
+`always | auto | disabled`.
 
 - `always` — include in every prompt render unconditionally.
-- `keyword_llm` — include when either (a) a keyword heuristic matches
-  recent text or (b) the retrieval agent's LLM-powered selection
-  picks it up. **Default** for new rows.
+- `auto` — let the retrieval pipeline decide via keyword + embedding
+  - LLM-fallback. **Default** for new rows. See
+    [docs/memory/retrieval.md → Hybrid retrieval per type](./memory/retrieval.md#hybrid-retrieval-per-type).
 - `disabled` — never include automatically; only surfaces if
   explicitly referenced.
 
-**Breaking rename on `lore.injection_mode`.** Previously
-`always | keyword | manual`. "Manual" was ambiguous — old-app
-semantics meant "LLM-agent-selected retrieval," which reads far
-better as `keyword_llm`. `disabled` replaces the dropped "manual"
-with a clearer name.
+**Naming history.** `lore.injection_mode` was originally
+`always | keyword | manual`; a renaming pass changed it to
+`always | keyword_llm | disabled`. The current `auto` rename
+collapses the keyword-vs-LLM distinction — retrieval handles both
+under the hood (keyword + embedding + LLM-fallback when both miss),
+so the user-facing knob doesn't need to expose the implementation
+detail. Schema migration: rename enum value across `entities`,
+`lore`, `threads`.
 
 **`happenings` deliberately do not carry `injection_mode`.** The
 awareness graph (`happening_awareness`) is the injection rule —
 structural, not user-toggled. A happening is injected because a POV
-character knows about it (per the awareness link + salience), not
-because the user set a mode.
+character knows about it (per the awareness link, ranked by
+`decay_resistance` and `sim_blend`), not because the user set a
+mode.
 
 **Structural invariant — active + in-scene entities always
 injected.** Regardless of an entity's `injection_mode` setting,
@@ -1334,11 +1380,10 @@ in-scene entity IS what the current narrative is about; excluding
 it on a user-set `disabled` flag would produce broken prompts. The
 mode setting is consulted only for entities that are NOT
 structurally required — staged, retired, or active-but-off-scene.
-Same invariant applies structurally-required lore/threads when
-applicable (TBD as retrieval design lands — tracked in
-[`followups.md → Lore-management agent shape`](./followups.md#lore-management-agent-shape));
-pipeline details in architecture.md → "Retrieval / injection
-phase."
+Same invariant applies to active threads (must-inject) and to
+`injection_mode='always'` rows. See
+[docs/memory/retrieval.md → Candidate pools](./memory/retrieval.md#candidate-pools)
+for the full structural-floor contract.
 
 ### Entry mutability & rollback
 
@@ -1477,15 +1522,33 @@ is split into two layers with clean responsibilities:
   - `happening_involvements` — which entities are the subject matter
     (character, location, item, faction; optional free-form `role` label).
   - `happening_awareness` — which characters know about it, with
-    `learned_at_entry`, `salience`, and a free-form `source` descriptor
-    ("overheard in tavern" / "told by Jorin" / "witnessed firsthand") that
-    the LLM authors and we use verbatim in prompts. No `relation` enum —
-    the source text carries that information more expressively, and the
-    LLM wants to write it in natural language anyway. This **is** character
-    memory — no separate memory table. "What does Aria know?" is just a
-    query against awareness links where `character_id = Aria`. Happenings
-    with `common_knowledge=1` skip awareness links entirely (no need to
-    write N identical rows for "everyone knows the king is dead").
+    `learned_at_entry`, `decay_resistance` (per-character pin signal,
+    set by classifier severity at extraction; tunable by user toggle
+    and lore-mgmt at chapter close — see
+    [docs/memory/retrieval.md → Pinning](./memory/retrieval.md#pinning--decay_resistance)),
+    `retrieval_count` (delta-logged operational counter the ranker
+    increments on injection; drives the high-frequency review at
+    chapter-close phase 3d), and a free-form `source` descriptor
+    ("overheard in tavern" / "told by Jorin" / "witnessed firsthand")
+    that the LLM authors and we use verbatim in prompts. No `relation`
+    enum — the source text carries that information more expressively,
+    and the LLM wants to write it in natural language anyway. This
+    **is** character memory — no separate memory table. "What does
+    Aria know?" is just a query against awareness links where
+    `character_id = Aria`. Happenings with `common_knowledge=1` skip
+    awareness links entirely (no need to write N identical rows for
+    "everyone knows the king is dead"). A
+    `UNIQUE(branch_id, character_id, happening_id)` constraint ensures
+    upsert semantics in the classifier and user-edit paths — duplicate
+    awareness rows can't accumulate at the DB level.
+
+    Old `salience REAL` field was dropped — replaced by the
+    `sim_blend × recency_factor` model in the retrieval ranker, where
+    `recency_factor` integrates `decay_resistance` for the ageing
+    story. Old salience was content-blind; the new model is
+    content-aware (`sim_blend` recomputes per turn against the current
+    scene). See
+    [docs/memory/retrieval.md → The ranker](./memory/retrieval.md#the-ranker).
 
 - **`threads`** — the broader view: quest tracker, overarching arcs,
   ambient plot pressures. Freeform `category` + `icon` (string key from a
@@ -1518,11 +1581,17 @@ the Zod check is the friendlier validation surface. `threads` don't carry
 resolve via entry positions (same worldTime-derivation story as
 happenings).
 
-**Context-bloat note:** for long-running stories, character awareness lists
-grow unbounded. This is handled at injection time (retrieve top-K by
-salience + scene relevance, not full history) and by periodic compaction
-at chapter close (see below). Schema is unchanged; bloat is a runtime
-concern.
+**Context-bloat note:** for long-running stories, character awareness
+lists grow unbounded — projected scale is thousands of happenings and
+tens of thousands of awareness rows on a 30+ chapter story per
+[docs/memory/retrieval.md → Scale assumptions](./memory/retrieval.md#scale-assumptions).
+This is handled at injection time (per-type budgets with hard
+partitions, top-200 pre-filter, MMR-diverse selection,
+`sim_blend × recency_factor + kw_boost` scoring with high-similarity
+bypass for revival of decayed memories) and by chapter-close lore-mgmt
+(awareness pin tuning, happenings consolidation). Schema is mostly
+unchanged from the bloat angle; the storage profile remains workable
+at v1's projected volumes.
 
 ### Translation
 
@@ -1578,45 +1647,53 @@ separate concern — handled by `i18next` at the UI layer, backed by
 
 **Decided:** chapters are first-class, per-branch, user-visible. They
 segment the narrative into named, summarized ranges and provide the
-cadence trigger for all expensive background work.
+cadence trigger for the chapter-close pipeline.
+
+This section captures the storage / atomic-commit contract; the
+pipeline phases, lore-mgmt sub-jobs, and memory architecture more
+broadly are designed in [`docs/memory/`](./memory/README.md).
 
 **Open chapter has no row.** Only closed chapters are persisted as
-`chapters` rows. Entries in the "open region" (after the latest closed
-chapter's end) simply have `chapter_id IS NULL` until a chapter is created
-that includes them.
+`chapters` rows. Entries in the "open region" (after the latest
+closed chapter's end) simply have `chapter_id IS NULL` until a
+chapter is created that includes them.
 
 **Boundary trigger.** Per-story token threshold
 (`stories.settings.chapterTokenThreshold`, default 24k, user-
 configurable). When the open region's accumulated token count crosses
-the threshold, an agent runs to pick a natural ending point within
-the range and chapter-create is triggered across `start → selected
-end`. User can also manually trigger chapter-create at any time,
-choosing the ending entry explicitly.
+the threshold AND `stories.settings.chapterAutoClose=true`, the
+chapter-close pipeline fires. With `chapterAutoClose=false`, the UI
+shows a "ready to close" indicator but doesn't auto-fire. User can
+also manually trigger chapter-create at any time, picking the ending
+entry explicitly.
 
-**Chapter-create is the single cadence trigger** for three operations,
-each logged as deltas so the whole thing is reversible via rollback:
+**Chapter-close is the single cadence trigger** for the 5-phase
+pipeline (catch-up classifier, boundary selection, chapter metadata,
+lore management with five sub-jobs, lifecycle review). All five
+phases share one `action_id` so a single CTRL-Z reverses the entire
+chapter-close. See
+[docs/memory/chapter-close.md](./memory/chapter-close.md) for the
+full pipeline design.
 
-1. **LLM generates title, summary, theme, keywords, time range** for the closed range.
-2. **Lore-management agent runs** — promotes staged entities, updates
-   lore, creates new lore from events discovered in the range.
-   Concrete prompt + parse shape is parked in
-   [`followups.md → Lore-management agent shape`](./followups.md#lore-management-agent-shape).
-3. **Memory compaction runs** — consolidates low-salience
-   `happening_awareness` rows from the just-closed range into summary
-   happenings, decays salience, drops redundancies. Salience math +
-   compaction philosophy parked in
-   [`followups.md → Top-K-by-salience retrieval`](./parked.md#top-k-by-salience-retrieval--long-term-memory-implications).
+**Chapter summaries become a retrieval candidate pool.** Closed
+`chapters` rows feed the chapter-summaries retrieval pool — each
+chapter's `summary` (plus `theme` and `keywords`) is embeddable and
+ranks against the per-turn query stack. Matched chapters also boost
+happenings within their range (chapter-match boost). See
+[docs/memory/retrieval.md → Candidate pools](./memory/retrieval.md#candidate-pools).
 
-**Per-branch, forks cleanly.** Each branch has its own `chapters` rows
-with its own IDs. On branch creation, chapter rows (and all other state)
-are copied to the new branch up to the fork point. Edits to a chapter's
-title or summary on one branch don't leak to siblings. If the fork point
-is inside what would have been a closed chapter on the parent, the new
-branch simply never sees that chapter's closure events — those deltas
-happened after the fork point and aren't copied.
+**Per-branch, forks cleanly.** Each branch has its own `chapters`
+rows with its own IDs. On branch creation, chapter rows (and all
+other state) are copied to the new branch up to the fork point.
+Edits to a chapter's title or summary on one branch don't leak to
+siblings. If the fork point is inside what would have been a closed
+chapter on the parent, the new branch simply never sees that
+chapter's closure events — those deltas happened after the fork
+point and aren't copied.
 
 **No chapter-boundary restrictions on rollback or branching** — see
-Branch model above. Chapters are user-visible structure, not gatekeepers.
+Branch model above. Chapters are user-visible structure, not
+gatekeepers.
 
 ### Backup & export format
 

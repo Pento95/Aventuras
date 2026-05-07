@@ -26,7 +26,7 @@ Reached through dialogue:
   long-press for actions, no swipe-on-row, no pull-to-refresh.
   Hover-bound affordances translate to always-visible-muted via
   the existing
-  [`patterns/icon-actions.md → Visibility`](../ui/patterns/icon-actions.md#visibility--always-rendered-muted-default-brighten-on-hover)
+  [`patterns/icon-actions.md → Visibility`](../ui/patterns/icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover)
   rule, generalized.
 - **Save bar on phone hides while keyboard is open.** Reappears on
   field blur (keyboard dismissal). Approach B from the dialogue —

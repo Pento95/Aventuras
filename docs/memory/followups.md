@@ -166,18 +166,18 @@ land alongside (or before) the v1-blocking work above:
   [Retrieval / injection phase](../architecture.md#retrieval--injection-phase)
   section, linking to this folder as canonical.
 - **[`followups.md`](../followups.md)** — substantially resolves the
-  [Lore-management agent shape](../followups.md#lore-management-agent-shape)
+  [Memory architecture — design landed](../followups.md#memory-architecture--design-landed)
   entry (move resolution narrative into this folder). Partially
   resolves the
   [Pipeline consolidation](../followups.md#next-turn-suggestions--design-pass)
   question (piggyback IS pipeline consolidation, with model-capability
   gating). Add the v1-blocking followups above.
 - **[`parked.md`](../parked.md)** — the
-  [Top-K-by-salience](../parked.md#top-k-by-salience-retrieval--long-term-memory-implications)
+  [Multi-axis salience — long-term memory revisit](../parked.md#multi-axis-salience--long-term-memory-revisit)
   parked entry partially resolves (multi-axis salience still parked,
   but `decay_resistance` answers the "pinned forever" override
   question and the "compaction philosophy" question). The
-  [Concurrent pipeline / agent coordination](../parked.md#concurrent-pipeline--agent-coordination)
+  [Concurrent pipeline / agent coordination — first consumer landed](../parked.md#concurrent-pipeline--agent-coordination--first-consumer-landed)
   parked entry is now answered (the periodic classifier is the first
   agent that uses the gate-declaration shape).
 

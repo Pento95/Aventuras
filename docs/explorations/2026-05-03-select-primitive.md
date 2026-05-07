@@ -181,9 +181,7 @@ but the hook also covers other already-spec'd behaviors:
 - Future cross-tier components (calendar picker, autocomplete,
   responsive overlay helper)
 
-The
-[ResponsiveOverlay primitive](../followups.md#calendar-picker-primitive--open-shape-decisions)
-question stays parked. Building it now is YAGNI — Select can't use
+The ResponsiveOverlay primitive question stays parked. Building it now is YAGNI — Select can't use
 it (Select's popover side is `@rn-primitives/select`, not our
 Popover), and only one Phase-2 consumer needs the Sheet/Popover
 switch. When a Phase-3 consumer (calendar picker, actions menu)
@@ -316,12 +314,12 @@ ThemeMatrix per components.md's portal-skip pattern.
    both Select and future Autocomplete; remove model-as-Sheet
    example; add Sheet-size auto-derive rule). Add Implementation
    contract subsection citing this exploration.
-7. **Followup updates**: close
-   [Calendar picker primitive — open shape decisions](../followups.md#calendar-picker-primitive--open-shape-decisions)
-   only partially — Select's responsive-switch resolution lands
-   here; calendar picker's Picker-fork-vs-Select-extension question
-   stays open until calendar picker's design pass. Update the
-   followup wording to reflect what's resolved.
+7. **Followup updates**: close the calendar-picker-primitive
+   open-shape-decisions followup only partially — Select's
+   responsive-switch resolution lands here; calendar picker's
+   Picker-fork-vs-Select-extension question stays open until
+   calendar picker's design pass. Update the followup wording to
+   reflect what's resolved.
 
 ## Adversarial pass
 

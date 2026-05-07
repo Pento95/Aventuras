@@ -1167,12 +1167,13 @@ edits on those patterns; no Used-by structure to add to.
 
 **Not resolved by this pass:**
 
-- **`Calendar picker primitive — open shape decisions`** in
-  [`followups.md`](../followups.md#calendar-picker-primitive--open-shape-decisions)
-  — that followup's two sub-questions (Select-extension vs.
-  Picker-fork; search-bar threshold) are about the Select primitive
-  - popover-search threshold, not about `worldTimeOrigin`. The
-    wizard pass doesn't touch them; the followup stands as-is.
+- **`Calendar picker primitive — open shape decisions`** (followup
+  active at the time of this pass; since resolved by the
+  [calendar-picker compound](../ui/patterns/calendar-picker.md))
+  — its two sub-questions (Select-extension vs. Picker-fork;
+  search-bar threshold) are about the Select primitive's
+  popover-search threshold, not about `worldTimeOrigin`. The
+  wizard pass doesn't touch them.
 
 **Followups introduced** (new):
 

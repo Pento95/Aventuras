@@ -133,7 +133,7 @@ not chrome, and keyboard avoidance treats it the same as the
 composer.
 
 **Per-entry actions** stay always-visible-muted per
-[`patterns/icon-actions.md → Visibility`](../ui/patterns/icon-actions.md#visibility--always-rendered-muted-default-brighten-on-hover);
+[`patterns/icon-actions.md → Visibility`](../ui/patterns/icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover);
 no tier-specific change. Touch users see the icons at the muted
 default; taps trigger normally.
 

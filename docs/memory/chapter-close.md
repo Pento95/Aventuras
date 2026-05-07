@@ -37,7 +37,7 @@ constraint on `happening_awareness` plus upsert semantics in the
 classifier and user-edit paths. Embedding-driven retrieval lets the
 bench grow without performance pressure, and duplicates can't
 accumulate in the first place. The
-[Top-K-by-salience parked entry](../parked.md#top-k-by-salience-retrieval--long-term-memory-implications)
+[Multi-axis salience parked entry](../parked.md#multi-axis-salience--long-term-memory-revisit)
 flagged the cost of eager summarization losing detail; upsert is the
 cleaner shape than chapter-close sweeps.
 

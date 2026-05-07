@@ -72,93 +72,37 @@ Decisions needed:
 - How `sceneTime` (when it lands) co-exists with manual
   `worldTime` edits.
 
-### Lore-management agent shape
+### Memory architecture — design landed
 
-[`data-model.md → Chapters / memory system`](./data-model.md#chapters--memory-system)
-declares that a lore-management agent runs at chapter close to
-promote staged entities, update lore, and write new lore from
-events discovered in the just-closed range. Cadence + scope are
-locked; what's deferred is the agent's concrete shape:
+The memory pipeline (cadence stratification, retrieval ranker,
+chapter-close pipeline with lore-mgmt sub-jobs, embedding
+infrastructure, pinning, per-type budgets) is designed in
+[`docs/memory/`](./memory/README.md). Substantially resolves what
+was the "Lore-management agent shape" entry and the nested
+"State-field write contract — architecture" sub-entry; both
+removed with this commit.
 
-- Prompt design — what context does it see (the closed range only?
-  the open buffer too? structural floor?), and what's the output
-  format (a list of proposed mutations, a delta JSON, free-form
-  prose to re-parse)?
-- Promotion rules — when does staged → active fire automatically vs
-  surface as a suggestion the user confirms? Conservative bias is
-  the lean (don't auto-mutate without a high-confidence signal).
-- New-lore creation policy — proactive (writes anything novel
-  observed) vs conservative (only writes when explicit story-world
-  context warrants a new lore entry). Old app erred proactive and
-  produced lore noise.
-- Failure modes — agent timeouts mid-cadence, partial output,
-  contradictions with existing state. Each delta is reversible via
-  rollback so the floor isn't catastrophic, but it should still be
-  designed not to thrash.
-- **Compaction of `traits` / `drives` (CharacterState) and `agenda`
-  (FactionState).** Per [`data-model.md → World-state storage`](./data-model.md#world-state-storage),
-  these slow-evolving identity arrays are written ONLY at
-  chapter-close lore-mgmt — never per-turn. The agent dedupes
-  synonyms ("brave" + "courageous" → one), prunes outdated entries
-  ("former alcoholic" 10 chapters past sobriety → drop), and
-  consolidates overly-specific entries against the soft caps
-  (`traits ≤ 8`, `drives ≤ 6`, `agenda ≤ 4`).
-- **Stackable-key normalization on `CharacterState.stackables`.** Cross-
-  character keys ("gold" / "Gold" / "gold pieces") drift over time;
-  the agent normalizes to canonical lowercase keys at chapter close.
-- **`lore.priority` retrieval semantics.** The schema declares the
-  field but its precise effect is not pinned. UI today (per
-  [`world.md → Settings tab — lore`](./ui/screens/world/world.md#settings-tab--lore))
-  renders `priority` editable with a working-model tooltip — "higher
-  priority preferred when retrieval is token-budget-constrained,
-  ties break by recency." Retrieval-side behavior must firm up this
-  contract or the UI tooltip diverges from runtime reality. Pairs
-  naturally with this entry because lore-mgmt + retrieval are
-  designed jointly per the closing note.
-- **Description revision suggestion-queue** — the deferred
-  autonomous-vs-confirm-mode toggle for classifier-proposed
-  description revisions (per the entity description authorship
-  contract). Until this UI lands, classifier writes description
-  only at first introduction; the agent never amends post-
-  establishment.
+**What's still open** lives in the memory folder's own followups:
 
-Lands once the retrieval agent's shape is also pinned (per
-[`architecture.md → What this doc does not yet cover`](./architecture.md#what-this-doc-does-not-yet-cover))
-— both agents share enough scaffolding (prompt construction,
-output validation, delta emission) to design as a pair rather than
-sequentially. The write-cadence + state-field authorship contract
-below is the architecture-side counterpart to this same design
-pass.
+- [v1-blocking memory work](./memory/followups.md#v1-blocking) —
+  threshold tuning, local embedder selection, background classifier
+  UX, entity-merge UI, memory probe affordance, lore-creation cap
+  tuning.
+- [Cross-doc updates](./memory/followups.md#cross-doc-updates-this-design-forces) —
+  the integration commits across data-model, architecture,
+  followups, parked.
+- [Parked / post-v1 items](./memory/followups.md#parked--post-v1) —
+  multi-axis salience, pin-contradiction reconciliation, spillover
+  policy, polymorphic naming, etc.
 
-#### State-field write contract — architecture
-
-[`data-model.md → World-state storage → Authorship contract`](./data-model.md#authorship-contract)
-declares per-field "first write" and "subsequent writes"
-authority, but the _enforcement mechanism_ is architecture
-territory. Open:
-
-- **Per-turn classifier write contract.** Which agent (per-turn
-  classifier vs every-N-turn classifier vs chapter-close
-  lore-mgmt) writes which fields, with what cadence? This design
-  proposes a stratification (per-turn for scene metadata + visual
-  - relationships + stackables; chapter-close-only for traits /
-    drives / agenda) but locks neither the agent boundaries nor
-    the prompt designs.
-- **Manual-edit-vs-classifier-overwrite policy.** v1 lean:
-  classifier writes from prose-evidenced changes; user edits
-  "stick" only until classifier reads contradicting prose.
-  Per-field provenance metadata (parked, see
-  [`parked.md → Per-field provenance metadata`](./parked.md#per-field-provenance-metadata-for-entitiesstate))
-  is the proper fix; v1 accepts this floor.
-- **Concurrency / coordination.** Per the parked
-  [Concurrent pipeline / agent coordination](./parked.md#concurrent-pipeline--agent-coordination)
-  followup — when background agents enter the picture (style-
-  review, standalone memory-compaction), state-field writes from
-  multiple agents need conflict policies.
-
-Same design pass as the lore-management agent shape above —
-chapter-close lore-mgmt is one of the agents whose write contract
-this section locks down.
+The previously-listed "lore.priority retrieval semantics" sub-item
+resolves: priority is 0-100, integrated into the ranker as
+`sim_blend × (priority/100) + kw_boost` per
+[`docs/memory/retrieval.md → The ranker`](./memory/retrieval.md#the-ranker).
+The "description revision suggestion-queue" sub-item stays
+deferred as a UI concern (independent of memory design) — until
+that UI lands, classifier writes description only at first
+introduction per the existing authorship contract.
 
 ### Delta diff cache for history surfaces
 
@@ -536,19 +480,15 @@ decisions during the reader-composer detail pass:
   Affects refresh cadence (debounce, on-pause), placement relative
   to the input cursor, commit semantics (tap to replace vs merge
   with typed text), and how this composes with category filtering.
-- **Pipeline consolidation — fold classifier (and possibly
-  suggestions) into the main narrative prompt.** Today's pipeline
-  treats classification as a separate post-generation pass per
-  [`architecture.md`](./architecture.md). Folding classification —
-  and possibly suggestion-emission — into the narrative call is
-  cheaper (one round-trip instead of two or three) but couples
-  responsibilities and may degrade output quality, especially on
-  smaller models. Inverse intuition: capable models can do it all
-  in one pass; smaller models need the split to stay coherent.
-  Worth exploring as an optional consolidated mode rather than a
-  replacement, and the suggestion-emission half is the natural
-  first slice to fold (lower stakes than classification, lives next
-  to narrative output anyway).
+- **Suggestion-emission piggyback — fold suggestions into the
+  narrative call.** The classifier-fold half is now answered by
+  [piggyback mode](./memory/piggyback.md) — capability-gated trailing
+  block on the narrative call, with periodic classifier as the
+  separate fallback. Suggestion-emission is the natural extension of
+  that pattern (lower stakes than classification, lives next to
+  narrative output anyway). Open: whether suggestions reuse the same
+  trailing block or live in a sibling block; how the suggestion
+  surface composes with category filtering and user-input guidance.
 
 The three questions interact: consolidation mode shapes how
 suggestions are produced, which constrains how categories can be

@@ -18,7 +18,7 @@ This file is session 5 of the mobile-foundations multi-session pass
   interactions, not a parallel rich-gesture vocabulary.
 - **Hover-bound affordances translate to always-visible-muted.**
   Generalization of the
-  [`patterns/icon-actions.md → Visibility`](../../patterns/icon-actions.md#visibility--always-rendered-muted-default-brighten-on-hover)
+  [`patterns/icon-actions.md → Visibility`](../../patterns/icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover)
   rule.
 - **No long-press for actions, no swipe-on-row, no
   pull-to-refresh.** Gesture vocabulary stays small.
@@ -43,7 +43,7 @@ This file is session 5 of the mobile-foundations multi-session pass
 ## Hover translation
 
 The
-[`patterns/icon-actions.md → Visibility`](../../patterns/icon-actions.md#visibility--always-rendered-muted-default-brighten-on-hover)
+[`patterns/icon-actions.md → Visibility`](../../patterns/icon-actions.md#visibility--always-rendered-color-tiered-brighten-on-hover)
 rule (always-rendered-muted, brighten on hover/focus on desktop,
 no hover state on touch) becomes the universal rule for any
 "hover-revealed" affordance:

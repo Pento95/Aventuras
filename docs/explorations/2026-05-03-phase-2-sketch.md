@@ -40,9 +40,11 @@ primitives don't depend on either, but ~half of phase 3 patterns do.
 
 ### Group B — Select primitive
 
-Already flagged in
-[`followups.md → Calendar picker primitive — open shape decisions`](../followups.md#calendar-picker-primitive--open-shape-decisions)
-as load-bearing for the calendar-picker pattern shape decision
+Already flagged at the time of this sketch in `followups.md →
+Calendar picker primitive — open shape decisions` (followup since
+resolved by the
+[calendar-picker compound](../ui/patterns/calendar-picker.md)) as
+load-bearing for the calendar-picker pattern shape decision
 (does Select gain rich-row content + popover tail-actions, or does
 a sibling `Picker` primitive fork off?). Lands together with the
 Sheet / Popover pair from Group A.

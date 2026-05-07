@@ -59,10 +59,13 @@ consumer concern (per [`layout.md → Decision tree`](../foundations/mobile/layo
 and [`layout.md → Surface bindings`](../foundations/mobile/layout.md#surface-bindings--existing-app-surfaces)),
 not something the primitives encode.
 
-The deferred [responsive-switch helper](../../followups.md#calendar-picker-primitive--open-shape-decisions)
-question (one consumer-side `<ResponsiveOverlay>` helper vs
-in-Select breakpoint dispatch) lives with Group B's Select design
-pass, not with the primitives.
+The responsive-switch helper question (one consumer-side
+`<ResponsiveOverlay>` helper vs in-Select breakpoint dispatch) was
+answered in the
+[Select design pass](../../explorations/2026-05-03-select-primitive.md#usetier-hook):
+in-Select breakpoint dispatch via the `useTier()` hook wins. No
+separate helper primitive; consumers like the calendar-picker
+compound use `useTier()` directly.
 
 ## rn-primitives mapping
 
