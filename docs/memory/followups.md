@@ -122,9 +122,11 @@ Settings Memory tab pass.
   similarity, involvements overlap percentage, time-proximity
   window). Lands once test stories exist to calibrate against;
   defaults ship for v1, advanced settings expose them.
-- **Local embedder integration + on-device perf demo** — selection,
-  runtime, tokenizer, sourcing, and the empirical pass that closes
-  the design.
+- **Local embedder integration + on-device perf demo (PoC done — production wiring remains)** —
+  PoC ran on the `poc/embedder-demo` branch (kept as audit trail,
+  not merged). The design is validated; v1-blocking work that
+  remains is the production integration (downloader, license dialog,
+  settings UI), tracked under that scope below.
 
   **Runtime path.** ONNX everywhere — `onnxruntime-react-native` on
   Expo, `onnxruntime-node` on Electron. Same ONNX file used on both
@@ -134,57 +136,84 @@ Settings Memory tab pass.
   practice — going ONNX-only on both sides keeps stored vectors
   comparable.
 
-  **Tokenizer.** `onnxruntime-extensions` custom ops, baked into the
-  ONNX graph. No JS tokenizer code path. Curated shortlist gets
-  paired bundles (model + tokenizer ONNX) generated offline once via
-  `gen_processing_models`; we host the bundles or republish to a
-  known HF location. WordPiece coverage spans the candidate models
-  (MiniLM, BGE-small, mxbai, snowflake-arctic).
+  **Tokenizer (pivoted from original ort-extensions plan).** The
+  original spec was `onnxruntime-extensions` custom ops baked into
+  the ONNX graph. PoC proved this doesn't work on ORT-RN: its JSI
+  string-tensor binding cannot pass strings into custom ops; every
+  tested input-shape variant failed with the same buffer-size
+  mismatch (`expected 24, got 8`) at `tokSession.run`. The
+  tokenizer.onnx file itself is correct — verified in Python with
+  cosine 1.000000 vs reference — the bug is in ORT-RN's binding
+  layer.
 
-  **Sourcing.** Curated HF download is the in-app primary path with
-  **live model-card fetch** at download time so the user agrees to
-  the current license rather than a curation-time snapshot — defends
-  against authors editing model cards post-curation. We store the
-  agreed-to license text alongside the model file so the agreement
-  is frozen even if the source changes later. Custom-URL dropped
-  entirely; replaced with **custom file import** for power users:
-  user downloads model.onnx, runs `gen_processing_models` themselves
-  to produce the tokenizer ONNX, brings both files via file picker.
-  License is user-attested for custom imports (no live fetch). The
-  `gen_processing_models` step requires Python — we ship a small
-  recipe in docs, not in-app tooling.
+  Pivoted to **`@huggingface/tokenizers`** in JS: pure JS/TS, zero
+  dependencies, ~8 KB gzipped, supports BPE / WordPiece / Unigram /
+  Legacy (covers every tokenizer family on production HF models).
+  Same proven library transformers.js uses internally; consumes
+  standard HF `tokenizer.json` directly. Tokenization happens in JS
+  (Hermes-compatible — verified working in the PoC), model runs in
+  ORT-RN's native code path. No JS-side numerics in the model
+  inference; tokenizer is pure transformation.
 
-  **Perf demo.** Candidate bundle wired into a throwaway Expo build
-  (not a standalone bench), running the realistic per-turn workload —
-  sequential pipeline (embed input, retrieve, LLM generate, embed
-  results; classifier and narrative stream don't overlap by design).
-  Measures cold-start init, warm per-query latency, peak memory, and
-  thermal/battery over a multi-turn session on a representative
-  low-end Android target. Demo also sanity-checks **numerical
-  divergence across execution providers** (CPU vs CoreML vs NNAPI):
-  comparing output vectors for the same input across EPs tells us
-  whether EP changes need to trigger re-index in addition to
-  `embedding_model_id` changes. If divergence is non-trivial, the
-  re-index trigger broadens to `(model_id, execution_provider)` —
-  schema implication kept open until the demo decides.
+  **Bundle format.**
+  `{model.onnx, tokenizer.json, tokenizer_config.json, meta.json}`.
+  The previous `tokenizer.onnx` format is dropped.
 
-  Demo itself is disposable; the integration pattern (ORT loading,
-  model + tokenizer file management, init-failure handling, EP
-  selection, file-import flow) feeds forward to the production
-  embedder. Pass criteria: embedding cost is bounded and predictable
-  within a few-second pre-LLM gate — anchored to the prior app's
+  **Sourcing (simplified by pivot).** Curated HF download is the
+  in-app primary path with **live model-card fetch** at download
+  time so the user agrees to the current license rather than a
+  curation-time snapshot — defends against authors editing model
+  cards post-curation. We store the agreed-to license text alongside
+  the model file so the agreement is frozen even if the source
+  changes later. Custom-URL dropped entirely; replaced with
+  **custom file import** — user provides the three standard HF
+  files (no Python conversion either side). License is user-attested
+  for custom imports.
 
-  > 1 minute pre-turn baseline, users won't notice multi-second
-  > embedder cost as long as it stays bounded. The demo also informs
-  > whether one model serves all device tiers or whether a tiered
-  > selection (different ONNX models per detected device class,
-  > possibly user-selectable) is warranted — empirical finding, not a
-  > v1 commitment going in.
+  **PoC findings (Galaxy Fold 7 — last-gen flagship; low-end
+  testing parked, see below).**
+  - **Warm per-embed:** CPU 10 ms mean / 1-30 ms range; NNAPI 13 ms
+    mean, much tighter distribution. NNAPI's stability is more
+    valuable for P99-bounded budgeting than its slightly higher
+    mean.
+  - **Cold init:** ~270 ms (asset extraction from APK dominates).
+    Warm re-init: ~120 ms. Asset extraction accounts for ~150 ms of
+    cold start.
+  - **EP divergence:** CPU vs NNAPI cosine = 1.000000. Either ORT
+    enforces fp32 at partition boundaries or the quantized-int8 ops
+    are deterministic across implementations. The
+    `(model_id, execution_provider)` cache-key broadening raised
+    pre-PoC is **resolved as no** — single-key `embedding_model_id`
+    is sufficient.
+  - **xnnpack EP** crashes the app on embed. Op-coverage gap or
+    quant incompatibility. Not blocking — CPU + NNAPI both work and
+    are interchangeable.
 
-  Failure mode: if no candidate meets the bar across the mobile
-  target range, demote local-embedder to desktop-only / opt-in,
-  leave provider as the mobile default — design pre-commits to this
-  off-ramp so the decision isn't blocked on "find a better model."
+  Numbers are 100x+ under the few-second pre-LLM gate budget.
+  Mobile feasibility settled with significant headroom; a 4-year-old
+  mid-range device could be 10x slower and still comfortably pass.
+
+  **Open — cross-device tier-finding.** PoC tested only the flagship.
+  Tier-finding question (one model serves all device classes vs
+  tiered selection per detected class) is genuinely unanswered.
+  Demo will be distributed to additional testers to gather
+  cross-device perf data. v1 ships with the curated default
+  (`Xenova/all-MiniLM-L6-v2-q8`); the off-ramp (demote local to
+  desktop-only / opt-in, leave provider as mobile default if low-end
+  devices fail) remains on the table until cross-device data lands.
+
+  **Open — production integration.** What stays v1-blocking from
+  this entry's scope:
+  - Real downloader with progress UI, resumability, SHA256
+    verification (for curated entries we ship known hashes).
+  - License-fetch + agreement dialog at download time; agreed-to
+    license text persisted alongside the model.
+  - Settings UI: model picker, current-model display, re-index
+    dialog wiring (already specified —
+    [`retrieval.md → Model swap UX`](./retrieval.md#model-swap-ux)),
+    "remove downloaded model" affordance.
+  - Init-failure handling, EP selection per device, fallback to
+    provider mode if local-embedder init fails.
 
 - **Embedding compute lifecycle** — when do new-record embeddings
   get computed? Three plausible models:
