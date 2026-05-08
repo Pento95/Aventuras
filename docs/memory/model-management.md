@@ -22,9 +22,6 @@ What it explicitly does not own:
 - Wire-level wireframes for the App Settings and Story Settings
   Memory tabs — those land at the per-screen design pass; this doc
   defines the contract those screens have to satisfy.
-- Cluster 2 (execution-provider selection per device, provider-mode
-  fallback semantics) — that lands as a separate design pass; see
-  [`followups.md → v1-blocking`](./followups.md#v1-blocking).
 
 ---
 
