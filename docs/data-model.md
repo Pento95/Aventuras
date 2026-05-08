@@ -223,7 +223,7 @@ erDiagram
         text entry_id FK "the story_entry that produced this delta; null for non-entry-triggered actions (chapter close, user direct edit)"
         text action_id "groups deltas into one user-visible action (used for CTRL-Z batching)"
         integer log_position "append-only ordering within branch"
-        text source "ai_classifier | user_edit | lore_agent | memory_compaction | chapter_close"
+        text source "ai_classifier | user_edit | lore_agent | chapter_close"
         text target_table "story_entries | entities | lore | threads | happenings | happening_involvements | happening_awareness | chapters | entry_assets | translations | branch_era_flips"
         text target_id "id in target_table"
         text op "create | update | delete"
@@ -981,7 +981,7 @@ app_settings.assignments: Record<AgentId, string>  // agentId → profile.id
 
 The `AgentId` registry is the single source of truth for which
 agents exist. v1 ships:
-`classifier | translation | suggestion | lore-mgmt | memory-compaction | retrieval | wizard-assist`.
+`classifier | translation | suggestion | lore-mgmt | retrieval | wizard-assist`.
 Narrative is not an agent — it's the storyteller, always wired to
 the `kind: 'narrative'` profile, no assignment slot needed.
 
@@ -1014,10 +1014,9 @@ app_settings.default_story_settings: Partial<StorySettings>
 
 Mirrors the operational
 [`stories.settings`](#story-settings-shape) shape — chapter threshold,
-auto-close, recent buffer, compaction detail, translation block,
-composer prefs, suggestions toggle. On story creation these copy
-into the new `stories.settings`; the story owns its values
-thereafter. Definitional fields (those in `stories.definition` —
+auto-close, recent buffer, translation block, composer prefs,
+suggestions toggle. On story creation these copy into the new
+`stories.settings`; the story owns its values thereafter. Definitional fields (those in `stories.definition` —
 `mode`, `leadEntityId`, `narration`, `genre`, `tone`, `setting`,
 `calendarSystemId`, `worldTimeOrigin`) are absent from this default
 shape — they're wizard-authored per story with no global default.
@@ -1396,7 +1395,7 @@ for the full structural-floor contract.
 
 **Decided:** everything is an event in the append-only `deltas` log,
 regardless of who authored the change — AI classifier, lore-management
-agent, memory compaction pass, chapter close, or direct user edit.
+agent, chapter close, or direct user edit.
 Rollback = reverse every delta with `log_position ≥ N`. Entity rows
 (and lore / thread / happening / chapter rows) are mutated in place for
 fast reads; the delta log is the history of record.
@@ -1495,9 +1494,9 @@ by the same user-visible operation. Action boundaries:
   whole batch uniformly — the story_entries row is deleted as the
   reversal of its `op=create` delta, no special case needed.
 - **Chapter close** — the chapter row insert + `story_entries.chapter_id`
-  updates across the range + lore-agent writes + memory-compaction
-  writes all share one `action_id`. CTRL-Z collapses the entire batch
-  as a single unit, because a user who clicks "undo" expects the whole
+  updates across the range + lore-mgmt writes (the 5 sub-jobs) all
+  share one `action_id`. CTRL-Z collapses the entire batch as a
+  single unit, because a user who clicks "undo" expects the whole
   "the chapter closed" event to disappear in one press.
 
 Algorithm:

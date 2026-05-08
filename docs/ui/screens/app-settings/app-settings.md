@@ -257,10 +257,9 @@ first).
 **Default agent profiles seeded by
 [Onboarding](../onboarding/onboarding.md#what-gets-seeded-silently):**
 `Fast tasks` (cheap routine agents) and `Heavy reasoning` (lore-mgmt
-
-- memory-compaction at chapter close). The names and exact
-  assignment matrix are placeholder shapes; final templates land with
-  implementation. User can rename / delete / extend.
+at chapter close). The names and exact assignment matrix are
+placeholder shapes; final templates land with implementation. User
+can rename / delete / extend.
 
 ### Assignments
 
@@ -270,12 +269,11 @@ Each agent dropdown picks a profile. Agents currently in the system:
 - `translation` — pipeline phase
 - `suggestion` — next-turn suggestion pane
 - `lore-mgmt` — chapter close
-- `memory-compaction` — chapter close
 - `retrieval` — retrieval phase (when designed)
 
 Default assignment seeded by
 [Onboarding](../onboarding/onboarding.md#what-gets-seeded-silently)
-(typically all → `Fast tasks` except the chapter-close pair →
+(typically all → `Fast tasks` except `lore-mgmt` →
 `Heavy reasoning`). Placeholder split — finalized with
 implementation.
 
@@ -322,8 +320,8 @@ stories.
 ### Memory
 
 Same form as Story Settings · Memory — chapter token threshold (with
-preset buttons), recent buffer, compaction detail. Form component
-literally reused; only data binding differs.
+preset buttons), recent buffer. Form component literally reused;
+only data binding differs.
 
 ### Translation
 

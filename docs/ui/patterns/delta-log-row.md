@@ -34,7 +34,7 @@ type DeltaLogRowProps = {
   delta: {
     id: string
     op: 'create' | 'update' | 'delete'
-    source: 'ai_classifier' | 'user_edit' | 'lore_agent' | 'memory_compaction' | 'chapter_close'
+    source: 'ai_classifier' | 'user_edit' | 'lore_agent' | 'chapter_close'
     targetTable: string // host's resolution call; compound uses it as fallback label only
     targetDisplayName: string // pre-resolved by host
     fieldPath: string | null // op=update: "state.traits[2]"; op=create/delete: null
@@ -106,7 +106,6 @@ Muted foreground (`text-fg-muted text-xs`), middle-dot separators:
   - `ai_classifier` → `classifier`
   - `user_edit` → `user`
   - `lore_agent` → `lore agent`
-  - `memory_compaction` → `memory compaction`
   - `chapter_close` → `chapter close`
 - **Entry link** — `entry #<n>` when `entryId` non-null; omitted
   when null. Host supplies the pre-formatted "entry #47" via the

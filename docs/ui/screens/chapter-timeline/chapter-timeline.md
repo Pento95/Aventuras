@@ -131,8 +131,8 @@ Three buttons in a row beneath the form, before the save bar:
 - **Regenerate summary** — re-runs only the LLM metadata-generation
   step (title / summary / theme / keywords) on the chapter's
   existing range. Idempotent for the metadata layer; does NOT
-  re-run lore-management or memory compaction (those are destructive
-  re-applications and out of scope for v1 — see
+  re-run lore-management (that's a destructive re-application and
+  out of scope for v1 — see
   [open questions](#screen-specific-open-questions)). Confirm modal
   warns "this overwrites the current title/summary/theme/keywords."
 - **Delete…** — destructive. Opens the
@@ -194,7 +194,7 @@ button. Same modal, same shape — uniform UX.
 │  Closes the open chapter from entry 89 through       │
 │  your chosen end entry. The AI generates title,      │
 │  summary, theme, and keywords; lore management       │
-│  and memory compaction run as part of the close.     │
+│  runs as part of the close.                          │
 │                                                      │
 │  ── Start of chapter ──                              │
 │  ┌────────────────────────────────────────────────┐ │

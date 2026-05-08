@@ -248,7 +248,7 @@ their next pass.
 
 Standalone panel exposing the global `deltas` log for power-user
 debugging — what happened to the data layer, when, by which agent
-(classifier / lore-mgmt / memory-compaction / user_edit). Likely a
+(classifier / lore-mgmt / user_edit / chapter-close). Likely a
 chronological scroll with filters by source, target_table,
 action_id. Distinct from per-entity History tab (World, Plot) which
 already scopes the log to one row's lineage.

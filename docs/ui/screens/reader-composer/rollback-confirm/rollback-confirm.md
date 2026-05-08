@@ -96,7 +96,7 @@ copy:
 
 > **1 chapter re-opened** — chapter 5 will return to in-progress.
 
-Why bold: chapter close fires lore-mgmt + memory-compaction writes;
+Why bold: chapter close fires lore-mgmt writes (the 5 sub-jobs);
 those reverse along with the chapter row itself. The re-open is the
 load-bearing consequence the user needs to see, not just the count.
 

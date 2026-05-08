@@ -112,8 +112,7 @@ card `⋯ → Edit info` routes to `About` directly.
 **Settings section** (operational — post-creation knobs):
 
 - **Models** — per-feature override picks (see below)
-- **Memory** — chapter threshold (with presets), recent buffer size,
-  compaction detail
+- **Memory** — chapter threshold (with presets), recent buffer size
 - **Translation** — master enable, target language, granular
   per-content-type toggles
 - **Pack** — active pack + pack-declared variables (see below)
@@ -151,7 +150,6 @@ their currently-resolved chain:
 - `translation` — Fast tasks → gpt-4o-mini
 - `suggestion` — Fast tasks → gpt-4o-mini
 - `lore-mgmt` — Heavy reasoning → claude-opus-4-7
-- `memory-compaction` — Heavy reasoning → claude-opus-4-7
 - `retrieval` — Fast tasks → gpt-4o-mini (when designed)
 
 (Image generation is deferred — see
@@ -201,7 +199,6 @@ stories.settings.models: {
   translation?: string;
   suggestion?: string;
   loreMgmt?: string;
-  memoryCompaction?: string;
   retrieval?: string;
 }
 ```
@@ -272,7 +269,7 @@ confirmation lives at the save-session commit step. Lead is **not**
 flagged — lead-switching is a first-class action per
 [principles → Mode, lead, narration](../../principles.md#mode-lead-and-narration--three-orthogonal-concepts).
 
-## Memory tab — chapter threshold + recent buffer + compaction
+## Memory tab — chapter threshold + recent buffer
 
 **Chapter threshold** gets quick-pick preset buttons alongside the
 numeric input: `Short (8k)`, `Balanced (24k)`, `Long (48k)`,
@@ -315,13 +312,6 @@ The structural floor — active+in-scene entities, current-location
 lore, awareness-driven happenings, always-injection rows — is not
 governed by `recentBuffer` either. Those reach the prompt
 unconditionally when their structural conditions hold.
-
-### Compaction detail
-
-Single-line directive that tells the memory-compaction agent (running
-at chapter close) what to focus on when condensing the just-closed
-range. Free-form text. Default: empty (agent uses its built-in
-defaults).
 
 ## Translation tab — display-only, opt-in, single target
 
