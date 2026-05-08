@@ -426,6 +426,7 @@
           <div class="rail-section-title">Generation</div>
           <div class="nav-item" data-nav="providers">Providers <span class="nav-hint">instances</span></div>
           <div class="nav-item active" data-nav="profiles">Profiles <span class="nav-hint">narrative + agents</span></div>
+          <div class="nav-item" data-nav="embedders">Embedding models <span class="nav-hint">installed + provider</span></div>
         </div>
 
         <div class="rail-section">
@@ -502,93 +503,92 @@
                 </div>
               </details>
 
-              <!-- MODELS — pinned-only by default; "View all" expands to search + full list -->
-              <div class="model-list-head">
-                <h4>Models</h4>
-                <span class="meta">12 cached &middot; last fetched 2h ago</span>
-                <span class="refresh">&#8635; Refresh</span>
-              </div>
-
-              <!-- pinned section: always visible, short -->
-              <div style="font-size: 10px; color: var(--ink-faint); margin: 4px 0;">PINNED &middot; quick access in pickers</div>
-              <div class="model-list">
-                <div class="model-row">
-                  <span class="pin on" title="pinned &mdash; floats to top of pickers">&#9733;</span>
-                  <span class="m-name">claude-sonnet-4-7</span>
-                  <span class="m-caps">
-                    <span class="cap-badge on" title="reasoning">&#129504;</span>
-                    <span class="cap-badge on" title="structured output">&#9881;</span>
-                  </span>
-                  <span class="remove" title="remove from cache">&times;</span>
+              <!-- MODELS — split by capability: Text models + Embedding models. Both default-collapsed. -->
+              <div class="model-section" data-mcap-section="anthropic-text">
+                <div class="model-list-head" data-mcap-toggle="anthropic-text" style="cursor: pointer;">
+                  <span class="chevron" style="font-size: 11px;">&#9656;</span>
+                  <h4 style="margin-left: 4px;">Text models</h4>
+                  <span class="meta">12 cached &middot; 2h ago</span>
+                  <span class="refresh" data-no-toggle>&#8635; Refresh</span>
                 </div>
-                <div class="model-row">
-                  <span class="pin on" title="pinned">&#9733;</span>
-                  <span class="m-name">claude-opus-4-7</span>
-                  <span class="m-caps">
-                    <span class="cap-badge on" title="reasoning">&#129504;</span>
-                    <span class="cap-badge on" title="structured output">&#9881;</span>
-                  </span>
-                  <span class="remove" title="remove from cache">&times;</span>
-                </div>
-              </div>
-
-              <!-- view-all toggle + expanded section + add-custom — stacked vertically -->
-              <div class="model-actions">
-                <span class="view-all-cta" data-toggle-models="anthropic">View all 12 models &rarr;</span>
-
-                <div class="view-all-section" data-models-section="anthropic">
-                <div class="models-search-bar">
-                  <span class="search-input">Search models&hellip;</span>
-                  <span class="cap-filter">&#129504; reasoning</span>
-                  <span class="cap-filter">&#9881; structured</span>
-                  <span class="cap-filter">&#9733; pinned only</span>
-                </div>
-                <div class="all-models-list">
-                  <div class="model-row">
-                    <span class="pin on">&#9733;</span>
-                    <span class="m-name">claude-sonnet-4-7</span>
-                    <span class="m-caps"><span class="cap-badge on">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
-                    <span class="remove">&times;</span>
+                <div class="model-section-body" hidden>
+                  <div style="font-size: 10px; color: var(--ink-faint); margin: 4px 0;">PINNED &middot; quick access in pickers</div>
+                  <div class="model-list">
+                    <div class="model-row">
+                      <span class="pin on" title="pinned &mdash; floats to top of pickers">&#9733;</span>
+                      <span class="m-name">claude-sonnet-4-7</span>
+                      <span class="m-caps">
+                        <span class="cap-badge on" title="reasoning">&#129504;</span>
+                        <span class="cap-badge on" title="structured output">&#9881;</span>
+                      </span>
+                      <span class="remove" title="remove from cache">&times;</span>
+                    </div>
+                    <div class="model-row">
+                      <span class="pin on" title="pinned">&#9733;</span>
+                      <span class="m-name">claude-opus-4-7</span>
+                      <span class="m-caps">
+                        <span class="cap-badge on" title="reasoning">&#129504;</span>
+                        <span class="cap-badge on" title="structured output">&#9881;</span>
+                      </span>
+                      <span class="remove" title="remove from cache">&times;</span>
+                    </div>
                   </div>
-                  <div class="model-row">
-                    <span class="pin on">&#9733;</span>
-                    <span class="m-name">claude-opus-4-7</span>
-                    <span class="m-caps"><span class="cap-badge on">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
-                    <span class="remove">&times;</span>
+                  <div class="model-actions">
+                    <span class="view-all-cta" data-toggle-models="anthropic-text">View all 12 models &rarr;</span>
+                    <div class="view-all-section" data-models-section="anthropic-text">
+                      <div class="models-search-bar">
+                        <span class="search-input">Search models&hellip;</span>
+                        <span class="cap-filter">&#129504; reasoning</span>
+                        <span class="cap-filter">&#9881; structured</span>
+                        <span class="cap-filter">&#9733; pinned only</span>
+                      </div>
+                      <div class="all-models-list">
+                        <div class="model-row">
+                          <span class="pin on">&#9733;</span>
+                          <span class="m-name">claude-sonnet-4-7</span>
+                          <span class="m-caps"><span class="cap-badge on">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
+                          <span class="remove">&times;</span>
+                        </div>
+                        <div class="model-row">
+                          <span class="pin on">&#9733;</span>
+                          <span class="m-name">claude-opus-4-7</span>
+                          <span class="m-caps"><span class="cap-badge on">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
+                          <span class="remove">&times;</span>
+                        </div>
+                        <div class="model-row">
+                          <span class="pin">&#9734;</span>
+                          <span class="m-name">claude-haiku-4-5</span>
+                          <span class="m-caps"><span class="cap-badge">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
+                          <span class="remove">&times;</span>
+                        </div>
+                        <div class="model-row">
+                          <span class="pin">&#9734;</span>
+                          <span class="m-name">claude-3-5-haiku</span>
+                          <span class="m-caps"><span class="cap-badge">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
+                          <span class="remove">&times;</span>
+                        </div>
+                        <div style="font-size: 10px; color: var(--ink-faint); padding: 6px 8px; text-align: center;">&hellip; 8 more &hellip;</div>
+                      </div>
+                      <div class="all-models-foot">
+                        <span>showing 4 of 12 &middot; pinned float to top across all pickers</span>
+                        <span class="view-all-cta" style="padding: 0;" data-toggle-models="anthropic-text">&uarr; Collapse</span>
+                      </div>
+                    </div>
+                    <span class="add-custom-model">+ Add custom model id</span>
                   </div>
-                  <div class="model-row">
-                    <span class="pin">&#9734;</span>
-                    <span class="m-name">claude-haiku-4-5</span>
-                    <span class="m-caps"><span class="cap-badge">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
-                    <span class="remove">&times;</span>
-                  </div>
-                  <div class="model-row">
-                    <span class="pin">&#9734;</span>
-                    <span class="m-name">claude-3-5-haiku</span>
-                    <span class="m-caps"><span class="cap-badge">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
-                    <span class="remove">&times;</span>
-                  </div>
-                  <div class="model-row">
-                    <span class="pin">&#9734;</span>
-                    <span class="m-name">claude-3-5-sonnet</span>
-                    <span class="m-caps"><span class="cap-badge">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
-                    <span class="remove">&times;</span>
-                  </div>
-                  <div class="model-row">
-                    <span class="pin">&#9734;</span>
-                    <span class="m-name">claude-3-opus</span>
-                    <span class="m-caps"><span class="cap-badge">&#129504;</span><span class="cap-badge on">&#9881;</span></span>
-                    <span class="remove">&times;</span>
-                  </div>
-                  <div style="font-size: 10px; color: var(--ink-faint); padding: 6px 8px; text-align: center;">&hellip; 6 more &hellip;</div>
-                </div>
-                <div class="all-models-foot">
-                  <span>showing 6 of 12 &middot; pinned float to top across all pickers</span>
-                  <span class="view-all-cta" style="padding: 0;" data-toggle-models="anthropic">&uarr; Collapse</span>
                 </div>
               </div>
 
-                <span class="add-custom-model">+ Add custom model id</span>
+              <div class="model-section" data-mcap-section="anthropic-embed">
+                <div class="model-list-head" data-mcap-toggle="anthropic-embed" style="cursor: pointer;">
+                  <span class="chevron" style="font-size: 11px;">&#9656;</span>
+                  <h4 style="margin-left: 4px;">Embedding models</h4>
+                  <span class="meta" style="color: var(--ink-faint);">none &middot; this provider doesn't expose embeddings</span>
+                  <span class="refresh" data-no-toggle>&#8635; Refresh</span>
+                </div>
+                <div class="model-section-body" hidden>
+                  <div style="font-size: 11px; color: var(--ink-muted); padding: 10px 4px; font-style: italic;">No embedding-capable models on this provider. Provider's <code>/models</code> endpoint either doesn't list embedding models or marks none of them as embedding-capable.</div>
+                </div>
               </div>
             </div>
           </div>
@@ -659,44 +659,79 @@
                 </div>
               </details>
 
-              <!-- MODEL LIST — manual entry emphasized -->
-              <div class="model-list-head">
-                <h4>Models</h4>
-                <span class="meta">3 cached &middot; auto-discovery limited &mdash; add custom ids as needed</span>
-                <span class="refresh">&#8635; Refresh</span>
+              <!-- MODEL LIST — split by capability, manual entry emphasized -->
+              <div class="model-section" data-mcap-section="ollama-text">
+                <div class="model-list-head" data-mcap-toggle="ollama-text" style="cursor: pointer;">
+                  <span class="chevron" style="font-size: 11px;">&#9656;</span>
+                  <h4 style="margin-left: 4px;">Text models</h4>
+                  <span class="meta">3 cached &middot; auto-discovery limited &mdash; add custom ids as needed</span>
+                  <span class="refresh" data-no-toggle>&#8635; Refresh</span>
+                </div>
+                <div class="model-section-body" hidden>
+                  <div class="model-list">
+                    <div class="model-row">
+                      <span class="pin on">&#9733;</span>
+                      <span class="m-name">llama3.1:70b</span>
+                      <span class="m-caps">
+                        <span class="cap-badge" title="capability data unavailable">&#129504;</span>
+                        <span class="cap-badge" title="capability data unavailable">&#9881;</span>
+                      </span>
+                      <span class="remove">&times;</span>
+                    </div>
+                    <div class="model-row">
+                      <span class="pin">&#9734;</span>
+                      <span class="m-name">qwen2.5-coder:32b</span>
+                      <span class="m-caps">
+                        <span class="cap-badge">&#129504;</span>
+                        <span class="cap-badge">&#9881;</span>
+                      </span>
+                      <span class="remove">&times;</span>
+                    </div>
+                    <div class="model-row">
+                      <span class="pin">&#9734;</span>
+                      <span class="m-name">my-custom-finetune <span style="font-size: 10px; color: var(--ink-faint);">(custom id)</span></span>
+                      <span class="m-caps">
+                        <span class="cap-badge">&#129504;</span>
+                        <span class="cap-badge">&#9881;</span>
+                      </span>
+                      <span class="remove">&times;</span>
+                    </div>
+                  </div>
+                  <span class="add-custom-model">+ Add custom model id</span>
+                  <div style="font-size: 10px; color: var(--ink-faint); margin-top: 6px; font-style: italic;">
+                    Capability data unavailable for OpenAI-compatible &mdash; auto resolves to force-off; flip per-profile if your model supports it.
+                  </div>
+                </div>
               </div>
-              <div class="model-list">
-                <div class="model-row">
-                  <span class="pin on">&#9733;</span>
-                  <span class="m-name">llama3.1:70b</span>
-                  <span class="m-caps">
-                    <span class="cap-badge" title="capability data unavailable">&#129504;</span>
-                    <span class="cap-badge" title="capability data unavailable">&#9881;</span>
-                  </span>
-                  <span class="remove">&times;</span>
+
+              <div class="model-section" data-mcap-section="ollama-embed">
+                <div class="model-list-head" data-mcap-toggle="ollama-embed" style="cursor: pointer;">
+                  <span class="chevron" style="font-size: 11px;">&#9656;</span>
+                  <h4 style="margin-left: 4px;">Embedding models</h4>
+                  <span class="meta">2 cached &middot; locally-served</span>
+                  <span class="refresh" data-no-toggle>&#8635; Refresh</span>
                 </div>
-                <div class="model-row">
-                  <span class="pin">&#9734;</span>
-                  <span class="m-name">qwen2.5-coder:32b</span>
-                  <span class="m-caps">
-                    <span class="cap-badge">&#129504;</span>
-                    <span class="cap-badge">&#9881;</span>
-                  </span>
-                  <span class="remove">&times;</span>
+                <div class="model-section-body" hidden>
+                  <div class="model-list">
+                    <div class="model-row">
+                      <span class="pin on">&#9733;</span>
+                      <span class="m-name">nomic-embed-text</span>
+                      <span class="m-caps">
+                        <span class="cap-badge" title="capability data unavailable">&#9881;</span>
+                      </span>
+                      <span class="remove">&times;</span>
+                    </div>
+                    <div class="model-row">
+                      <span class="pin">&#9734;</span>
+                      <span class="m-name">mxbai-embed-large</span>
+                      <span class="m-caps">
+                        <span class="cap-badge">&#9881;</span>
+                      </span>
+                      <span class="remove">&times;</span>
+                    </div>
+                  </div>
+                  <span class="add-custom-model">+ Add custom model id</span>
                 </div>
-                <div class="model-row">
-                  <span class="pin">&#9734;</span>
-                  <span class="m-name">my-custom-finetune <span style="font-size: 10px; color: var(--ink-faint);">(custom id)</span></span>
-                  <span class="m-caps">
-                    <span class="cap-badge">&#129504;</span>
-                    <span class="cap-badge">&#9881;</span>
-                  </span>
-                  <span class="remove">&times;</span>
-                </div>
-              </div>
-              <span class="add-custom-model">+ Add custom model id</span>
-              <div style="font-size: 10px; color: var(--ink-faint); margin-top: 6px; font-style: italic;">
-                Capability data unavailable for OpenAI-compatible &mdash; auto resolves to force-off; flip per-profile if your model supports it.
               </div>
             </div>
           </div>
@@ -910,23 +945,20 @@
 
         <!-- MEMORY -->
         <div class="tab-panel" data-panel="memory">
-          <div class="tab-title">Memory <span style="font-size: 12px; color: var(--ink-muted); font-weight: 400;">&middot; story default</span></div>
-          <div class="tab-subtitle">Defaults copied into new stories at creation. Editing here doesn't propagate to existing stories.</div>
+          <div class="tab-title">Memory</div>
+          <div class="tab-subtitle">Story defaults (seed new stories) plus embedder management and cross-story embedding status.</div>
 
           <div class="panel-note">
-            Same form component as Story Settings &middot; Memory. Differs only in data binding (<code>app_settings.defaultStorySettings.memory</code> vs <code>stories.settings.memory</code>).
+            Story Defaults section uses the same form components as Story Settings &middot; Memory; differs only in data binding (<code>app_settings.default_story_settings</code> vs <code>stories.settings</code>). Editing here doesn't propagate to existing stories.
           </div>
 
+          <!-- STORY DEFAULTS -->
+          <div class="tab-section"><div class="tab-section-title">Story Defaults &middot; Chapter close</div></div>
           <div class="field-row">
             <div class="field-label">chapter token threshold
               <span class="hint">presets + numeric</span>
             </div>
             <div>
-              <!-- Preset+custom hybrid uses the chip-row pattern (matches
-                   story-settings's threshold control). 4 options + custom
-                   doesn't fit Select primitive's three render modes
-                   cleanly; chips wrap naturally and read as "selectable
-                   presets". Per Group D wireframe-review unification. -->
               <div class="chip-row" style="margin-bottom: 8px;">
                 <span class="add-chip" style="padding: 4px 12px;">Short (8k)</span>
                 <span class="add-chip" style="padding: 4px 12px; background: var(--bg-highlight); border-style: solid;">Balanced (24k)</span>
@@ -943,11 +975,159 @@
             </div>
             <span class="toggle on"></span>
           </div>
+
+          <div class="tab-section"><div class="tab-section-title">Story Defaults &middot; Prompt context</div></div>
           <div class="field-row">
             <div class="field-label">recent buffer
               <span class="hint">entries injected verbatim</span>
             </div>
             <input class="input-text" value="10" />
+          </div>
+          <div class="switch-row" role="switch" aria-checked="false">
+            <div class="switch-row-text">
+              <div class="switch-row-label">full chapter in buffer</div>
+              <div class="switch-row-hint">always include the current chapter verbatim, in addition to recent buffer</div>
+            </div>
+            <span class="toggle off"></span>
+          </div>
+
+          <div class="tab-section"><div class="tab-section-title">Story Defaults &middot; Classifier</div></div>
+          <div class="field-row">
+            <div class="field-label">cadence
+              <span class="hint">turns between background classifier runs</span>
+            </div>
+            <div>
+              <span style="font-size: 11px; color: var(--ink-muted);">every</span>
+              <input class="input-text" value="10" style="width: 60px;" />
+              <span style="font-size: 11px; color: var(--ink-muted); margin-left: 4px;">turns</span>
+            </div>
+          </div>
+          <div class="switch-row" role="switch" aria-checked="true">
+            <div class="switch-row-text">
+              <div class="switch-row-label">use piggyback mode <span style="font-size: 10px; color: var(--ink-faint);">(recommended)</span></div>
+              <div class="switch-row-hint">narrative call emits a tagged trailing block; falls back to a per-turn classifier pass when off</div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+
+          <div class="tab-section"><div class="tab-section-title">Story Defaults &middot; Retrieval budgets <span style="font-size: 10px; color: var(--ink-faint); font-weight: 400;">&middot; per-type token budgets, hard partitions</span></div></div>
+          <div class="field-row">
+            <div class="field-label">entities</div>
+            <div><input class="input-text" value="800" style="width: 90px;" /> <span style="font-size: 10px; color: var(--ink-faint);">tokens</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-label">lore</div>
+            <div><input class="input-text" value="1200" style="width: 90px;" /> <span style="font-size: 10px; color: var(--ink-faint);">tokens</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-label">happenings</div>
+            <div><input class="input-text" value="1500" style="width: 90px;" /> <span style="font-size: 10px; color: var(--ink-faint);">tokens</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-label">threads</div>
+            <div><input class="input-text" value="500" style="width: 90px;" /> <span style="font-size: 10px; color: var(--ink-faint);">tokens</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-label">chapter summaries</div>
+            <div><input class="input-text" value="600" style="width: 90px;" /> <span style="font-size: 10px; color: var(--ink-faint);">tokens</span></div>
+          </div>
+
+          <div class="tab-section"><div class="tab-section-title">Story Defaults &middot; Embedder</div></div>
+          <div class="field-row">
+            <div class="field-label">backend
+              <span class="hint">where embeddings come from for new stories</span>
+            </div>
+            <div class="input-select" style="min-width: 130px;"><span>local</span> <span style="color: var(--ink-faint);">&#9662;</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-label">model
+              <span class="hint">when backend = local: lists installed local models (<a href="#" data-tab-link="embedders" style="color: var(--ink-faint);">manage</a>) &middot; when backend = provider: lists embedding-capable models grouped by provider (sourced from <a href="#" data-tab-link="providers" style="color: var(--ink-faint);">Providers</a>' Embedding models lists)</span>
+            </div>
+            <div>
+              <div class="input-select" style="min-width: 280px; margin-bottom: 6px;"><span>Xenova/all-MiniLM-L6-v2-q8</span> <span style="color: var(--ink-faint);">&#9662;</span></div>
+              <div>
+                <span class="add-chip" style="padding: 3px 10px; font-size: 11px;">Test embedder</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EMBEDDING MODELS -->
+        <div class="tab-panel" data-panel="embedders">
+          <div class="tab-title">Embedding models</div>
+          <div class="tab-subtitle">Installed local models, provider embedder configuration, and cross-story embedding status. The default <em>selection</em> for new stories lives in <a href="#" data-tab-link="memory" style="color: var(--ink-muted);">Memory</a>; this tab is the inventory + management surface.</div>
+
+          <div class="tab-section"><div class="tab-section-title">Installed local models <span style="font-size: 10px; color: var(--ink-faint); font-weight: 400;">&middot; tap to expand for detail</span></div></div>
+
+          <!-- Collapsed accordion row -->
+          <div class="embedder-row" data-erow="m1" style="border: 1px solid var(--border); padding: 10px 14px; margin-bottom: 6px; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="color: var(--ink-faint); font-size: 11px;">&#9656;</span>
+              <code style="font-size: 12px; flex: 1;">Xenova/all-MiniLM-L6-v2-q8</code>
+              <span style="font-size: 10px; color: var(--ink-faint);">25 MB</span>
+              <span style="font-size: 11px; color: #2d8a4f;" title="tested ok">&#10003;</span>
+              <span style="color: var(--ink-faint);">&#8943;</span>
+            </div>
+            <div class="embedder-row-detail" data-edetail="m1" hidden style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px;">
+              <div style="margin-bottom: 6px;">backend: <code>local</code> &middot; folder: <code style="font-size: 10px;">xenova--all-minilm-l6-v2-q8/</code></div>
+              <div style="margin-bottom: 6px;">last tested: just now &middot; <span style="color: #2d8a4f;">success</span></div>
+              <div style="display: flex; gap: 12px; align-items: center; margin-top: 10px;">
+                <span class="add-chip" style="padding: 3px 10px;">Test embedder</span>
+                <span style="color: var(--ink-muted);">EP:</span>
+                <div class="input-select" style="min-width: 110px;"><span>cpu</span> <span style="color: var(--ink-faint);">&#9662;</span></div>
+                <span style="font-size: 10px; color: var(--ink-faint);">catalog default</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="embedder-row" data-erow="m2" style="border: 1px solid var(--border); padding: 10px 14px; margin-bottom: 6px; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="color: var(--ink-faint); font-size: 11px;">&#9656;</span>
+              <code style="font-size: 12px; flex: 1;">BAAI/bge-base-en-v1.5</code>
+              <span style="font-size: 10px; color: var(--ink-faint);">120 MB</span>
+              <span style="font-size: 11px; color: var(--ink-faint);" title="not yet tested">&mdash;</span>
+              <span style="color: var(--ink-faint);">&#8943;</span>
+            </div>
+            <div class="embedder-row-detail" data-edetail="m2" hidden style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px;">
+              <div style="margin-bottom: 6px;">backend: <code>local</code> &middot; folder: <code style="font-size: 10px;">baai--bge-base-en-v1-5/</code></div>
+              <div style="margin-bottom: 6px;">last tested: never</div>
+              <div style="display: flex; gap: 12px; align-items: center; margin-top: 10px;">
+                <span class="add-chip" style="padding: 3px 10px;">Test embedder</span>
+                <span style="color: var(--ink-muted);">EP:</span>
+                <div class="input-select" style="min-width: 110px;"><span>cpu</span> <span style="color: var(--ink-faint);">&#9662;</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin: 14px 0 6px;">
+            <span class="add-chip" style="padding: 5px 14px;">+ Add model</span>
+            <span style="font-size: 10px; color: var(--ink-faint); margin-left: 8px;">curated catalog &middot; or import custom files</span>
+          </div>
+
+          <div class="panel-note" style="font-size: 11px; color: var(--ink-muted); padding: 8px 10px; background: var(--bg-highlight); border-left: 3px solid var(--border); margin: 14px 0 12px;">
+            <b>Provider embedders</b> aren't installed; they live on the configured providers' embedding-models lists in <a href="#" data-tab-link="providers" style="color: var(--ink-muted);">Providers</a>. The default selection (which provider + model to use for new stories' embedder) lives in <a href="#" data-tab-link="memory" style="color: var(--ink-muted);">Memory</a>'s Embedder default card. This tab is for installed-local management.
+          </div>
+
+          <div class="tab-section"><div class="tab-section-title">Embedding status &middot; across stories <span style="font-size: 10px; color: var(--ink-faint); font-weight: 400;">&middot; <a href="#" id="cross-staleness-toggle" style="color: var(--ink-faint);">show preview (3 stories)</a></span></div></div>
+
+          <div id="cross-staleness-empty" style="font-size: 12px; color: var(--ink-muted); font-style: italic; padding: 10px 0;">No stories have pending re-embeds.</div>
+
+          <div id="cross-staleness-list" style="display: none;">
+            <div class="warn-box" style="background: #fdf6e7; border-color: #d8c79b; border-left-color: #b89540; color: #6b5520; margin-bottom: 8px;">
+              <div style="font-size: 12px; margin-bottom: 2px;"><b>Aria's Descent</b></div>
+              <div style="font-size: 11px; color: var(--ink-muted); margin-bottom: 8px;">12 rows pending re-embed under MiniLM-L6 &middot; model removed</div>
+              <span class="add-chip" style="padding: 3px 10px; font-size: 11px;">Open story settings</span>
+            </div>
+            <div class="warn-box" style="background: #fdf6e7; border-color: #d8c79b; border-left-color: #b89540; color: #6b5520; margin-bottom: 8px;">
+              <div style="font-size: 12px; margin-bottom: 2px;"><b>The Tower of Saints</b></div>
+              <div style="font-size: 11px; color: var(--ink-muted); margin-bottom: 8px;">3 rows pending re-embed under bge-base-en-v1.5 &middot; embedder offline</div>
+              <span class="add-chip" style="padding: 3px 10px; font-size: 11px;">Open story settings</span>
+            </div>
+            <div class="warn-box" style="background: #fdf6e7; border-color: #d8c79b; border-left-color: #b89540; color: #6b5520;">
+              <div style="font-size: 12px; margin-bottom: 2px;"><b>Untitled draft</b></div>
+              <div style="font-size: 11px; color: var(--ink-muted); margin-bottom: 8px;">1 row pending re-embed under MiniLM-L6 &middot; init failure</div>
+              <span class="add-chip" style="padding: 3px 10px; font-size: 11px;">Open story settings</span>
+            </div>
           </div>
         </div>
 
@@ -1292,6 +1472,55 @@
             const target = t.dataset.toggleModels;
             const section = document.querySelector('[data-models-section="' + target + '"]');
             if (section) section.classList.toggle('open');
+          });
+        });
+
+        // Per-capability model section toggle (Text models / Embedding models within a provider)
+        document.querySelectorAll('[data-mcap-toggle]').forEach((head) => {
+          head.addEventListener('click', (e) => {
+            // Don't toggle when clicking the inner Refresh button
+            if (e.target.closest('[data-no-toggle]')) return;
+            const id = head.dataset.mcapToggle;
+            const section = document.querySelector('[data-mcap-section="' + id + '"]');
+            if (!section) return;
+            const body = section.querySelector('.model-section-body');
+            const chev = head.querySelector('.chevron');
+            if (!body) return;
+            body.hidden = !body.hidden;
+            if (chev) chev.innerHTML = body.hidden ? '&#9656;' : '&#9662;';
+          });
+        });
+
+        // Cross-story staleness preview toggle (Embedding models tab)
+        const crossStalenessToggle = document.getElementById('cross-staleness-toggle');
+        const crossStalenessEmpty = document.getElementById('cross-staleness-empty');
+        const crossStalenessList = document.getElementById('cross-staleness-list');
+        if (crossStalenessToggle && crossStalenessList) {
+          crossStalenessToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            const open = crossStalenessList.style.display !== 'none';
+            crossStalenessList.style.display = open ? 'none' : 'block';
+            if (crossStalenessEmpty) crossStalenessEmpty.style.display = open ? 'block' : 'none';
+            crossStalenessToggle.textContent = open ? 'show preview (3 stories)' : 'hide preview';
+          });
+        }
+
+        // Installed-embedder accordion rows
+        document.querySelectorAll('.embedder-row').forEach(function (row) {
+          row.addEventListener('click', function (e) {
+            // Don't toggle if user clicked an interactive descendant
+            if (e.target.closest('.add-chip, .input-select, .embedder-row-detail')) return;
+            const id = row.dataset.erow;
+            const detail = document.querySelector('.embedder-row-detail[data-edetail="' + id + '"]');
+            if (detail) detail.hidden = !detail.hidden;
+          });
+        });
+
+        // Cross-tab navigation links (e.g., 'manage installed' link in Memory tab)
+        document.querySelectorAll('[data-tab-link]').forEach(function (a) {
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            setTab(a.dataset.tabLink);
           });
         });
       })();

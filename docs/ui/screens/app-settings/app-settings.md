@@ -175,13 +175,43 @@ The OpenAI-compatible type differs from the others:
 - **Custom model id is more prominent** — auto-discovery may return
   no models or partial lists; manual entry is the primary path.
 
+### Models — split by capability
+
+Each provider's models surface as **two collapsible sections**
+within its card:
+
+- **Text models** — chat-completion / instruct models. Consumed
+  downstream by Profiles (narrative + agent profiles).
+- **Embedding models** — embedding-capable models. Consumed
+  downstream by the Embedder default selector in Memory tab.
+
+Both sections **default collapsed** showing only their head row
+(name + count + `Refresh`). The user expands a section to see
+the model list, pinned/full/search affordances, and add-custom-id.
+Refetch is per-section: clicking `Refresh` on the head row
+refreshes only that capability category.
+
+For providers that don't expose embedding-capable models (e.g.
+Anthropic today), the Embedding models head shows
+`Embedding models · none` and the expanded body has an explanatory
+empty state. The section isn't hidden — explicit empty surface is
+more discoverable than a missing one.
+
+Both sections are populated from the same `/models` endpoint at
+fetch time; capability metadata in
+`app_settings.providers[].cachedModels[].capabilities` carries the
+classification. Capabilities are detected from the provider but
+always user-overridable (per the global pattern; some providers
+report inconsistently, custom endpoints may run models the
+provider's metadata doesn't recognize).
+
 ### Model fetching strategy
 
 - **Refresh on app launch** — automatic on startup, **staggered**
   across configured providers to avoid hammering the network with
   parallel calls.
-- **Manual refresh** per provider via the `↻` button on the model
-  list head.
+- **Manual refresh** per provider, per capability section via the
+  `↻` button on the section head row.
 - **Cached results persisted** in SQLite alongside provider config;
   survive restarts even when offline.
 
@@ -308,6 +338,68 @@ Power-user features that earn their v1 weight:
 - **Refresh fetch** — `↻` button on the provider row in Keys,
   per-dropdown manual refresh on the model picker.
 
+## GENERATION · Embedding models
+
+The place where **installed local models** are managed (install,
+test, EP override, remove) plus a **cross-story staleness
+aggregate**. Sits under Generation alongside Providers and Profiles
+— embedders are infrastructure, not a story default.
+
+**Provider embedders aren't installed; they live on the configured
+providers' Embedding models lists in
+[Providers](#generation--providers).** The default _selection_
+(which embedder — local or provider — new stories inherit) lives
+under [Memory](#memory)'s Embedder default card. Three surfaces,
+three concerns: Providers fetches and lists provider-side models;
+this tab manages local models on disk; Memory selects which one is
+the default for new stories.
+
+### Installed local models
+
+Accordion list. Each row collapsed shows: model id + size + status
+icon (✓ tested-ok / ⚠ error / — never tested) + overflow handle.
+Tapping the row expands to:
+
+- Backend (`local`) and on-disk folder reference.
+- Last-tested timestamp + last test outcome.
+- `[Test embedder]` button — runs init + smoke-test embed.
+- `Execution provider` picker. Defaults to the catalog's
+  `default_ep[platform]` for curated entries, or the user's pick
+  at import time for custom entries. Override persists in the
+  model's `runtime.json`.
+
+Overflow menu (`⋯`) on the collapsed row: `Remove…` (warn-and-
+confirm; details in
+[`memory/model-management.md → Removal`](../../../memory/model-management.md#removal)).
+
+`+ Add model` opens an action picker:
+
+- **Curated catalog** — list of pre-vetted models from the bundled
+  JSON catalog (see
+  [`memory/model-management.md → Curated catalog`](../../../memory/model-management.md#curated-catalog)).
+  Triggers the curated download flow with live model-card fetch
+  and license dialog.
+- **Import custom…** — three-file import per
+  [`memory/model-management.md → Custom file import`](../../../memory/model-management.md#custom-file-import).
+
+### Embedding status — across stories
+
+Cross-story aggregate. Lists every story across the database that
+has stale embedding rows, with the blocking reason and an
+`Open story settings` action that navigates into that story's
+Memory tab. Counterpart to the per-story view (Story Settings ·
+Memory · Embedding status).
+
+Empty state: `No stories have pending re-embeds.` Otherwise, one
+row per affected story:
+
+> **Story Title**
+> 12 rows pending re-embed under MiniLM-L6 · model removed
+> `[ Open story settings ]`
+
+Full design context in
+[`memory/model-management.md → Staleness UI`](../../../memory/model-management.md#staleness-ui).
+
 ## STORY DEFAULTS
 
 Mirrors the corresponding Story Settings tabs, but configures the
@@ -319,9 +411,31 @@ stories.
 
 ### Memory
 
-Same form as Story Settings · Memory — chapter token threshold (with
-preset buttons), recent buffer. Form component literally reused;
-only data binding differs.
+Mirrors Story Settings · Memory's
+[Chapter close + Prompt context + Classifier (cadence + piggyback
+only) + Retrieval budgets + Embedder default](../story-settings/story-settings.md#memory-tab)
+sections, bound to `app_settings.default_story_settings.*` instead
+of `stories.settings.*`. Form components literally reused; only
+data binding differs.
+
+Two intentional differences from the per-story version:
+
+- **No classifier status block, no `Run classifier now` button.**
+  Those are per-story operational state (live progress, failures,
+  manual override), not seedable defaults.
+- **Embedder default is the selection only — backend toggle plus a
+  model picker.** Picker source switches with the backend toggle:
+  - **`local`** — lists installed local models from
+    [Embedding models](#generation--embedding-models). Inline
+    `manage →` link routes there for installation / EP override
+    / removal.
+  - **`provider`** — lists embedding-capable models grouped by
+    provider, sourced from each provider's Embedding models list
+    in [Providers](#generation--providers). No separate config
+    surface; the picker IS the selection.
+
+  `Test embedder` button next to the picker runs init + smoke-test
+  embed against whatever's currently selected.
 
 ### Translation
 
