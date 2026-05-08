@@ -122,25 +122,41 @@ entity embedding itself.
 
 ### Model swap UX
 
-The dialog fires whenever `app_settings.embedding_model_id` textually
-changes and cached `embeddings.model_id` rows under the old value
-exist. No attempt to detect "same model, different label" cases — any
-ID change is treated as a swap. AlertDialog surfaces three options:
+**Why a model swap is disruptive:** embeddings only have meaning
+inside the vector space of the model that produced them. After a
+swap, every stored vector is in the OLD model's space, but the
+query vector at the next turn will be embedded under the NEW model.
+Cosine similarities between them are not comparable — retrieval is
+effectively broken until every stored vector has been recomputed
+under the new model. A "lazy" or "on-demand" re-embed strategy
+doesn't degrade gracefully here; it just gives the user broken
+retrieval over a partial subset until convergence. The realistic
+options are full re-index (with the system temporarily limited
+while it runs) or accept the risk and skip.
 
-- **Re-index now.** Background job re-embeds existing rows under the
-  new model. Progress visible; cancellable.
-- **Re-index lazily.** Default. Re-embeds on demand as candidates are
-  touched. UX-graceful, spreads cost.
-- **Skip re-index.** Bulk-updates `embeddings.model_id` to the new
-  value without re-computing vectors. Disclaimer shown ("retrieval
+The dialog fires whenever `app_settings.embedding_model_id`
+textually changes and cached embedding rows under the old value
+exist. No attempt to detect "same model, different label" cases —
+any ID change is treated as a swap. AlertDialog surfaces two
+options:
+
+- **Re-index in background.** Default. Background job re-embeds all
+  existing rows under the new model. While the job runs, retrieval
+  is in a degraded state — the system surfaces a "re-indexing X /
+  N — retrieval limited" indicator on UI surfaces that consume
+  retrieval (composer, history pane, world panel). Progress
+  visible; cancellable. On cancel, the swap is rolled back to the
+  previous `embedding_model_id` so retrieval recovers full quality.
+- **Skip re-index.** Bulk-updates the recorded model id to the new
+  value without recomputing vectors. Disclaimer shown ("retrieval
   quality may silently degrade if the new model produces different
-  vectors than the cached ones"). Escape hatch — useful when the user
-  knows the underlying model is unchanged (relabeling a custom
+  vectors than the cached ones"). Escape hatch — useful when the
+  user knows the underlying model is unchanged (relabeling a custom
   import, canonical-id refactor, etc.) and accepts the risk.
 
 A standalone "Re-index now" button stays available in the same
-settings panel for users who want to force a re-index without changing
-the model.
+settings panel for users who want to force a re-index without
+changing the model.
 
 ---
 
