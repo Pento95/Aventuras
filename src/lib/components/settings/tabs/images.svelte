@@ -70,6 +70,7 @@
     { value: 'google', label: 'Google AI Studio' },
     { value: 'zhipu', label: 'Zhipu CogView' },
     { value: 'comfyui', label: 'ComfyUI' },
+    { value: 'a1111', label: 'A1111 / SD.cpp / Kobold' },
   ]
   const profileModes = [
     { value: ComfyMode.CustomWorkflow, label: 'Custom Workflow' },
@@ -333,20 +334,26 @@
   // Derived LoRA items — avoids re-mapping on every render
   const loraItems = $derived(availableLoras.map((l) => ({ value: l, label: l })))
 
-  // Load models for the profile form when provider/apiKey change
+  // Load models for the profile form when provider/apiKey/baseUrl change
   let profileModelsReqId = 0
 
   async function loadProfileFormModels(
     providerType: ImageProviderType,
     apiKey: string,
+    baseUrl: string,
     forceReload: boolean,
   ) {
-    const baseUrl = profileBaseUrl || undefined
+    const effectiveBaseUrl = baseUrl || undefined
     const reqId = ++profileModelsReqId
     isLoadingProfileModels = true
     profileModelsError = null
     try {
-      const models = await listImageModelsByProvider(providerType, apiKey, forceReload, baseUrl)
+      const models = await listImageModelsByProvider(
+        providerType,
+        apiKey,
+        forceReload,
+        effectiveBaseUrl,
+      )
       // Discard stale results if a newer request has already started.
       if (reqId !== profileModelsReqId) return
       profileModels = models
@@ -359,22 +366,29 @@
   }
 
   // Reactively load models when provider, apiKey, or (for ComfyUI) baseUrl changes in profile form.
-  // No loadingInEffect guard — stale-result checks inside each loader discard superseded results;
-  // the registry cache deduplicates concurrent requests for the same endpoint.
+  // Reactive deps are captured explicitly before untrack() so that reads inside the loader
+  // functions (e.g. settings.apiSettings.llmTimeoutMs) are NOT accidentally tracked as
+  // dependencies — which would cause the effect to re-run on unrelated settings changes.
   $effect(() => {
     if (editingProfileId && profileProviderType) {
-      // Touch profileBaseUrl so Svelte tracks it; ComfyUI models depend on the endpoint.
-      void profileBaseUrl
-      loadProfileFormModels(profileProviderType, profileApiKey, false)
-      if (profileProviderType === 'comfyui') {
-        loadSamplerInfo(profileBaseUrl || undefined)
-        loadLoras(profileBaseUrl || undefined)
-      }
+      const providerType = profileProviderType
+      const apiKey = profileApiKey
+      const baseUrl = profileBaseUrl
+
+      untrack(() => {
+        loadProfileFormModels(providerType, apiKey, baseUrl, false)
+        if (providerType === 'comfyui') {
+          loadSamplerInfo(baseUrl || undefined, 'comfyui')
+          loadLoras(baseUrl || undefined)
+        } else if (providerType === 'a1111') {
+          loadSamplerInfo(baseUrl || undefined, 'a1111')
+        }
+      })
     }
   })
 
-  async function loadSamplerInfo(baseUrl?: string) {
-    const info = await getComfySamplerInfo(baseUrl)
+  async function loadSamplerInfo(baseUrl?: string, providerType: 'comfyui' | 'a1111' = 'comfyui') {
+    const info = await getComfySamplerInfo(baseUrl, providerType)
     if ((profileBaseUrl || undefined) !== baseUrl) return
     profileSamplers = info.samplers.map((s) => ({ value: s, label: s }))
     profileSchedulers = info.schedulers.map((s) => ({ value: s, label: s }))
@@ -425,6 +439,15 @@
 
   // Builds the provider-specific options object from current form state
   function buildProviderOptions(): Record<string, any> {
+    if (profileProviderType === 'a1111') {
+      return {
+        steps: profileSteps,
+        cfg: profileCfg,
+        negativePrompt: profileNegativePrompt,
+        sampler: profileSampler,
+        scheduler: profileScheduler,
+      }
+    }
     if (profileProviderType !== 'comfyui') return {}
     const opts: Record<string, any> = {
       sampler: profileSampler,
@@ -492,6 +515,7 @@
         profileVaeName,
         profileClipType,
         profileWeightDtype,
+        // a1111 fields reuse profileSteps, profileCfg, profileNegativePrompt, profileSampler
       ]
       // Skip the first run after startEditProfile populates the form
       if (suppressAutoSave) {
@@ -522,8 +546,8 @@
     profileSampler = 'dpmpp_2m_sde_gpu'
     profileScheduler = 'sgm_uniform'
     profileMode = ComfyMode.BasicTxt2Img
-    profileCfg = 1
-    profileSteps = 6
+    profileCfg = 7
+    profileSteps = 20
     profilePositivePrompt = ''
     profileNegativePrompt = ''
     prevComfyBaseUrl = null
@@ -558,6 +582,15 @@
     profileBaseUrl = profile.baseUrl || ''
     profileModel = profile.model || ''
     profileModels = []
+
+    if (profile.providerType === 'a1111') {
+      const opts = profile.providerOptions || {}
+      profileSteps = Number(opts.steps) || 20
+      profileCfg = Number(opts.cfg) || 7
+      profileNegativePrompt = (opts.negativePrompt as string) || ''
+      profileSampler = (opts.sampler as string) || 'Euler a'
+      profileScheduler = (opts.scheduler as string) || 'karras'
+    }
 
     if (profile.providerType === 'comfyui') {
       const opts = profile.providerOptions || {}
@@ -768,7 +801,7 @@
   // Auto-load when switching to UNet mode
   $effect(() => {
     if (profileMode === ComfyMode.UnetTxt2Img && availableClips.length === 0) {
-      void loadUnetModels()
+      untrack(() => void loadUnetModels())
     }
   })
 
@@ -1313,8 +1346,8 @@
       />
     </div>
 
-    <!-- comfy doesnt use API keys -->
-    {#if profileProviderType !== 'comfyui'}
+    <!-- comfy and a1111 don't require API keys -->
+    {#if profileProviderType !== 'comfyui' && profileProviderType !== 'a1111'}
       <div class="space-y-2">
         <Label>API Key</Label>
         <div class="flex gap-2">
@@ -1367,7 +1400,7 @@
       </div>
     {/if}
 
-    {#if profileProviderType === 'comfyui' || profileProviderType === 'openai' || profileProviderType === 'zhipu'}
+    {#if profileProviderType === 'comfyui' || profileProviderType === 'openai' || profileProviderType === 'zhipu' || profileProviderType === 'a1111'}
       <div class="space-y-2">
         <Label>Base URL (optional)</Label>
         <Input bind:value={profileBaseUrl} placeholder="Custom base URL" />
@@ -1389,7 +1422,8 @@
         isLoading={isLoadingProfileModels}
         errorMessage={profileModelsError}
         showRefreshButton={true}
-        onRefresh={() => loadProfileFormModels(profileProviderType, profileApiKey, true)}
+        onRefresh={() =>
+          loadProfileFormModels(profileProviderType, profileApiKey, profileBaseUrl, true)}
       />
       {#if referenceProfileImg2ImgWarning}
         <p class="text-warning mt-1 text-xs">
@@ -1403,9 +1437,54 @@
       {/if}
     {/snippet}
 
-    {#if profileProviderType !== 'comfyui'}
+    {#if profileProviderType !== 'comfyui' && profileProviderType !== 'a1111'}
       <div class="space-y-2">
         {@render modelSelectContent()}
+      </div>
+    {/if}
+    {#if profileProviderType === 'a1111'}
+      <div class="space-y-2">
+        {@render modelSelectContent()}
+      </div>
+      <div class="grid grid-cols-2 gap-4 pt-2">
+        <div class="space-y-2">
+          <Label>Steps</Label>
+          <Input type="number" bind:value={profileSteps} placeholder="20" min="1" />
+        </div>
+        <div class="space-y-2">
+          <Label>CFG Scale</Label>
+          <Input type="number" bind:value={profileCfg} placeholder="7" step="0.5" />
+        </div>
+        <div class="space-y-2">
+          <Label>Sampler</Label>
+          <Autocomplete
+            items={profileSamplers}
+            selected={profileSamplers.find((s) => s.value === profileSampler)}
+            onSelect={(v) => {
+              profileSampler = (v as { value: string }).value
+            }}
+            itemLabel={(s: { label: string }) => s.label}
+            itemValue={(s: { value: string }) => s.value}
+            placeholder="Euler a"
+          />
+        </div>
+        <div class="space-y-2">
+          <Label>Scheduler</Label>
+          <Autocomplete
+            items={profileSchedulers}
+            selected={profileSchedulers.find((s) => s.value === profileScheduler)}
+            onSelect={(v) => {
+              profileScheduler = (v as { value: string }).value
+            }}
+            itemLabel={(s: { label: string }) => s.label}
+            itemValue={(s: { value: string }) => s.value}
+            placeholder="karras"
+          />
+        </div>
+        <div class="col-span-2 space-y-2">
+          <Label>Negative Prompt</Label>
+          <Textarea bind:value={profileNegativePrompt} placeholder="Negative prompt..." />
+        </div>
       </div>
     {/if}
     {#if profileProviderType === 'comfyui'}

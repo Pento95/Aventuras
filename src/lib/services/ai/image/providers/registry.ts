@@ -25,6 +25,7 @@ import { createGoogleProvider } from './google'
 import { createZhipuProvider } from './zhipu'
 import { createComfyProvider } from './comfy'
 import { createOpenRouterProvider } from './openrouter'
+import { createA1111Provider } from './a1111'
 
 const log = createLogger('ImageRegistry')
 
@@ -43,6 +44,7 @@ const PROVIDER_FACTORIES: Record<ImageProviderType, ProviderFactory> = {
   google: createGoogleProvider,
   zhipu: createZhipuProvider,
   comfyui: createComfyProvider,
+  a1111: createA1111Provider,
 }
 
 // ============================================================================
@@ -196,10 +198,11 @@ export async function listImageModelsByProvider(
 }
 
 /**
- * Get sampler info for a ComfyUI provider.
+ * Get sampler/scheduler info for a ComfyUI or A1111 provider.
  */
 export async function getComfySamplerInfo(
   baseUrl?: string,
+  providerType: 'comfyui' | 'a1111' = 'comfyui',
 ): Promise<{ samplers: string[]; schedulers: string[] }> {
   try {
     const config: ImageProviderConfig = {
@@ -207,7 +210,8 @@ export async function getComfySamplerInfo(
       baseUrl,
       timeoutMs: settings.apiSettings.llmTimeoutMs,
     }
-    const provider = createComfyProvider(config)
+    const provider =
+      providerType === 'a1111' ? createA1111Provider(config) : createComfyProvider(config)
     if (provider.getSamplerInfo) {
       return await provider.getSamplerInfo()
     }

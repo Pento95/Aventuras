@@ -764,6 +764,7 @@ export type ImageProviderType =
   | 'google'
   | 'zhipu'
   | 'comfyui'
+  | 'a1111'
 
 export interface ImageProfile {
   id: string
