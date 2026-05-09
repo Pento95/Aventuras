@@ -745,6 +745,56 @@
         <input class="input" placeholder="A sentence or two summarizing what the story is about.">
       </div>
 
+      <!--
+        Memory cost (Matryoshka effective dim) — conditional on
+        `default_story_settings.embeddingBackend === 'provider'` AND
+        the picked default model has `capabilities.matryoshkaSupported = true`.
+        Hidden otherwise. Collapsed-disclosure pattern; expanded here
+        for layout demo. See wizard.md → Memory cost section.
+      -->
+      <div class="step-section" id="memory-cost-section">
+        <div class="section-rule">
+          <span class="rule-label">▾ Memory cost <span style="font-weight: 400; color: var(--ink-muted); font-size: 11px;">(advanced — locked at creation)</span></span>
+          <span class="rule-line"></span>
+        </div>
+        <p style="font-size: 12px; color: var(--ink-muted); line-height: 1.5; margin: 0 0 12px;">
+          Provider model supports Matryoshka representation. Smaller dim is faster and uses less storage; slight quality trade. Locked at story creation.
+        </p>
+
+        <div class="label-row"><span class="label">Effective dim</span></div>
+        <div class="dim-picker" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+          <label style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="effective-dim" value="512">
+            <span style="flex: 1;"><b>512 dim</b></span>
+            <span style="color: var(--ink-muted); font-family: ui-monospace, monospace; font-size: 11px;">⚡ ~80 ms/turn &middot; 📦 ~2 MB / 30 ch</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--ink); border-radius: 4px; cursor: pointer; background: #f7f4ec;">
+            <input type="radio" name="effective-dim" value="1024" checked>
+            <span style="flex: 1;"><b>1024 dim</b> <span style="font-size: 10px; color: #7a6a40; font-style: italic;">← suggested for mobile</span></span>
+            <span style="color: var(--ink-muted); font-family: ui-monospace, monospace; font-size: 11px;">⚡ ~160 ms/turn &middot; 📦 ~4 MB / 30 ch</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="effective-dim" value="2048">
+            <span style="flex: 1;"><b>2048 dim</b></span>
+            <span style="color: var(--ink-muted); font-family: ui-monospace, monospace; font-size: 11px;">⚡ ~320 ms/turn &middot; 📦 ~8 MB / 30 ch</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line-soft); border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="effective-dim" value="3072">
+            <span style="flex: 1;"><b>3072 dim</b> <span style="font-size: 10px; color: var(--ink-faint);">(native)</span></span>
+            <span style="color: var(--ink-muted); font-family: ui-monospace, monospace; font-size: 11px;">⚡ ~480 ms/turn &middot; 📦 ~12 MB / 30 ch</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px dashed var(--line-soft); border-radius: 4px; cursor: pointer;">
+            <input type="radio" name="effective-dim" value="custom">
+            <span style="flex: 1;"><b>Custom…</b></span>
+            <input class="input" style="width: 80px; padding: 3px 6px; font-size: 11px;" placeholder="N" disabled>
+          </label>
+        </div>
+        <div style="font-size: 10px; color: var(--ink-faint); margin-top: 8px; line-height: 1.5;">
+          Estimates assume a 30-chapter story on this device's tier. Actual latency depends on device and story length.<br>
+          Custom dims off the model's curated ladder may exhibit quality cliffs.
+        </div>
+      </div>
+
       <!-- Overlay: AI guidance popover -->
       <div id="overlay-ai-guidance" class="ai-popover hidden">
         <div class="ai-title"><span class="sparkle">✨</span> Suggest setting</div>

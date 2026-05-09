@@ -770,6 +770,22 @@
           </div>
         </div>
 
+        <!--
+          Effective dim — read-only row, only renders when
+          stories.settings.effectiveDim is non-null.
+          Hidden for the local default above; provider-mode stories
+          on a Matryoshka model show this with the truncation N.
+        -->
+        <div class="field-row">
+          <div class="field-label">effective dim
+            <span class="hint">Matryoshka truncation, locked at creation; change via model-swap dialog</span>
+          </div>
+          <div style="font-size: 12px;">
+            <code style="font-size: 11px;">1024 dim</code>
+            <span style="color: var(--ink-faint); font-size: 11px;">&middot; truncated from 3072 native</span>
+          </div>
+        </div>
+
         <div class="tab-section">
           <div class="tab-section-title">Retrieval budgets <span style="font-size: 10px; color: var(--ink-faint); font-weight: 400;">&middot; per-type token budgets, hard partitions</span></div>
         </div>
