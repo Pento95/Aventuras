@@ -43,6 +43,8 @@ export function EmbedderDownloadDialogView(props: EmbedderDownloadDialogViewProp
   const [hfInputValue, setHfInputValue] = React.useState('')
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* 560px overrides the primitive's sm:max-w-lg (≈512px) per
+          the design spec: "560px-capped centered shape." */}
       <DialogContent className="sm:max-w-[560px]">
         <Header state={state} onCancel={props.onCancel} />
         <Body {...props} hfInputValue={hfInputValue} onHfInputChange={setHfInputValue} />
@@ -265,6 +267,13 @@ function EpPickerBody({
       <Text variant="secondary" size="sm">
         Pick the execution provider this model will run under.
       </Text>
+      {/* TODO: real EP picker once detection lands per
+          docs/memory/model-management.md → Execution provider. EP
+          values are platform-specific (cpu / webgpu / nnapi / …);
+          the binary toggle below is stub-grade and only round-trips
+          between cpu and webgpu. Real shape: enumerate platform-
+          supported EPs via the driver and render a segmented Chip
+          group. */}
       <Pressable
         onPress={() => onPick(pickedEp === 'cpu' ? 'webgpu' : 'cpu')}
         className="self-start rounded-md border border-border px-3 py-2"
@@ -290,9 +299,7 @@ function ImportConfirmBody({
   return (
     <View className="gap-3">
       <Text variant="secondary" size="sm">
-        {
-          "You're importing a custom model. By using it, you assert that you have a license to do so."
-        }
+        You’re importing a custom model. By using it, you assert that you have a license to do so.
       </Text>
       <View className="gap-1">
         <Text size="sm">
@@ -401,8 +408,8 @@ function DoneBody() {
   )
 }
 
-// FailReason → body copy. Cancelled is its own variant per the
-// state-machine refactor; no more sentinel string check.
+// 'cancelled' is its own FailReason variant per the state-machine
+// refactor — no more sentinel string check inside card-fetch-failed.
 function FailedBody({ reason }: { reason: FailReason }) {
   switch (reason.kind) {
     case 'cancelled':
@@ -415,16 +422,15 @@ function FailedBody({ reason }: { reason: FailReason }) {
             {reason.message}
           </Text>
           <Text variant="muted" size="sm">
-            {
-              "The license is fetched live to defend against post-curation edits — we can't proceed with a cached copy. Check your connection and try again."
-            }
+            The license is fetched live to defend against post-curation edits — we can’t proceed
+            with a cached copy. Check your connection and try again.
           </Text>
         </View>
       )
     case 'resolve-failed':
       return (
         <View className="gap-2">
-          <Text>{"Couldn't resolve the HF model:"}</Text>
+          <Text>Couldn’t resolve the HF model:</Text>
           <Text className="font-mono" size="sm">
             {reason.message}
           </Text>
@@ -433,7 +439,7 @@ function FailedBody({ reason }: { reason: FailReason }) {
     case 'validation-failed':
       return (
         <View className="gap-2">
-          <Text>{"This model doesn't have the required ONNX exports."}</Text>
+          <Text>This model doesn’t have the required ONNX exports.</Text>
           <Text variant="muted" size="sm">
             Missing: {reason.missingFiles.join(', ')}
           </Text>
@@ -446,12 +452,11 @@ function FailedBody({ reason }: { reason: FailReason }) {
     case 'hash-mismatch':
       return (
         <View className="gap-2">
-          <Text>{"One of the downloaded files doesn't match the expected hash:"}</Text>
+          <Text>One of the downloaded files doesn’t match the expected hash:</Text>
           <Text size="sm">✗ {reason.failingFile} sha256 mismatch</Text>
           <Text variant="muted" size="sm">
-            {
-              "This may indicate a corrupted download or an upstream change the bundled catalog hasn't caught up to. The partial install has been deleted."
-            }
+            This may indicate a corrupted download or an upstream change the bundled catalog hasn’t
+            caught up to. The partial install has been deleted.
           </Text>
         </View>
       )
