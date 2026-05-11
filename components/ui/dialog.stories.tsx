@@ -15,7 +15,7 @@ import { Text } from '@/components/ui/text'
 import { themes } from '@/lib/themes/registry'
 
 const meta: Meta<typeof Dialog> = {
-  title: 'UI/Dialog',
+  title: 'Primitives/Dialog',
   component: Dialog,
   parameters: { layout: 'centered' },
 }
