@@ -97,10 +97,19 @@ describe('reducer — card-fetch state', () => {
     }
   })
 
-  it('cancel from card-fetch transitions to failed (cancelled marker)', () => {
+  it('cancel from card-fetch transitions to failed with cancelled reason', () => {
     const before: DialogState = { kind: 'card-fetch', meta: sampleMeta }
     const after = reducer(before, { type: 'cancel' })
     expect(after.kind).toBe('failed')
+  })
+
+  it('cancel from card-fetch sets reason.kind to cancelled', () => {
+    const before: DialogState = { kind: 'card-fetch', meta: sampleMeta }
+    const after = reducer(before, { type: 'cancel' })
+    expect(after.kind).toBe('failed')
+    if (after.kind === 'failed') {
+      expect(after.reason.kind).toBe('cancelled')
+    }
   })
 })
 
@@ -182,7 +191,7 @@ describe('reducer — downloading state', () => {
     }
   })
 
-  it('cancel from downloading transitions to failed (cancelled marker)', () => {
+  it('cancel from downloading transitions to failed with cancelled reason', () => {
     const before: DialogState = {
       kind: 'downloading',
       meta: sampleMeta,

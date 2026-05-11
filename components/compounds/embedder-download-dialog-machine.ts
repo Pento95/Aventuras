@@ -32,6 +32,7 @@ export type FileProgress =
   | { kind: 'done' }
 
 export type FailReason =
+  | { kind: 'cancelled' }
   | { kind: 'card-fetch-failed'; message: string }
   | { kind: 'resolve-failed'; message: string }
   | { kind: 'validation-failed'; missingFiles: string[] }
@@ -44,7 +45,14 @@ export type DialogInit =
   | { kind: 'import'; files: ImportBundle; ep: ExecutionProvider }
 
 export type DialogState =
+  // 'hf-input' is a sink state in the reducer — the only exit is host
+  // closing the dialog and re-opening with a new DialogInit. Submitting
+  // an input changes `init` at the host layer.
   | { kind: 'hf-input' }
+  // 'ep-picker' is reserved for the HF id flow's post-license step
+  // (per spec "EP picker appears as a final step before download").
+  // No reducer transition currently enters it; arrives when HF id
+  // driver wiring lands and inserts license → ep-picker → downloading.
   | { kind: 'resolving'; init: DialogInit }
   | { kind: 'card-fetch'; meta: ModelMeta }
   | { kind: 'license'; meta: ModelMeta; licenseText: string; licenseName: string }
@@ -137,7 +145,7 @@ export function reducer(state: DialogState, action: DialogAction): DialogState {
     return {
       kind: 'failed',
       meta,
-      reason: { kind: 'card-fetch-failed', message: '__cancelled__' },
+      reason: { kind: 'cancelled' },
     }
   }
 
@@ -183,6 +191,9 @@ export function reducer(state: DialogState, action: DialogAction): DialogState {
         return { kind: 'downloading', meta: state.meta, progressByFile: {} }
       }
       if (action.type === 'license-declined') {
+        // Decline routes through 'done' (no separate 'declined' state).
+        // The container tracks the dispatched action via a ref and maps
+        // done-after-decline → DialogResolution { kind: 'declined' }.
         return { kind: 'done', meta: state.meta }
       }
       return state
@@ -195,7 +206,10 @@ export function reducer(state: DialogState, action: DialogAction): DialogState {
     }
     case 'import-confirm': {
       if (action.type === 'license-accepted') {
-        return { kind: 'verifying', meta: stateToMeta(state), verifyByFile: {} }
+        // Container reuses 'license-accepted' as the import-confirm Import
+        // CTA — semantic is the same (proceed past confirmation). Files
+        // are local, so we skip downloading and go straight to verifying.
+        return { kind: 'verifying', meta: bundleToMeta(state.bundle), verifyByFile: {} }
       }
       return state
     }
@@ -259,19 +273,24 @@ export function reducer(state: DialogState, action: DialogAction): DialogState {
       }
       return state
     }
-    default:
+    case 'hf-input':
+    case 'done':
       return state
+    default: {
+      const _exhaustive: never = state
+      return _exhaustive
+    }
   }
 }
 
-function stateToMeta(state: { kind: 'import-confirm'; bundle: ImportBundle }): ModelMeta {
-  const total = state.bundle.files.reduce((acc, f) => acc + f.sizeBytes, 0)
+function bundleToMeta(bundle: ImportBundle): ModelMeta {
+  const total = bundle.files.reduce((acc, f) => acc + f.sizeBytes, 0)
   return {
-    displayName: state.bundle.modelId,
+    displayName: bundle.modelId,
     source: 'custom-import',
     revision: 'n/a',
     sizeBytes: total,
-    fileCount: state.bundle.files.length,
+    fileCount: bundle.files.length,
   }
 }
 
