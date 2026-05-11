@@ -129,7 +129,7 @@ function Body(props: EmbedderDownloadDialogViewProps) {
         />
       )
     case 'ep-picker':
-      return <EpPickerBody meta={state.meta} pickedEp={state.pickedEp} onPick={props.onPickEp} />
+      return <EpPickerBody pickedEp={state.pickedEp} onPick={props.onPickEp} />
     case 'import-confirm':
       return (
         <ImportConfirmBody
@@ -231,11 +231,9 @@ function LicenseBody({
 }
 
 function EpPickerBody({
-  meta,
   pickedEp,
   onPick,
 }: {
-  meta: { displayName: string }
   pickedEp: ExecutionProvider
   onPick: (ep: ExecutionProvider) => void
 }) {
