@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-native-web-vite'
+import { PortalHost } from '@rn-primitives/portal'
 import { View } from 'react-native'
 import { fn } from 'storybook/test'
 
@@ -52,11 +53,14 @@ const handlers = {
   onOpenChange: fn(),
 }
 
+// No `tags: ['autodocs']` — every story sets `open: true` to show
+// the modal state directly, so autodocs would render N overlapping
+// modals on the docs page. The Canvas view (one story at a time) is
+// the intended consumption mode for this compound.
 const meta: Meta<typeof EmbedderDownloadDialogView> = {
   title: 'Compounds/EmbedderDownloadDialog',
   component: EmbedderDownloadDialogView,
   parameters: { layout: 'centered' },
-  tags: ['autodocs'],
 }
 export default meta
 type Story = StoryObj<typeof EmbedderDownloadDialogView>
@@ -173,32 +177,42 @@ export const Failed_SmokeTest = failed({
   ep: 'webgpu',
 })
 
+// ThemeMatrix routes each row's modal through a per-row PortalHost
+// named after the theme id. The Dialog primitive normally portals
+// to the app's default host (one global root, one theme via the
+// Storybook toolbar). Per-row hosts keep each modal inside its
+// themed wrapper so every theme paints simultaneously.
 export const ThemeMatrix: Story = {
   render: () => (
-    <View className="gap-4">
-      {themes.map((t) => (
-        <View
-          key={t.id}
-          // @ts-expect-error — dataSet is RN-Web only.
-          dataSet={{ theme: t.id }}
-          className="rounded-md bg-bg-base p-4"
-          style={{ width: 360 }}
-        >
-          <Text variant="muted" size="sm" className="mb-2">
-            {t.name}
-          </Text>
-          <EmbedderDownloadDialogView
-            open
-            state={{
-              kind: 'license',
-              meta: sampleMeta,
-              licenseText: APACHE_2,
-              licenseName: 'Apache 2.0',
-            }}
-            {...handlers}
-          />
-        </View>
-      ))}
+    <View className="gap-6">
+      {themes.map((t) => {
+        const hostName = `embedder-download-theme-${t.id}`
+        return (
+          <View
+            key={t.id}
+            // @ts-expect-error — dataSet is RN-Web only.
+            dataSet={{ theme: t.id }}
+            className="rounded-md bg-bg-base p-4"
+            style={{ width: 600, minHeight: 480 }}
+          >
+            <Text variant="muted" size="sm" className="mb-2">
+              {t.name}
+            </Text>
+            <EmbedderDownloadDialogView
+              open
+              portalHost={hostName}
+              state={{
+                kind: 'license',
+                meta: sampleMeta,
+                licenseText: APACHE_2,
+                licenseName: 'Apache 2.0',
+              }}
+              {...handlers}
+            />
+            <PortalHost name={hostName} />
+          </View>
+        )
+      })}
     </View>
   ),
 }

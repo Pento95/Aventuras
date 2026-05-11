@@ -38,10 +38,15 @@ type EmbedderDownloadDialogViewProps = {
   onCancel: () => void
   onRetry: () => void
   onClose: () => void
+  /** Optional named portal host. Routes the modal into a specific
+   * `<PortalHost name={...} />` rather than the app-level default —
+   * needed by Storybook's ThemeMatrix so each themed wrapper hosts
+   * its own modal. */
+  portalHost?: string
 }
 
 export function EmbedderDownloadDialogView(props: EmbedderDownloadDialogViewProps) {
-  const { open, onOpenChange, state } = props
+  const { open, onOpenChange, state, portalHost } = props
   // hf-input value is view-local ephemera — the Footer's Resolve
   // button reads the same value HfInputBody types into. Once
   // onSubmitHfInput fires the host re-mounts the dialog with a
@@ -51,7 +56,7 @@ export function EmbedderDownloadDialogView(props: EmbedderDownloadDialogViewProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* 560px overrides the primitive's sm:max-w-lg (≈512px) per
           the design spec: "560px-capped centered shape." */}
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent className="sm:max-w-[560px]" portalHost={portalHost}>
         <Header state={state} onCancel={props.onCancel} />
         <Body {...props} hfInputValue={hfInputValue} onHfInputChange={setHfInputValue} />
         <Footer {...props} hfInputValue={hfInputValue} />
