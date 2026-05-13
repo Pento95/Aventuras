@@ -30,21 +30,21 @@ describe('initMergeState', () => {
   it('sets canonicalId to defaultCanonicalId', () => {
     const a = baseEntity()
     const b = baseEntity({ id: 'ent_b', description: 'Different' })
-    const state = initMergeState(computeDivergence(a, b), a.id, a, b)
+    const state = initMergeState(computeDivergence(a, b), a.id, a.id)
     expect(state.canonicalId).toBe('ent_a')
   })
 
   it('initializes deselectedTags as empty', () => {
     const a = baseEntity()
     const b = baseEntity({ id: 'ent_b', tags: ['guard'] })
-    const state = initMergeState(computeDivergence(a, b), a.id, a, b)
+    const state = initMergeState(computeDivergence(a, b), a.id, a.id)
     expect(state.deselectedTags).toEqual([])
   })
 
   it('initializes fieldChoices to A for each divergent scalar when canonical=A', () => {
     const a = baseEntity({ description: 'A desc', status: 'active' })
     const b = baseEntity({ id: 'ent_b', description: 'B desc', status: 'retired' })
-    const state = initMergeState(computeDivergence(a, b), a.id, a, b)
+    const state = initMergeState(computeDivergence(a, b), a.id, a.id)
     expect(state.fieldChoices.description).toBe('A')
     expect(state.fieldChoices.status).toBe('A')
   })
@@ -52,7 +52,7 @@ describe('initMergeState', () => {
   it('initializes fieldChoices to B for each divergent scalar when canonical=B', () => {
     const a = baseEntity({ description: 'A desc', status: 'active' })
     const b = baseEntity({ id: 'ent_b', description: 'B desc', status: 'retired' })
-    const state = initMergeState(computeDivergence(a, b), b.id, a, b)
+    const state = initMergeState(computeDivergence(a, b), b.id, a.id)
     expect(state.fieldChoices.description).toBe('B')
     expect(state.fieldChoices.status).toBe('B')
   })
@@ -60,7 +60,7 @@ describe('initMergeState', () => {
   it('omits non-divergent fields from fieldChoices', () => {
     const a = baseEntity({ description: 'same', status: 'active' })
     const b = baseEntity({ id: 'ent_b', description: 'same', status: 'retired' })
-    const state = initMergeState(computeDivergence(a, b), a.id, a, b)
+    const state = initMergeState(computeDivergence(a, b), a.id, a.id)
     expect(state.fieldChoices).toEqual({ status: 'A' })
   })
 })
@@ -75,7 +75,7 @@ describe('mergeReducer', () => {
       tags: ['guard', 'sword'],
     })
     const diff = computeDivergence(a, b)
-    const initial = initMergeState(diff, a.id, a, b)
+    const initial = initMergeState(diff, a.id, a.id)
     return { a, b, diff, initial }
   }
 
@@ -188,8 +188,7 @@ describe('mergeReducer', () => {
         type: 'reset',
         diff: newDiff,
         defaultCanonicalId: newA.id,
-        entityA: newA,
-        entityB: newB,
+        entityAId: newA.id,
       })
       expect(next.canonicalId).toBe('ent_c')
       expect(next.deselectedTags).toEqual([])
