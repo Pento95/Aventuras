@@ -3,7 +3,7 @@
 Implementation design for the needs-design compound at
 [`component-inventory.md → Compounds — needs design`](../ui/component-inventory.md#compounds--needs-design)
 and the inventory's
-[`Modifications pending → ListRow`](../ui/component-inventory.md#modifications-pending)
+[`Compounds — shipped → CollisionListRow`](../ui/component-inventory.md#compounds--shipped)
 row. The feature spec lives in
 [`world.md → Collision review and entity merge`](../ui/screens/world/world.md#collision-review-and-entity-merge);
 this doc settles the **implementation** (component split, API

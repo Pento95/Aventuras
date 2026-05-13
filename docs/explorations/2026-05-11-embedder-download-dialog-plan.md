@@ -2228,7 +2228,7 @@ codebase:
 
 - `ListRow`'s below-row collision-strip extension — separate
   followup, tracked in
-  [`component-inventory.md → Modifications pending`](../ui/component-inventory.md#modifications-pending).
+  [`component-inventory.md → Compounds — shipped → CollisionListRow`](../ui/component-inventory.md#compounds--shipped).
 - `CollisionResolveDialog` — different needs-design compound.
 - Real `DialogDriver` implementations — per-consumer followups.
 - Wiring the dialog into Onboarding Step 4 / App Settings /
