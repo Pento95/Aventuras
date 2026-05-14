@@ -30,15 +30,14 @@ Generic, single-purpose, reusable. Live in `components/ui/`.
 ### Primitives — shipped
 
 Accordion, AlertDialog, Autocomplete, Avatar, Button, Checkbox,
-Chip, Dialog, EmptyState, Heading, Icon, IconAction, Input, Popover, Select,
-Sheet, Skeleton, Spinner, Switch, SwitchVisual, Tabs, Tag, Textarea,
-Text, Toast. Plus the `NativeOnlyAnimatedView` utility wrapper.
+Chip, Dialog, EmptyState, Heading, Icon, IconAction, InlineEditableName,
+Input, Popover, Select, Sheet, Skeleton, Spinner, Switch, SwitchVisual,
+Tabs, Tag, Textarea, Text, Toast. Plus the `NativeOnlyAnimatedView`
+utility wrapper.
 
 ### Primitives — build-ready
 
-| Primitive          | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| InlineEditableName | Inline-editable text affordance: read state shows label + pencil (hover-revealed on desktop, always-visible on touch tier), edit state swaps to Input with blur-save / Escape-cancel semantics. Required by DetailPane's `nameSlot`. Spec: [world.md → Detail head structure](./screens/world/world.md#detail-head-structure) + [2026-05-14-shells-design.md → DetailPane dependency](../explorations/2026-05-14-shells-design.md#dependency--inlineeditablename). |
+_Empty — every build-ready primitive has shipped._
 
 ### Primitives — needs design
 
