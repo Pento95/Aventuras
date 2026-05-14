@@ -185,7 +185,7 @@ export function ScreenShell({
       >
         {leftSlot}
         <View className="min-w-0 flex-1 flex-row items-center gap-3">
-          <TextClassContext.Provider value="leading-none">
+          <TextClassContext.Provider value="!leading-none">
             <View className="min-w-0 flex-shrink flex-row items-center">{title}</View>
           </TextClassContext.Provider>
           {inlineCenterExtras != null ? (
