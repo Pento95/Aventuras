@@ -177,8 +177,20 @@ export function DetailPane({
           components/ui/tabs.tsx already carries its own bottom
           border, so no extra separator is needed between strip and
           body. Horizontal padding matches the head so the active-
-          tab underline aligns with the entities above. */}
-      <View className="px-row-x-md">{tabs}</View>
+          tab underline aligns with the entities above. Wrapped in
+          a horizontal ScrollView so a long tab strip (e.g. World's
+          8-tab character composition) stays inside the pane width
+          and is reachable by swipe / scroll instead of escaping the
+          right edge. Consumers wanting a Select substitute at narrow
+          tiers (per patterns/tabs.md → Group C rule) pass a Select
+          here instead of TabsList. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerClassName="px-row-x-md"
+      >
+        {tabs}
+      </ScrollView>
 
       {/* Body scroll container — owns vertical scroll so the head,
           tabs, and saveBar stay pinned. `min-h-0` lets ScrollView
