@@ -1686,9 +1686,19 @@
     <div class="md-layout">
       <aside class="list-pane">
         <div class="list-controls">
-          <div class="segment" id="side-segment" title="Plot ledgers">
-            <span class="seg active" data-seg="threads">Threads</span>
-            <span class="seg" data-seg="happenings">Happenings</span>
+          <div class="list-kind-row" style="display: flex; align-items: center; gap: 6px; position: relative;">
+            <div class="segment" id="side-segment" title="Plot ledgers" style="flex: 1;">
+              <span class="seg active" data-seg="threads">Threads</span>
+              <span class="seg" data-seg="happenings">Happenings</span>
+            </div>
+            <!-- EntityListPane [+] icon-action — tooltip tracks active side -->
+            <span class="icon-action new-entity-trigger threads-only" id="new-trigger-threads" title="New thread" style="font-size: 14px; color: var(--ink-secondary); cursor: pointer; padding: 4px 8px;">&plus;</span>
+            <span class="icon-action new-entity-trigger happenings-only" id="new-trigger-happenings" title="New happening" style="font-size: 14px; color: var(--ink-secondary); cursor: pointer; padding: 4px 8px;">&plus;</span>
+            <div class="new-menu" id="new-menu" style="top: calc(100% + 6px); bottom: auto; left: auto; right: 0; transform: none;">
+              <div class="new-menu-item">Blank</div>
+              <div class="new-menu-item">From JSON file&hellip;</div>
+              <div class="new-menu-item disabled" title="Vault not yet implemented">From Vault&hellip;</div>
+            </div>
           </div>
           <div class="search-row">
             <div class="list-search">
@@ -1890,20 +1900,11 @@
           </div>
           <div class="empty-sub">
             The classifier writes most rows automatically as the
-            story progresses. You can also add them manually with
-            <b>+ New</b> below.
+            story progresses. You can also add them manually:
           </div>
-        </div>
-
-        <div class="list-footer">
-          <div class="new-menu-wrapper">
-            <span class="new-entity-btn threads-only" id="new-trigger-threads">+ New thread &#9662;</span>
-            <span class="new-entity-btn happenings-only" id="new-trigger-happenings">+ New happening &#9662;</span>
-            <div class="new-menu" id="new-menu">
-              <div class="new-menu-item">Blank</div>
-              <div class="new-menu-item">From JSON file&hellip;</div>
-              <div class="new-menu-item disabled" title="Vault not yet implemented">From Vault&hellip;</div>
-            </div>
+          <div class="empty-cta" style="margin-top: 10px;">
+            <span class="new-entity-btn threads-only" id="new-trigger-empty-threads">+ Add the first thread &#9662;</span>
+            <span class="new-entity-btn happenings-only" id="new-trigger-empty-happenings">+ Add the first happening &#9662;</span>
           </div>
         </div>
       </aside>

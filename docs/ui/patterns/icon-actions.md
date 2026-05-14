@@ -27,6 +27,11 @@ Used by:
   (☆/★ pin toggle inline before each story-card title — applies
   the visibility rule via existing muted-opacity, brighten-on-hover
   styling)
+- [World per-row import affordance](../screens/world/world.md#per-row-import)
+  and [Plot manual creation](../screens/plot/plot.md#manual-creation--per-row-import)
+  (`[+]` add icon on the EntityListPane kind-selector row — tooltip
+  tracks active kind; empty-state slot carries a labeled CTA to
+  compensate for the minimalist icon when the list is empty)
 
 Future row-shaped surfaces with per-row actions follow the same
 pattern.

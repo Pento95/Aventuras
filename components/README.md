@@ -26,7 +26,7 @@ a new file and want to know where it goes.
 
 - **`shells/`** — layout shells. The big-picture wrappers that
   define a whole screen (MasterDetailLayout, ScreenShell,
-  ListPane, DetailPane).
+  EntityListPane, DetailPane).
 
 - **`foundations/`** — Storybook-only documentation surfaces
   (the foundations explorer). Not real components a user sees.

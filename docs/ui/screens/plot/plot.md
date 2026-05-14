@@ -33,7 +33,7 @@ Cross-cutting principles that govern this panel are in
 ├─────────────────────┬───────────────────────────────────────┤
 │ LIST PANE (~340px)  │ DETAIL PANE                           │
 │                     │                                       │
-│ [ Threads | Happ. ] │ breadcrumb: ◇ thread                  │
+│ [ Threads|Happ. ][+]│ breadcrumb: ◇ thread                  │ ← [+] tooltip tracks active side
 │ search              │ Name: Crown's bargain ✎         [⋯]  │
 │ filter chips        │ ─────                                 │
 │                     │ tabs: Overview | History              │
@@ -42,7 +42,7 @@ Cross-cutting principles that govern this panel are in
 │                     │                                       │
 │                     │ ───                                   │
 │                     │ save bar (when dirty)                 │
-│ + New thread        │   N unsaved · [discard] [save ⌘S]     │
+│                     │   N unsaved · [discard] [save ⌘S]     │
 └─────────────────────┴───────────────────────────────────────┘
 ```
 
@@ -53,16 +53,27 @@ gesture.
 
 ## Implementation reuse
 
-Plot reuses the master-detail components established by the World
-panel:
+Plot reuses the same shell decomposition as the World panel — see
+[2026-05-14-shells-design.md → Shell decomposition](../../../explorations/2026-05-14-shells-design.md#shell-decomposition):
 
-- `MasterDetailShell` — top bar, list pane, detail pane, save bar
-- `ListPane` — search, filter chips, scrollable rows (row rendering
-  composable per kind)
-- `DetailPane` — breadcrumb, name + ⋯ menu,
-  [tab strip](../../patterns/tabs.md), scrollable content
-- `SaveBar` — dirty-only footer (Cmd/Ctrl-S)
-- Form generation — zod-driven typed forms, same pattern as World
+- [`ScreenShell`](../../component-inventory.md#shells--build-ready)
+  — chrome wrapper (top bar, banners, body). Variant `in-story`;
+  shell handles Logo / Return on the left, status pill + ⛭ + ⚲
+  cluster on the right, and the chapter token-progress strip.
+- [`MasterDetailLayout`](../../foundations/mobile/collapse.md) —
+  responsive 2-pane frame; phone collapses list-first per the
+  [two-pane navigation rule](../../foundations/mobile/collapse.md#two-pane-navigation-surfaces-world-plot-settings).
+- [`EntityListPane`](../../component-inventory.md#shells--build-ready)
+  — kind selector + minimalist `[+]` icon-action + Toolbar (search,
+  filter chips, optional sort) + virtualized list + EmptyState.
+  Row rendering composable per kind.
+- [`DetailPane`](../../component-inventory.md#shells--build-ready)
+  — breadcrumb + name (via `InlineEditableName`) + ⋯ menu +
+  [tab strip](../../patterns/tabs.md) + scrollable content + optional
+  SaveBar slot.
+- [`SaveBar`](../../component-inventory.md#compounds--shipped) —
+  dirty-only footer (Cmd/Ctrl-S).
+- Form generation — zod-driven typed forms, same pattern as World.
 
 What changes per panel: the **kind selector control** (World uses a
 dropdown for 5+ categories; Plot uses a segment toggle for 2), the
@@ -217,11 +228,14 @@ by source / target_table / action_id) is its own panel; see
 
 ## Manual creation + per-row import
 
-`+ New thread` and `+ New happening` affordances live at the
-list-pane footer, **visually de-emphasized** (smaller text, lower
-contrast) — manual creation is uncommon since most rows are
-classifier-authored, but it's a real use case (user authoring a
-backstory thread, manually marking an off-screen happening).
+`New thread` and `New happening` affordances live as the
+EntityListPane `[+]` icon-action (see
+[2026-05-14-shells-design.md → EntityListPane](../../../explorations/2026-05-14-shells-design.md#shell-2--entitylistpane)),
+right-anchored alongside the Threads / Happenings segment toggle.
+Tooltip tracks the active segment. Manual creation is uncommon
+since most rows are classifier-authored, but it's a real use case
+(user authoring a backstory thread, manually marking an off-screen
+happening).
 
 Each follows the standard
 [import-counterparts pattern](../../patterns/data.md#import-counterparts--file-based--vault)
@@ -351,5 +365,5 @@ inherit unchanged.
   [empty list-pane state pattern](../../patterns/lists.md#empty-list--table-state).
   Per-kind shape: "No threads on this branch yet." / "No
   happenings on this branch yet." plus the classifier-writes-rows
-  explainer and a pointer at the existing `+ New` footer
-  affordance.
+  explainer and the EntityListPane empty-state CTA convention
+  (`+ Add the first thread` / `+ Add the first happening`).

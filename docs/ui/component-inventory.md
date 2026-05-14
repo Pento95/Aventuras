@@ -36,7 +36,9 @@ Text, Toast. Plus the `NativeOnlyAnimatedView` utility wrapper.
 
 ### Primitives — build-ready
 
-_Empty — every primitive on the v1 build queue has shipped._
+| Primitive          | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| InlineEditableName | Inline-editable text affordance: read state shows label + pencil (hover-revealed on desktop, always-visible on touch tier), edit state swaps to Input with blur-save / Escape-cancel semantics. Required by DetailPane's `nameSlot`. Spec: [world.md → Detail head structure](./screens/world/world.md#detail-head-structure) + [2026-05-14-shells-design.md → DetailPane dependency](../explorations/2026-05-14-shells-design.md#dependency--inlineeditablename). |
 
 ### Primitives — needs design
 
@@ -104,15 +106,15 @@ Top-level layout primitives.
 
 ### Shells — build-ready
 
-| Shell              | Spec                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------- |
-| MasterDetailLayout | [collapse.md](./foundations/mobile/collapse.md), [layout.md](./foundations/mobile/layout.md) |
+| Shell              | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MasterDetailLayout | [collapse.md](./foundations/mobile/collapse.md), [layout.md](./foundations/mobile/layout.md)                                                                                                                                                                                                                                                                                                                                          |
+| ScreenShell        | Chrome wrapper — variant-driven (`app-root` / `app` / `in-story`). Owns left slot (Logo vs ← Return), variant-derived right cluster, token-progress strip (driven by `chapterProgress: number`), banner stack, and tier-aware reshuffle of reader chip cluster. Page fills slots for title / status / extras. Spec: [2026-05-14-shells-design.md → ScreenShell](../explorations/2026-05-14-shells-design.md#shell-1--screenshell).    |
+| EntityListPane     | Master list pane for World + Plot. Toolbar + virtualized list + EmptyState. Kind selector row carries the minimalist `[+]` icon-action (replaces the prior footer `+ New <kind>` cell). Spec: [2026-05-14-shells-design.md → EntityListPane](../explorations/2026-05-14-shells-design.md#shell-2--entitylistpane). Story List grid / Browse rail / settings rails compose ad-hoc with the underlying patterns rather than this shell. |
+| DetailPane         | Master detail pane for World + Plot. Head (kind-breadcrumb + nameSlot + badges + ⋯) + tabs strip + scrollable body + optional SaveBar slot. Tab composition is per-kind, hand-written by each detail-pane consumer. Depends on InlineEditableName primitive. Spec: [2026-05-14-shells-design.md → DetailPane](../explorations/2026-05-14-shells-design.md#shell-3--detailpane).                                                       |
 
 ### Shells — needs design
 
-| Shell         | Question                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ScreenShell   | Header + body + optional save-bar footer. Does every screen route through one shell or compose ad-hoc? Header contract (title / back / overflow).      |
-| ListPane      | Toolbar + list + EmptyState + footer +New as one component vs ad-hoc with sub-primitives. Reusability vs coupling trade-off — five surfaces ride this. |
-| DetailPane    | Header + Tabs + tab body + SaveBar. Tab body shape is per-kind; what's the shared shell + slot contract?                                               |
-| ComposerShell | Reader-composer's idiosyncratic layout. Likely all-locality; no extracted shell. Confirm during reader-composer build pass.                            |
+| Shell         | Question                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| ComposerShell | Reader-composer's idiosyncratic layout. Likely all-locality; no extracted shell. Confirm during reader-composer build pass. |

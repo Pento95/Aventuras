@@ -46,7 +46,7 @@ Cross-cutting principles that govern this panel are in
 ├─────────────────────┬───────────────────────────────────────┤
 │ LIST PANE (~340px)  │ DETAIL PANE                           │
 │                     │                                       │
-│ [Characters ▾]      │ breadcrumb: ☺ character               │
+│ [Characters ▾]  [+] │ breadcrumb: ☺ character               │ ← [+] tooltip tracks active kind
 │ search              │ Name: Kael ✎                    [⋯]  │
 │ filter chips        │ ─────                                 │
 │                     │ tabs: Overview | Identity | Carrying  │
@@ -58,7 +58,6 @@ Cross-cutting principles that govern this panel are in
 │                     │ ───                                   │
 │                     │ save bar (when dirty)                 │
 │                     │   N unsaved · [discard] [save ⌘S]     │
-│ + New <kind>        │                                       │ ← label tracks active filter
 └─────────────────────┴───────────────────────────────────────┘
 ```
 
@@ -311,11 +310,13 @@ drawer. No World-specific deviation.
 
 ## Per-row import
 
-The list-pane footer carries a kind-aware `+ New <kind>` button
-(`+ New character`, `+ New location`, `+ New item`, `+ New
-faction`, `+ New lore`) — label tracks the active list-pane
-category. Lore is not an entity; the generic "+ New entity" copy
-would mis-label the lore creation path.
+The list-pane carries the EntityListPane affordance (see
+[2026-05-14-shells-design.md → EntityListPane](../../../explorations/2026-05-14-shells-design.md#shell-2--entitylistpane))
+— minimalist `[+]` icon-action right-anchored on the kind-selector
+row. Per-kind tooltip resolves to `New character`, `New location`,
+`New item`, `New faction`, or `New lore` per the active category;
+lore is not an entity, so the generic "New entity" copy would
+mis-label the lore creation path.
 
 The button follows the standard
 [import-counterparts pattern](../../patterns/data.md#import-counterparts--file-based--vault)
@@ -812,11 +813,12 @@ overflows.
   `View raw JSON` / `Delete entity`). Lore detail-head omits
   `Set as lead` (per the existing per-kind note); rule otherwise
   identical.
-- **Per-row import affordance** (`+ New <kind>` button) sits at
-  list-pane foot, full-width on phone for tap-target clarity. The
-  import-counterparts dropdown (`Blank` / `From JSON file…` /
-  `From Vault…`) opens as Sheet (short) on phone per the layout
-  binding for popover-style menus.
+- **Per-row import affordance** — the EntityListPane `[+]`
+  icon-action reads naturally on phone too (touch-tier hit area
+  per the icon-actions touch-tier minimum). The import-counterparts
+  dropdown (`Blank` / `From JSON file…` / `From Vault…`) opens
+  as Sheet (short) on phone per the layout binding for
+  popover-style menus.
 - **Raw JSON viewer** inherits the binding-table mapping: Sheet
   (right ~440 px) on desktop, Sheet (bottom, tall ~95 %) on phone
   per [`mobile/layout.md → Surface bindings`](../../foundations/mobile/layout.md#surface-bindings--existing-app-surfaces).

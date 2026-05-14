@@ -631,9 +631,18 @@
 
   <aside class="list-pane">
     <div class="list-controls">
-      <div class="list-select" title="World categories: Characters / Places / Items / Factions / Lore">
-        <span>Characters</span>
-        <span style="color: var(--ink-faint);">&#9662;</span>
+      <div class="list-kind-row" style="display: flex; align-items: center; gap: 6px; position: relative;">
+        <div class="list-select" title="World categories: Characters / Places / Items / Factions / Lore" style="flex: 1;">
+          <span>Characters</span>
+          <span style="color: var(--ink-faint);">&#9662;</span>
+        </div>
+        <!-- EntityListPane [+] icon-action — tooltip tracks active kind -->
+        <span class="icon-action new-entity-trigger" id="new-trigger" title="New character" style="font-size: 14px; color: var(--ink-secondary); cursor: pointer; padding: 4px 8px;">&plus;</span>
+        <div class="new-menu" id="new-menu" style="top: calc(100% + 6px); bottom: auto; left: auto; right: 0; transform: none;">
+          <div class="new-menu-item">Blank</div>
+          <div class="new-menu-item">From JSON file&hellip;</div>
+          <div class="new-menu-item disabled" title="Vault not yet implemented">From Vault&hellip;</div>
+        </div>
       </div>
       <div class="search-row">
         <div class="list-search">Search name, description&hellip;</div>
@@ -748,19 +757,10 @@
       <div class="empty-title">No characters on this branch yet.</div>
       <div class="empty-sub">
         The classifier writes most rows automatically as the
-        story progresses. You can also add them manually with
-        <b>+ New</b> below.
+        story progresses. You can also add them manually:
       </div>
-    </div>
-
-    <div class="list-footer">
-      <div class="new-menu-wrapper">
-        <span class="new-entity-btn" id="new-trigger">+ New entity &#9662;</span>
-        <div class="new-menu" id="new-menu">
-          <div class="new-menu-item">Blank</div>
-          <div class="new-menu-item">From JSON file&hellip;</div>
-          <div class="new-menu-item disabled" title="Vault not yet implemented">From Vault&hellip;</div>
-        </div>
+      <div class="empty-cta" style="margin-top: 10px;">
+        <span class="new-entity-btn" id="new-trigger-empty">+ Add your first character &#9662;</span>
       </div>
     </div>
   </aside>
