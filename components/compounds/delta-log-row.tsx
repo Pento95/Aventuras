@@ -43,12 +43,6 @@ type DeltaLogRowProps = {
   className?: string
 }
 
-// Op badge color mapping. Filled-surface pattern: `bg-X` paired
-// with `text-X-fg` for guaranteed contrast (each theme's --X-fg is
-// tuned for legibility on --X). Same pattern as filled Button +
-// selected Chip. Pattern doc names tokens as `bg-X-bg` shorthand;
-// the live tokens are `bg-X` (the DEFAULT slot) — followup tracks
-// the doc fix.
 const OP_STYLES: Record<DeltaOp, { container: string; label: string }> = {
   create: { container: 'bg-success', label: 'text-success-fg' },
   update: { container: 'bg-accent', label: 'text-accent-fg' },
@@ -66,20 +60,10 @@ const SOURCE_LABEL: Record<DeltaSource, string> = {
   chapter_close: 'chapter close',
 }
 
-// Aventuras's history-tab row. Read-only by design — rollback lives
-// in the reader's per-entry path. Takes pre-formatted display
-// strings opaque (same contract as EntryCard's worldTimeLabel and
-// StoryCard's chapterLabel/lastOpenedRelative): per-target
-// resolution and diff humanization happen in the host where the
-// domain knowledge lives. Compound owns layout + op-color +
-// source-enum mapping.
 export function DeltaLogRow({ delta, onPress, className }: DeltaLogRowProps) {
   const interactive = onPress != null
   const op = OP_STYLES[delta.op]
 
-  // Meta line parts. Source always present; entry link conditional
-  // (null for non-entry-triggered events like chapter_close); time
-  // always present. Joined with middle-dot separators downstream.
   const metaParts = [
     SOURCE_LABEL[delta.source],
     delta.entryId != null ? delta.entryId : null,
@@ -101,19 +85,11 @@ export function DeltaLogRow({ delta, onPress, className }: DeltaLogRowProps) {
         className,
       )}
     >
-      {/* Op badge — left-anchored, top-aligned with the target line.
-          Pill shape (rounded-full), filled with op color, label in
-          contrasting text-fg. mt-0.5 nudges baseline-aligned with
-          the target text since `text-xs font-medium` on a 14 px
-          base text shifts perceived center slightly upward. */}
       <View className={cn('mt-0.5 shrink-0 rounded-full px-2 py-0.5', op.container)}>
         <Text className={cn('text-xs font-medium', op.label)}>{delta.op}</Text>
       </View>
 
       <View className="min-w-0 flex-1 gap-0.5">
-        {/* Target line: name · field path. fieldPath is muted and
-            truncates separately so a long path doesn't push the
-            target name out of view. */}
         <View className="flex-row items-center gap-1.5">
           <Text className="shrink font-medium" numberOfLines={1}>
             {delta.targetDisplayName}
@@ -130,16 +106,10 @@ export function DeltaLogRow({ delta, onPress, className }: DeltaLogRowProps) {
           ) : null}
         </View>
 
-        {/* Summary — host-formatted diff prose. 2-line ellipsis bound
-            per pattern doc. */}
         <Text size="sm" numberOfLines={2}>
           {delta.summary}
         </Text>
 
-        {/* Meta line — source · entry · time. Middle-dot separators
-            embedded in the joined string keep them part of the same
-            text run, avoiding awkward wraps where a separator gets
-            isolated on its own line. */}
         <Text variant="muted" size="xs" numberOfLines={1}>
           {metaParts.join(' · ')}
         </Text>
@@ -148,4 +118,4 @@ export function DeltaLogRow({ delta, onPress, className }: DeltaLogRowProps) {
   )
 }
 
-export type { DeltaLogRowProps, Delta, DeltaOp, DeltaSource }
+export type { Delta, DeltaLogRowProps, DeltaOp, DeltaSource }

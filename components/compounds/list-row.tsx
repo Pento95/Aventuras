@@ -58,20 +58,6 @@ type ListRowProps = {
   className?: string
 }
 
-// Aventuras's pan-domain list row. Carries four orthogonal signals
-// per docs/ui/patterns/entity.md → Entity row indicators:
-//
-//   1. Lead badge (slotted via `meta`)
-//   2. Status pill (slotted via `trailing`)
-//   3. Scene-presence (left-edge stripe, typed prop `inScene`)
-//   4. Recently-classified (background tint, typed prop)
-//
-// Design rule: invariant channels are typed props so every row has
-// the same structural commitment; per-domain content (kind icon,
-// status pill, lead badge) is slotted because the visual primitives
-// differ per surface. `selected` and `recentlyClassified` can both
-// fire — recently-classified wins via class order so the transient
-// signal stays visible.
 export function ListRow({
   label,
   description,
@@ -95,20 +81,8 @@ export function ListRow({
       aria-selected={selected}
       className={cn(
         'relative flex-row items-center gap-3 px-row-x-md py-row-y-md',
-        // Selection background — depressed-surface tint. Visible
-        // when no recently-classified tint is fighting for the bg
-        // channel; when both fire, the tint overrides the sunken
-        // bg via class order, but the right-edge accent stripe
-        // (rendered below) keeps selection readable regardless.
         selected && 'bg-bg-sunken',
-        // Recently-classified fresh — full-strength tint from the
-        // token. Fading is rendered as a semi-transparent overlay
-        // behind content (see below) so only the background dims;
-        // text + icons remain at full opacity per the
-        // 4.5:1 contrast guarantee in
-        // docs/ui/foundations/color.md → Recently-classified slot.
         recentlyClassified === 'fresh' && 'bg-recently-classified-bg',
-        // Press / hover state-layer tints. Skip on disabled.
         interactive && 'active:bg-tint-press',
         Platform.select({ web: interactive ? 'cursor-pointer hover:bg-tint-hover' : '' }),
         disabled && 'opacity-50',
@@ -116,13 +90,6 @@ export function ListRow({
         className,
       )}
     >
-      {/* Fading-state overlay. Renders the fresh-tint color at 50%
-          opacity behind the row's content, leaving text + icons
-          fully opaque. This is the cross-platform equivalent of
-          web's `color-mix(in srgb, var(--recently-classified-bg)
-          50%, transparent)` — same visual result, works on RN
-          natively without a color-mix polyfill. Locked alpha is
-          0.5 per the foundation doc (empirically picked). */}
       {recentlyClassified === 'fading' ? (
         <View
           className="absolute inset-0 bg-recently-classified-bg opacity-50"
@@ -130,16 +97,6 @@ export function ListRow({
           pointerEvents="none"
         />
       ) : null}
-      {/* Scene-presence stripe — absolute so it doesn't push content;
-          spans the full row height by claiming top-0 / bottom-0. */}
-      {/* Channel stripes — left edge for scene-presence, right
-          edge for selection. Both are 3 px, absolute-positioned,
-          pointerEvents="none" so the row's Pressable still owns
-          the press surface. The two-edge split is load-bearing:
-          recently-classified owns the row body (bg tint), so
-          neither selection nor scene-presence can use the body
-          channel without contending. Edge stripes always read
-          regardless of what's happening on the body. */}
       {inScene ? (
         <View
           className="absolute bottom-0 left-0 top-0 w-[3px] bg-success"

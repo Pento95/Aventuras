@@ -16,18 +16,18 @@ import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/utils'
 
 import {
+  type DialogDriver,
+  type DialogInit,
+  type DialogResolution,
   type DialogState,
   type ExecutionProvider,
   type FailReason,
   type FileProgress,
-  type DialogDriver,
-  type DialogInit,
-  type DialogResolution,
   initialState,
   reducer,
 } from './embedder-download-dialog-machine'
 
-// Degenerate fallback when the host doesn't supply `availableEps`.
+// Fallback when the host doesn't supply `availableEps`.
 // Real hosts enumerate via the driver (platform detection + ORT
 // build introspection). v1 always-works fallback is plain CPU.
 const DEFAULT_AVAILABLE_EPS: readonly ExecutionProvider[] = ['cpu']
@@ -63,10 +63,6 @@ type EmbedderDownloadDialogViewProps = {
 
 export function EmbedderDownloadDialogView(props: EmbedderDownloadDialogViewProps) {
   const { open, onOpenChange, state, portalHost } = props
-  // hf-input value is view-local ephemera — the Footer's Resolve
-  // button reads the same value HfInputBody types into. Once
-  // onSubmitHfInput fires the host re-mounts the dialog with a
-  // new init, so this state resets naturally.
   const [hfInputValue, setHfInputValue] = React.useState('')
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -294,13 +290,6 @@ function LicenseBody({
   )
 }
 
-// Shared EP picker row used by both EpPickerBody (HF-id flow's
-// post-license step) and ImportConfirmBody (custom-import flow's
-// confirmation step). Renders the canonical `[ <ep> ▾ ]` dropdown
-// per the design spec, plus the warning copy from
-// docs/memory/model-management.md → Custom file import. The host
-// owns enumeration of platform-supported EPs; the dialog renders
-// the list as-is without model-side filtering.
 function EpSelectRow({
   pickedEp,
   onPick,
@@ -319,13 +308,6 @@ function EpSelectRow({
       <Text size="sm" variant="muted">
         Execution provider
       </Text>
-      {/* mode='radio' renders inline. The default auto-derivation
-          would flip to 'dropdown' (→ bottom sheet on phone native),
-          stacking a sheet on top of the dialog — discouraged by
-          both iOS HIG and Material guidance on nested modals.
-          Radio keeps the picker inside the modal's context on every
-          tier. 3–4 EPs per platform max, so vertical space cost is
-          modest. */}
       <Select
         options={options}
         value={pickedEp}
@@ -477,8 +459,6 @@ function DoneBody() {
   )
 }
 
-// 'cancelled' is its own FailReason variant per the state-machine
-// refactor — no more sentinel string check inside card-fetch-failed.
 function FailedBody({ reason }: { reason: FailReason }) {
   switch (reason.kind) {
     case 'cancelled':
@@ -555,9 +535,6 @@ function FailedBody({ reason }: { reason: FailReason }) {
   }
 }
 
-// 'cancelled' reason is its own FailReason variant (not a sentinel
-// on card-fetch-failed.message anymore); retry only applies to
-// the network/resolve failure paths that are actually retryable.
 function Footer(props: EmbedderDownloadDialogViewProps & { hfInputValue: string }) {
   const { state } = props
   switch (state.kind) {
@@ -658,9 +635,6 @@ export function EmbedderDownloadDialog(props: EmbedderDownloadDialogProps) {
   const resolvedRef = React.useRef(false)
   const lastUserActionRef = React.useRef<'declined' | 'cancelled' | null>(null)
 
-  // card-fetch effect: fires driver.fetchModelCard, dispatches result.
-  // Cancellation is best-effort — if state moves away mid-flight,
-  // the dispatched action lands on a stale state and is ignored.
   React.useEffect(() => {
     if (state.kind !== 'card-fetch') return
     if (init.kind !== 'catalog') return
@@ -686,11 +660,6 @@ export function EmbedderDownloadDialog(props: EmbedderDownloadDialogProps) {
     }
   }, [state.kind, driver, init])
 
-  // resolving effect (HF id path): fetch model card live from HF id.
-  // Extract the HF id input from the narrowed resolving state so the
-  // dep array references a stable primitive rather than the full state
-  // object (which is recreated on every dispatch). The effect uses
-  // resolvingHfInput directly — null acts as the early-return guard.
   const resolvingHfInput =
     state.kind === 'resolving' && state.init.kind === 'hf-id' ? state.init.input : null
   React.useEffect(() => {
@@ -718,10 +687,6 @@ export function EmbedderDownloadDialog(props: EmbedderDownloadDialogProps) {
     }
   }, [driver, resolvingHfInput])
 
-  // downloading effect: iterate files in meta.fileCount + the catalog
-  // entry. The container holds the file list via init; production
-  // driver wires real URLs and target paths. Stub-driver-friendly:
-  // never-resolving promises just leave state in 'downloading'.
   React.useEffect(() => {
     if (state.kind !== 'downloading') return
     if (init.kind !== 'catalog') return
@@ -757,9 +722,6 @@ export function EmbedderDownloadDialog(props: EmbedderDownloadDialogProps) {
     }
   }, [state.kind, driver, init])
 
-  // verifying effect: SHA256 each file; compare to expectedSha256
-  // from the catalog entry (curated path) or just compute (HF id /
-  // import paths).
   React.useEffect(() => {
     if (state.kind !== 'verifying') return
     if (init.kind !== 'catalog') return
@@ -812,9 +774,6 @@ export function EmbedderDownloadDialog(props: EmbedderDownloadDialogProps) {
     onResolve(res)
   }
 
-  // Auto-fire terminal observer: 'done' and 'failed { cancelled }'
-  // resolve immediately. Other failed states wait for user dismissal
-  // so the FailedBody has a chance to be read.
   React.useEffect(() => {
     if (resolvedRef.current) return
     if (state.kind === 'done') {
@@ -826,15 +785,6 @@ export function EmbedderDownloadDialog(props: EmbedderDownloadDialogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, onResolve])
 
-  // Dismissal wrap: every dismissal vector (Escape, overlay click,
-  // corner ×, Cancel/Decline/Close buttons) routes through here.
-  // - Already-resolved: bubble to host, do nothing else.
-  // - Terminal failed (non-cancelled): user reviewed the error, fire
-  //   error resolution and bubble.
-  // - Non-terminal license: treat as declined; reducer transitions
-  //   to 'done' and the terminal observer fires 'declined'.
-  // - Non-terminal other: treat as cancelled; reducer transitions
-  //   to 'failed { cancelled }' and the terminal observer fires.
   const handleOpenChange = (next: boolean) => {
     if (!next && !resolvedRef.current) {
       if (state.kind === 'failed') {

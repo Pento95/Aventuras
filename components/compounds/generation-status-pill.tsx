@@ -45,14 +45,11 @@ export function GenerationStatusPill({
   onErrorTap,
 }: GenerationStatusPillProps) {
   const tier = useTier()
-  // Imperative ref exposes `close()` — same pattern as importer-menu.tsx.
   const triggerRef = React.useRef<React.ComponentRef<typeof PopoverTrigger>>(null)
 
   // Priority: active generation > error state > hidden.
   if (activePhase != null) {
     const isPhone = tier === 'phone'
-    // asChild skipped — Tag isn't forwardRef'd; Trigger renders its own Pressable wrapper.
-    // Popover is uncontrolled: rn-primitives Root doesn't accept an `open` prop.
     return (
       <Popover>
         <PopoverTrigger ref={triggerRef}>
@@ -86,4 +83,4 @@ export function GenerationStatusPill({
   return null
 }
 
-export type { GenerationStatusPillProps, GenerationPhase, ErrorState }
+export type { ErrorState, GenerationPhase, GenerationStatusPillProps }

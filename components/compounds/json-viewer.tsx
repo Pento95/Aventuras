@@ -23,27 +23,6 @@ type JSONViewerProps = {
   className?: string
 }
 
-// Raw JSON viewer — the shared drawer behind every "View raw JSON"
-// affordance per docs/ui/patterns/data.md → Raw JSON viewer.
-//
-// Read-only in v1. The footer hint placeholder ("Edit raw — coming
-// later") is the spec'd disabled affordance for the deferred edit
-// mode (raw-edit + zod-validate on save).
-//
-// Tier-adapted shape:
-//   • Tablet / desktop — right-anchored 440 px drawer (matches the
-//     reader peek drawer for visual consistency). Header carries
-//     Copy + explicit close ×; mouse needs an obvious dismiss target.
-//   • Phone — tall bottom sheet. The drag handle (rendered by Sheet
-//     itself) plus tap-overlay are the natural dismiss gestures, so
-//     the explicit × is dropped — keeping it would be redundant
-//     chrome competing with the gesture affordance.
-//
-// Body keeps Sheet's default `p-6`. Header / footer carry their own
-// border-b / border-t lines (inset within the padding rather than
-// bleeding to the panel edges) so the structure is a flat sequence
-// of Content children with the ScrollView in the middle claiming
-// the remaining height via `flex-1`.
 export function JSONViewer({ open, onOpenChange, name, data, className }: JSONViewerProps) {
   const tier = useTier()
   const anchor = tier === 'phone' ? 'bottom' : 'right'
@@ -64,9 +43,6 @@ export function JSONViewer({ open, onOpenChange, name, data, className }: JSONVi
 
   const handleCopy = React.useCallback(() => {
     if (Platform.OS === 'web') {
-      // expo-clipboard's web shim is async too, but going through
-      // navigator.clipboard directly avoids a wrapper layer for the
-      // path that handles 99 % of viewer traffic (desktop drawer).
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         navigator.clipboard.writeText(formatted).catch(() => {})
       }

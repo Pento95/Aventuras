@@ -67,12 +67,6 @@ type EntryCardProps = {
   className?: string
 }
 
-// Bubble styling per kind. Spec doc uses tokens that don't exist
-// (`bg-highlight`, `bg-region`, `border-line-soft`); mapped to live
-// project tokens. user = recessed bg (input), ai/opening = raised
-// bg (response), system = warning border, streaming = dashed border
-// over ai bg. Visual identity session can swap these for purpose-
-// built tokens later.
 const KIND_BUBBLE: Record<EntryKind, string> = {
   user: 'bg-bg-sunken border-border',
   ai: 'bg-bg-raised border-border',
@@ -104,22 +98,11 @@ export function EntryCard({
   onCancelEdit,
   className,
 }: EntryCardProps) {
-  // Reasoning toggle is internal state — no external override. Brain
-  // icon click flips it. Hidden entirely when no reasoning data and
-  // not actively streaming reasoning.
   const [expanded, setExpanded] = React.useState(false)
   const hasReasoning = reasoning != null && reasoning.length > 0
   const isStreamingReasoning = kind === 'streaming' && streamingPhase === 'reasoning'
 
-  // Action cluster visibility. Hidden during edit, system, streaming.
-  // Per pattern doc — system uses inline retry/dismiss buttons in
-  // its content slot; streaming has no per-entry actions (cancel
-  // lives on the composer, not the bubble).
   const showActions = !editing && kind !== 'system' && kind !== 'streaming'
-
-  // World-time footer visibility. Spec says hidden for system /
-  // streaming, AND when worldTimeLabel undefined. Edit mode keeps
-  // the footer per spec (only brain/reasoning/cluster hide).
   const showWorldTime = worldTimeLabel != null && kind !== 'system' && kind !== 'streaming'
 
   return (
@@ -127,21 +110,10 @@ export function EntryCard({
       className={cn(
         'relative w-full rounded-lg border p-4',
         KIND_BUBBLE[kind],
-        // Disabled gate uniform with other compounds — opacity
-        // dim plus the host-supplied reason for hover tooltip on
-        // web (handled at action-button level since the bubble
-        // itself isn't a tap target).
         disabled && 'opacity-60',
         className,
       )}
-      // Reserve right-edge space when an absolute action cluster
-      // OR world-time footer renders, so prose doesn't slide under
-      // them. pr-20 (80 px) on the bubble carves out the cluster
-      // column; the footer right-3 (12 px) sits within that.
     >
-      {/* Top line — varies per kind. Reserves right-pad when the
-          action cluster is visible so a long meta line (model name
-          + tokens) doesn't slide under the absolute cluster. */}
       <View className={cn('mb-2 flex-row items-center gap-2', showActions && 'pr-28')}>
         {kind === 'user' ? (
           <View className="rounded-sm bg-fg-primary px-2 py-0.5">
@@ -165,14 +137,6 @@ export function EntryCard({
             <Icon as={ArrowRight} size="sm" className="shrink-0 text-fg-muted" />
           </>
         ) : (
-          // ai / opening — meta line. Book glyph + brain (toggle
-          // reasoning, only when present) + tokens. Model id stays
-          // off the entry per data-model — it's persisted as
-          // metadata for provenance but not surfaced in the
-          // narrative chrome. shrink-0 on the raw <Icon> because
-          // it doesn't bake that in (only <IconAction> does); flex
-          // children shrink by default, which collapses the SVG
-          // on narrow rows.
           <>
             <Icon as={Book} size="sm" className="shrink-0 text-fg-muted" />
             {hasReasoning ? (
@@ -184,12 +148,6 @@ export function EntryCard({
               />
             ) : null}
             {meta?.tokens != null ? (
-              // leading-none collapses the line-height to the
-              // font-size so the visible glyph centers on the same
-              // vertical line as the book icon and IconAction
-              // brain. Without this, text-xs's default line-height
-              // (1.33×) leaves descender space that pulls the
-              // visible glyph above the row's geometric center.
               <Text size="xs" variant="muted" className="leading-none">
                 {meta.tokens.reply} tokens
                 {meta.tokens.reasoning != null ? ` (+${meta.tokens.reasoning} reasoning)` : ''}
@@ -199,11 +157,6 @@ export function EntryCard({
         )}
       </View>
 
-      {/* Reasoning body — collapsible. Hidden during edit per spec
-          (edit-mode focuses on content only). Indented with a left
-          accent rule to read as quoted-meta. v1 toggles via display:
-          none / block; the spec calls for a height-clamp animation
-          which is deferred to a polish pass — followup if needed. */}
       {hasReasoning && expanded && !editing ? (
         <View className="mb-3 border-l-2 border-border pl-3">
           <Text size="sm" variant="muted" className="italic">
@@ -212,10 +165,6 @@ export function EntryCard({
         </View>
       ) : null}
 
-      {/* Live-stream reasoning preview — when actively streaming the
-          reasoning phase, surface what's coming through so the user
-          sees the model "thinking". Same visual shape as the static
-          reasoning body. */}
       {isStreamingReasoning && content.length > 0 ? (
         <View className="mb-3 border-l-2 border-border pl-3">
           <Text size="sm" variant="muted" className="italic">
@@ -224,11 +173,6 @@ export function EntryCard({
         </View>
       ) : null}
 
-      {/* Content slot — textarea in edit mode, system error layout
-          for system kind, prose otherwise. Streaming-reply phase
-          renders content as it streams (same prose path); the
-          reasoning-phase content is already shown in the live
-          preview block above, so we skip duplicate render. */}
       {editing ? (
         <View className="gap-2">
           <Textarea
@@ -237,27 +181,10 @@ export function EntryCard({
             editable={!disabled}
             autoFocus
             aria-label="Edit entry content"
-            // Esc cancels in-flight edits — universal text-edit
-            // UX. Commit-via-keyboard (Cmd/Ctrl+Enter) is host-
-            // bindable but skipped here since RN's onKeyPress is
-            // unreliable for modifier combos across platforms.
             onKeyPress={(e) => {
               if (e.nativeEvent.key === 'Escape') onCancelEdit?.()
             }}
           />
-          {/* Inline Save/Cancel — narrative-pattern UX (cf.
-              Slack/Discord edit). Spec forbids the full `<SaveBar>`
-              compound inside the card; these are simple buttons,
-              NOT a SaveBar. Host can still mount a page-level
-              SaveBar in parallel if it wants cross-entry dirty-
-              state tracking.
-
-              Mobile contract: the host's ScrollView MUST set
-              `keyboardShouldPersistTaps="handled"`. Without it,
-              the first tap on Save/Cancel only dismisses the soft
-              keyboard; user has to tap a second time to fire the
-              button. The compound can't fix this on its own — the
-              behavior is owned by the parent ScrollView. */}
           <View className="flex-row justify-end gap-2">
             <Button variant="ghost" size="sm" onPress={onCancelEdit} disabled={disabled}>
               <Text>Cancel</Text>
@@ -293,20 +220,11 @@ export function EntryCard({
           )}
         </View>
       ) : kind === 'streaming' &&
-        streamingPhase === 'reasoning' ? // Reasoning-phase streaming — content is already shown in
-      // the live preview block above. The reply slot stays empty
-      // until the stream transitions to 'reply'.
+        streamingPhase === 'reasoning' ? // until the stream transitions to 'reply'. // the live preview block above. The reply slot stays empty // Reasoning-phase streaming — content is already shown in
       null : (
         <Text size="sm">{content}</Text>
       )}
 
-      {/* Action cluster — absolute, anchored to align with the
-          meta line. Right-2 hugs the corner; top-4 matches the
-          bubble's `p-4` so the cluster's icon row shares a baseline
-          with the meta-line book/brain/tokens. (Earlier `top-2`
-          had the cluster floating 8 px above the meta line, which
-          read as misaligned.) Per icon-actions pattern: 0.55 rest
-          opacity, 1.0 on row hover. */}
       {showActions ? (
         <View className="absolute right-2 top-4 flex-row items-center gap-0.5">
           {onEdit != null ? (
@@ -363,9 +281,6 @@ export function EntryCard({
         </View>
       ) : null}
 
-      {/* World-time footer — bottom-right of bubble. Read-only; the
-          manual-correction-as-click-to-edit affordance is parked
-          (see followups). */}
       {showWorldTime ? (
         <View className="mt-3 flex-row justify-end">
           <Text size="xs" variant="muted">

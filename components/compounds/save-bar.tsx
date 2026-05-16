@@ -40,17 +40,6 @@ type SaveBarProps = {
   className?: string
 }
 
-// Save bar — the visible UI for the save-session pattern.
-// Spec: docs/ui/patterns/save-sessions.md → Save bar.
-//
-// Color treatment derives from `--warning` rather than the wireframe's
-// hardcoded `#fff7dc` so the bar reads as warning-state across all
-// 11 themes (the warm yellow looked alien on the dark themes). Bg is
-// `--warning` at 12% mixed with the surface; the dot is `--warning`
-// at full saturation. Cross-platform mechanism mirrors the
-// recently-classified-fading approach: an absolute-positioned
-// overlay View carries the warning color at low opacity behind the
-// content, leaving text + buttons fully opaque.
 export function SaveBar({
   dirtyFields,
   dirtyCount,
@@ -63,17 +52,6 @@ export function SaveBar({
   const count = dirtyCount ?? dirtyFields.length
   const fieldList = dirtyFields.length > 0 ? dirtyFields.join(', ') : null
 
-  // ⌘/Ctrl-S keystroke listener — mounted only on web while the
-  // bar exists. The bar self-mounts on dirty (consumers conditionally
-  // render), so this listener's lifetime tracks the dirty session
-  // exactly, with no risk of catching stray Cmd-S in clean state.
-  //
-  // Bound in **capture phase** (third arg `true`) because RN-Web
-  // wires TextInput's onKeyDown via React's synthetic event system;
-  // when an Input has focus, the keystroke goes through the synthetic
-  // dispatcher first, which can stop propagation before bubble-phase
-  // window listeners fire. Capture phase runs before the input gets
-  // the event, so Ctrl-S works whether or not a field has focus.
   React.useEffect(() => {
     if (Platform.OS !== 'web') return
     const handler = (e: KeyboardEvent) => {
@@ -87,11 +65,6 @@ export function SaveBar({
     return () => window.removeEventListener('keydown', handler, true)
   }, [onSave, saving])
 
-  // Keyboard hint shown inline in the Save button. Only render on
-  // web — native users have no equivalent shortcut. macOS users see
-  // ⌘S; everyone else web sees Ctrl+S. Detection sniffs the user
-  // agent because RN-Web's `Platform.OS` is just `'web'` and
-  // `navigator.platform` is deprecated.
   const shortcutHint = React.useMemo(() => {
     if (Platform.OS !== 'web') return null
     const isMac =
@@ -108,10 +81,6 @@ export function SaveBar({
         className,
       )}
     >
-      {/* Warning-tinted bg overlay. Cross-platform equivalent of
-          web's color-mix(in srgb, var(--warning) 12%, transparent).
-          Sits behind content; pointerEvents="none" so the row's
-          buttons own the press surface. */}
       <View
         className="absolute inset-0 bg-warning opacity-[.12]"
         aria-hidden
@@ -126,11 +95,6 @@ export function SaveBar({
             {count} unsaved change{count === 1 ? '' : 's'}
           </Text>
           {fieldList != null ? (
-            // Field list uses `secondary` rather than `muted`. The
-            // warning-tinted bg cuts perceptual contrast on dark
-            // themes (tokyo-night and friends), and `text-fg-muted`
-            // drops below readable. Secondary is the right tier
-            // for "lower-emphasis but still readable."
             <Text size="xs" variant="secondary">
               {' — '}
               {fieldList}
@@ -138,12 +102,6 @@ export function SaveBar({
           ) : null}
         </Text>
         {notice != null ? (
-          // RN-Web's `<View>` filters unknown HTML attrs, so a
-          // `title` prop on a View doesn't reach the DOM and the
-          // native browser tooltip never shows. Wrapping the icon
-          // in a raw `<div>` on web is the existing pattern (see
-          // IconAction's `disabledReason`). Native gets the
-          // accessible label via `aria-label` for screen readers.
           Platform.OS === 'web' ? (
             <div title={notice} style={{ display: 'inline-flex' }} aria-label={notice}>
               <Icon as={AlertTriangle} size="sm" className="text-warning" />

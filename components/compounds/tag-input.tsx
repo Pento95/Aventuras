@@ -36,9 +36,6 @@ type TagInputProps = {
   maxTagLength?: number
 }
 
-// Helpers — pure, testable in isolation. Case-insensitive dedupe;
-// on dedupe-rejection the input still clears (the user already has
-// that tag, no error surface needed).
 function dedupesAgainst(existing: readonly string[], candidate: string): boolean {
   const lc = candidate.toLowerCase()
   return existing.some((t) => t.toLowerCase() === lc)
@@ -173,13 +170,6 @@ export function TagInput({
   )
 
   const wrapperClasses = cn(
-    // Content-driven height. Earlier attempt with `min-h-control-md`
-    // plus `content-center` worked in Electron but not in Storybook's
-    // vite RN-Web build (the wrap-line stuck to the top of the
-    // wrapper). Letting content size the wrapper avoids the divergence:
-    // the inner TextInput's `min-h-control-md` sets a baseline single-
-    // line input height; chips wrap above/below at their natural size;
-    // `items-center` centers both per line.
     'flex-row flex-wrap items-center gap-1.5 rounded-md border border-border bg-bg-base px-2',
     focused
       ? Platform.select({
@@ -195,10 +185,6 @@ export function TagInput({
   )
 
   const inputClasses = cn(
-    // `min-h-control-md` ensures the input acts as a proper single-
-    // line input even when chips are absent, matching the Input
-    // primitive's height. Chips have their own natural height; both
-    // center within their wrap-line via the wrapper's items-center.
     'min-h-control-md min-w-[60px] flex-1 text-sm text-fg-primary',
     Platform.select({
       web: 'placeholder:text-fg-muted selection:bg-accent selection:text-accent-fg outline-none',

@@ -42,20 +42,6 @@ const NARROW_THRESHOLD_PX = 640
 const WIDE_LABEL_COLUMN_PX = 180
 const NARROW_LABEL_COLUMN_PX = 120
 
-// Container-keyed layout for label / hint / input rows. Spec:
-// docs/ui/patterns/forms.md → Form rows. Container width drives
-// stacked-vs-2-col, NOT viewport tier — a desktop-tier viewport
-// resized narrow gets stacked rows; a tablet-portrait detail pane
-// at 544 px container also gets stacked rows.
-//
-// V1 mechanism: `onLayout` measures the wrapper's width and toggles
-// the layout. First-paint uses `useTier()` as a fallback estimate
-// so most setups (phone-tier on phone, desktop-tier in desktop
-// window) start in their final shape. The one-frame mismatch case
-// is "tablet-tier viewport with a narrow detail pane" — that's
-// what the explicit `stacked` prop is for. NativeWind 4 has web
-// container-query class support but not on native; staying with
-// the measurement hook keeps web + native on the same mechanism.
 export function FormRow({
   label,
   hint,
@@ -72,9 +58,6 @@ export function FormRow({
     stackedOverride ??
     (containerWidth != null ? containerWidth < NARROW_THRESHOLD_PX : initialTier !== 'desktop')
 
-  // Tablet-narrow band (640 ≤ container < 1024) gets the 120 px
-  // label column; desktop-wide (≥ 1024) gets 180 px. Spec calls
-  // these out as the existing preferences-pane proportions.
   const labelColumnPx =
     containerWidth != null && containerWidth >= 1024 ? WIDE_LABEL_COLUMN_PX : NARROW_LABEL_COLUMN_PX
 

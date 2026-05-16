@@ -24,9 +24,6 @@ export function CollisionListRow({ row, collision }: CollisionListRowProps) {
         accessibilityRole="alert"
         accessibilityLabel="Collision warning"
         className={cn(
-          // Translucent warn fill via absolute overlay — matches
-          // `components/compounds/save-bar.tsx:116`. Direct
-          // bg-warning is too saturated for this surface.
           'relative flex-row items-center gap-3 overflow-hidden border-l-[3px] border-warning px-row-x-md py-row-y-sm',
         )}
       >

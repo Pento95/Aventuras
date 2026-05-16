@@ -10,22 +10,8 @@ import { Text } from '@/components/ui/text'
 import { useTier } from '@/hooks/use-tier'
 import { cn } from '@/lib/utils'
 
-// Container threshold for the desktop-vs-narrow layout switch. Per
-// `docs/ui/patterns/toolbar.md → Cross-tier overflow rule`. Same dual
-// mechanism as FormRow: `onLayout` measurement on the wrapper plus
-// `useTier()` as the first-paint fallback. Keeps web + native on a
-// single mechanism (NativeWind 4 has web container queries but not
-// native, and the consumer surfaces aren't deeply nested enough to
-// need separate rules per platform).
+// Container threshold for the desktop-vs-narrow layout switch.
 const NARROW_THRESHOLD_PX = 1024
-
-// ──────────────────────────────────────────────────────────────────
-// Toolbar.Search — wraps the search-bar-scope pattern. Input with
-// leading magnifier + trailing ⓘ help-popover that shows the
-// searchable fields. Popover on every tier — Sheet would be overkill
-// for an info-tooltip-shaped affordance (no decision to make, no list
-// to scroll, just a few fields to glance at).
-// ──────────────────────────────────────────────────────────────────
 
 type ToolbarSearchProps = {
   value: string
@@ -119,11 +105,6 @@ function ToolbarSearch({
   return input
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Toolbar.FilterChips — pure layout container for Chip children.
-// Wrap-capable; selection semantics are host concern.
-// ──────────────────────────────────────────────────────────────────
-
 type ToolbarFilterChipsProps = {
   className?: string
   children: React.ReactNode
@@ -132,11 +113,6 @@ type ToolbarFilterChipsProps = {
 function ToolbarFilterChips({ className, children }: ToolbarFilterChipsProps) {
   return <View className={cn('flex-row flex-wrap items-center gap-2', className)}>{children}</View>
 }
-
-// ──────────────────────────────────────────────────────────────────
-// Toolbar.Sort — Select forced to dropdown mode. Trigger renders
-// compact `Sort: <selected.label> ▾` (or bare value when no label).
-// ──────────────────────────────────────────────────────────────────
 
 type ToolbarSortProps = {
   value: string
@@ -185,12 +161,6 @@ function ToolbarSort({ value, onChange, options, label, disabled, className }: T
   )
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Toolbar — bar wrapper. Iterates children, type-checks against
-// sub-component identity, places each in its slot, applies the
-// cross-tier overflow rule.
-// ──────────────────────────────────────────────────────────────────
-
 type ToolbarProps = {
   className?: string
   children: React.ReactNode
@@ -230,12 +200,6 @@ function ToolbarRoot({ className, children }: ToolbarProps) {
         <View className="gap-2">
           {searchSlot}
           {(chipsSlot != null || sortSlot != null) && (
-            // Narrow-tier bottom row: chip children (extracted from
-            // the FilterChips slot) and sort flow as siblings in a
-            // single flex-wrap row. Left-aligned in entry order so
-            // they read as one visual group — earlier `ml-auto` on
-            // sort looked disconnected when chips fit on one line
-            // and sort dropped to its own.
             <View className="flex-row flex-wrap items-center gap-2">
               {(chipsSlot as React.ReactElement<{ children?: React.ReactNode }> | null)?.props
                 .children ?? null}
@@ -263,4 +227,4 @@ const Toolbar = Object.assign(ToolbarRoot, {
 })
 
 export { Toolbar }
-export type { ToolbarSearchProps, ToolbarFilterChipsProps, ToolbarSortProps }
+export type { ToolbarFilterChipsProps, ToolbarSearchProps, ToolbarSortProps }

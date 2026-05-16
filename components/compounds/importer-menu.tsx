@@ -48,25 +48,6 @@ type ImporterMenuProps = {
   className?: string
 }
 
-// ImporterMenu — trigger button + popover menu of import options.
-// Spec context: docs/ui/patterns/data.md → Import counterparts.
-//
-// **Scope: menu shell only.** This compound owns the visual + a11y
-// shape of the affordance (button-with-chevron, popover-anchored
-// menu, label / description / disabled-reason per option). It does
-// NOT own the actions themselves: file pickers, paste handlers,
-// schema validation, Vault dispatch, and the rest of the import
-// pipeline are caller-supplied via each option's `onPress`. A
-// fuller `Importer` wrapper that integrates those pieces is deferred
-// — the surfaces that need it (per-row World/Plot, calendar add,
-// story import) all want different action sets, so a single
-// "everything-included" compound would be premature.
-//
-// Common option set for entity-style per-row imports:
-//   `[{ key: 'blank',  label: 'Blank',           onPress: openBlankForm },
-//     { key: 'json',   label: 'From JSON file…', onPress: openFilePicker },
-//     { key: 'vault',  label: 'From Vault…',     disabled: true,
-//       disabledReason: 'Vault library coming later.' }]`
 export function ImporterMenu({
   label,
   options,
@@ -75,10 +56,6 @@ export function ImporterMenu({
   disabled,
   className,
 }: ImporterMenuProps) {
-  // @rn-primitives/popover's Root is uncontrolled — there's no
-  // `open` prop, only an `onOpenChange` callback. The Trigger's
-  // imperative ref exposes `close()` which is how we dismiss the
-  // menu after an option fires.
   const triggerRef = React.useRef<React.ComponentRef<typeof PopoverTrigger>>(null)
 
   return (
@@ -126,16 +103,8 @@ function ImporterMenuItem({
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
       onPress={onSelect}
-      // Inline pointerEvents per the project's rn-primitives gap
-      // memo: rn-primitives wrappers don't fully gate disabled
-      // clicks on web; the inline style is the reliable bypass.
       style={isDisabled ? { pointerEvents: 'none' } : undefined}
       className={cn(
-        // Density-aware paddings + a `min-h` floor that lifts to
-        // the touch-target tier (`control-h-lg` ≥ 44 px) on phone,
-        // mirroring the Autocomplete suggestion-row pattern. The
-        // padding tokens flex with the global density toggle so
-        // compact / regular / comfortable settings all read right.
         'justify-center rounded-sm px-row-x-md py-row-y-md',
         isPhone ? 'min-h-control-lg' : 'min-h-control-md',
         !isDisabled &&
@@ -157,9 +126,6 @@ function ImporterMenuItem({
     </Pressable>
   )
 
-  // Web tooltip via raw div + `title` attr — same pattern IconAction
-  // uses (RN-Web `<View>`/`<Pressable>` filter unknown HTML attrs,
-  // so the prop never reaches the DOM).
   if (isDisabled && option.disabledReason && Platform.OS === 'web') {
     return (
       <div title={option.disabledReason} style={{ display: 'flex' }}>

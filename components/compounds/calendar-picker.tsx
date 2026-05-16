@@ -104,29 +104,6 @@ type CalendarPickerProps = {
   className?: string
 }
 
-// CalendarPicker — picker dropdown + summary panel. Spec:
-// docs/ui/patterns/calendar-picker.md.
-//
-// Sits on top of the Select primitive's `dropdown` mode using its
-// `renderTrigger` / `renderRow` / `tailAction` extension points.
-// That keeps Select-shaped behaviors (tier-adapted Popover↔Sheet
-// dispatch, keyboard navigation, focus management, accessibility
-// semantics) intact while letting us surface the calendar-specific
-// chrome — name + type chip in the trigger, two-line rows with
-// chips and tier-paths, the `Manage calendars in Vault →` tail.
-//
-// **Scope.** Renders the picker control + the summary panel as one
-// cohesive compound. Per-host wrapper differences (framing copy,
-// outer layout, swap-warning AlertDialog) live with each host's
-// surface; the swap-warning modal is a Story-Settings-specific
-// composition that lives outside this compound (followup: dedicated
-// CalendarSwapDialog using AlertDialog when surface lands).
-//
-// **Disabled gate.** `disabled` covers both the picker trigger and
-// the Edit action. The summary block itself remains visible —
-// edit-restrictions principle says read-only inspection is allowed
-// even while generation is in flight; only mutating affordances
-// disable.
 export function CalendarPicker({
   options,
   selectedId,
@@ -167,13 +144,6 @@ export function CalendarPicker({
 
   const select = (
     <Select
-      // `w-full` on the trigger: when the picker sits inside the
-      // disabled-state wrapper `<div>` (display:flex row), Radix /
-      // RN-Web's intermediate wrappers don't propagate stretch on
-      // the inline-axis. Force the trigger full-width directly.
-      // Note: `className` only flows to the trigger inside Select's
-      // `DropdownBranch`; it does NOT thread to Sheet / Popover
-      // content.
       className="w-full"
       options={selectOptions}
       value={selectedId}
@@ -204,12 +174,6 @@ export function CalendarPicker({
         style={stacked ? undefined : { width: 320 }}
       >
         {disabled && disabledReason && Platform.OS === 'web' ? (
-          // Block-level wrapper (no `display: flex`): `display: flex`
-          // with a default `flex-direction: row` makes inner Root
-          // shrink to its content width since flex items don't
-          // stretch on the inline-axis. Plain block + width 100%
-          // lets RN-Web's Root (a View, block-level flex column)
-          // fill the wrapper's width naturally.
           <div title={disabledReason} style={{ width: '100%' }}>
             {select}
           </div>
@@ -406,4 +370,4 @@ function EditAction({
   return button
 }
 
-export type { CalendarOption, CalendarSummaryData, CalendarSummaryTier, CalendarPickerProps }
+export type { CalendarOption, CalendarPickerProps, CalendarSummaryData, CalendarSummaryTier }
