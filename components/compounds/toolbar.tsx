@@ -156,16 +156,8 @@ function ToolbarSort({ value, onChange, options, label, disabled, className }: T
       value={value}
       onValueChange={onChange}
       disabled={disabled}
-      // Trigger height matched to chip-row height for visual grouping
-      // with the filter chips. Select's default `h-control-md` (40 px)
-      // dwarfs chips' natural ~34 px. Native Tailwind `h-9` (36 px)
-      // gets within 2 px of Chip's natural height — closest match
-      // available without a Chip-primitive change. Used directly
-      // because `h-control-sm` is a custom token tailwind-merge
-      // doesn't recognize as conflicting with `h-control-md`. The
-      // residual 2 px gap is a Chip-primitive inconsistency, not
-      // Toolbar-fixable; tracked as a followup.
-      className={cn('h-9', className)}
+      size="xs"
+      className={className}
       // The `label` prop also drives the phone Sheet title — gives
       // the bottom-sheet a meaningful header when sorting on phone.
       label={label}

@@ -61,12 +61,18 @@ function Value({
   )
 }
 
-type TriggerSize = 'default' | 'sm'
+type TriggerSize = 'xs' | 'sm' | 'md'
+
+const TRIGGER_SIZE_HEIGHT: Record<TriggerSize, string> = {
+  xs: 'h-control-xs',
+  sm: 'h-control-sm',
+  md: 'h-control-md',
+}
 
 function Trigger({
   className,
   children,
-  size = 'default',
+  size = 'md',
   ...props
 }: React.ComponentProps<typeof SelectBase.Trigger> & {
   children?: React.ReactNode
@@ -75,11 +81,11 @@ function Trigger({
   return (
     <SelectBase.Trigger
       className={cn(
-        'flex h-control-md flex-row items-center justify-between gap-2 rounded-md border border-border bg-bg-base px-3 active:bg-tint-hover',
+        'flex flex-row items-center justify-between gap-2 rounded-md border border-border bg-bg-base px-3 active:bg-tint-hover',
+        TRIGGER_SIZE_HEIGHT[size],
         Platform.select({
           web: 'whitespace-nowrap outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-focus-ring [&_svg]:pointer-events-none [&_svg]:shrink-0',
         }),
-        size === 'sm' && 'h-control-sm',
         props.disabled && 'opacity-50',
         className,
       )}
@@ -591,6 +597,16 @@ export type SelectProps = {
   className?: string
 
   /**
+   * Trigger height tier — `'xs'` (`h-control-xs`, dense chrome),
+   * `'sm'` (`h-control-sm`, compact form), or `'md'` (`h-control-md`,
+   * default form row). Only affects the trigger button on every
+   * tier; Sheet sizing on phone is unaffected (driven by option
+   * count via `sheetSize`). Ignored for `segment` and `radio` modes
+   * — those render their own non-trigger surfaces.
+   */
+  size?: TriggerSize
+
+  /**
    * Custom row renderer for `dropdown` mode. When provided, replaces
    * the default `<ItemText />` rendering for each option — used by
    * compounds (e.g. `CalendarPicker`) that need rich two-line rows
@@ -768,6 +784,7 @@ function DropdownBranch({
   placeholder,
   label,
   className,
+  size,
   renderRow,
   renderTrigger,
   tailAction,
@@ -783,7 +800,7 @@ function DropdownBranch({
       }}
       disabled={disabled}
     >
-      <Trigger className={className} disabled={disabled}>
+      <Trigger className={className} disabled={disabled} size={size}>
         {renderTrigger != null ? (
           renderTrigger({ selected, placeholder })
         ) : (
