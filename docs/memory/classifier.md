@@ -29,6 +29,29 @@ declaration values.
   [`data-model.md → World-state storage`](../data-model.md#world-state-storage)
   remains intact).
 
+## ID handling in classifier output
+
+References to existing entities in the classifier's structured
+output are **placeholders** (`c1`, `l1`, `hp1`, …), not the
+underlying `char_<uuid>` / `loc_<uuid>` / etc. forms — the
+substitution layer swaps both directions
+(see [`generation-pipeline.md → ID placeholder substitution`](../generation-pipeline.md#id-placeholder-substitution)).
+The placeholder universe shown to the classifier covers entities
+in the prompt's structured entity/lore/happening lists.
+
+When the classifier creates a brand-new entity, it emits the
+entity as a **full object with no `id` field** — name, description,
+state fields, etc. Parse allocates a fresh `char_<uuid>` (or other
+kind-appropriate prefix) and registers it in the idMap if subsequent
+output references it. Any subsequent reference in the same response
+uses a temporary handle the LLM picks; parse maps the temporary
+handle to the newly-allocated UUID.
+
+This separation keeps the LLM's surface area small (no UUID
+copying) while preserving the existing disambiguation flow below
+unchanged — name-match + embedding-similarity work on prose +
+embeddings regardless of how identity is rendered to the model.
+
 ## Embedding compute boundary
 
 The classifier emits rows and embeds them in the same transaction —

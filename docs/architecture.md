@@ -43,6 +43,16 @@ read them.
 - **No prop-drilling between phases or templates.** Phases read via
   `useGenerationStore.getState().getPerTurnContext()` (or the kind's
   matching getter); templates render against that output.
+- **`entity.id` exposed to templates is the placeholder, not the
+  UUID.** Per
+  [`data-model.md → ID shape`](./data-model.md#id-shape--kind-prefixed-uuids-throughout)
+  and
+  [`generation-pipeline.md → ID placeholder substitution`](./generation-pipeline.md#id-placeholder-substitution),
+  the substitution layer swaps prefix-tagged UUIDs for short
+  placeholders (`c1`, `l1`, `lo1`, …) at context-construction time
+  — before Liquid renders. Pack authors writing
+  `{{ entity.id }}` always get the placeholder; the UUID is never
+  exposed to template-rendering code.
 
 ### Formatting lives in Liquid, not in the context builder
 

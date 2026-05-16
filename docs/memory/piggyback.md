@@ -24,26 +24,34 @@ scene-presence deltas.
 
 A tagged block at the END of the narrative output, not interleaved.
 Tagging beats raw JSON for parse robustness across models that don't
-have a strict structured-output mode. Reference shape:
+have a strict structured-output mode. Reference shape — IDs in the
+emission are **placeholders**, not the underlying UUIDs (the
+substitution layer swaps both directions; see
+[`generation-pipeline.md → ID placeholder substitution`](../generation-pipeline.md#id-placeholder-substitution)):
 
 ```xml
 <state>
-  <scene_entities>ent_aria, ent_kael</scene_entities>
-  <current_location>loc_marshes</current_location>
+  <scene_entities>c1, c2</scene_entities>
+  <current_location>l1</current_location>
   <world_time_delta>120</world_time_delta>
   <visual_changes>
-    <entity id="ent_kael">attire: cloak now muddied to the waist</entity>
+    <entity id="c2">attire: cloak now muddied to the waist</entity>
   </visual_changes>
   <transfers>
-    <entity id="ent_aria">+ amulet (from ent_jorin)</entity>
+    <entity id="c1">+ amulet (from c3)</entity>
   </transfers>
   <summary>Aria pushed into the marshes; met an exiled noble who recognized House Eldrin's sigil.</summary>
 </state>
 ```
 
-The exact format firms up at implementation; the principle is
-"tagged-block alongside prose, parsed best-effort, code-template
-fallback per field on parse failure."
+`c1`, `c2`, `c3` are placeholders for characters; `l1` for the
+location. The prompt's structured entity list maps each placeholder
+to a name in the LLM's view; the LLM emits the placeholder
+verbatim, and parse swaps it back to the underlying `char_<uuid>` /
+`loc_<uuid>` before the action layer fires. The exact tagged
+format firms up at implementation; the principle is "tagged-block
+alongside prose, parsed best-effort, code-template fallback per
+field on parse failure."
 
 ## jsonrepair fallback
 

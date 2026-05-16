@@ -281,6 +281,111 @@ erDiagram
 
 _Each subsection captures a design choice and why we made it. Fill in as we go._
 
+### ID shape — kind-prefixed UUIDs throughout
+
+Every database identifier is stored as **`{kind-prefix}_{uuid}`** —
+the prefix is part of the ID string, not just a column-level
+convention. Stripe-style. Applies universally across the data
+model:
+
+#### LLM-facing kinds (substituted to short placeholders at prompt build)
+
+| Kind             | ID prefix |
+| ---------------- | --------- |
+| Character entity | `char_`   |
+| Location entity  | `loc_`    |
+| Item entity      | `item_`   |
+| Faction entity   | `fact_`   |
+| Lore             | `lore_`   |
+| Thread           | `thr_`    |
+| Happening        | `hap_`    |
+| Chapter          | `chap_`   |
+
+`entities` is one table with `kind` as discriminator; the ID
+prefix matches the kind. The prefix is redundant with the column
+in storage but load-bearing for the placeholder substitution layer
+(see below), so the prefix authoritatively encodes kind.
+
+#### Non-LLM-facing kinds (never substituted)
+
+| Concept                        | ID prefix |
+| ------------------------------ | --------- |
+| Story                          | `story_`  |
+| Branch                         | `br_`     |
+| Story entry                    | `entry_`  |
+| Action (delta grouping)        | `act_`    |
+| Pipeline run                   | `run_`    |
+| Provider profile               | `prof_`   |
+| Model profile                  | `mod_`    |
+| Provider                       | `prov_`   |
+| Pack                           | `pack_`   |
+| Calendar definition            | `cal_`    |
+| Entry asset                    | `ast_`    |
+| Translation (singular PK case) | `tr_`     |
+
+External IDs (provider responses from OpenAI / Anthropic / etc.)
+keep their native format unchanged — only IDs that originate inside
+the app are prefixed. Composite PKs (awareness rows, involvements,
+translation lookups keyed by tuple) don't have a single ID to
+prefix.
+
+#### Generation
+
+```ts
+const generateCharacterId = (): CharacterId => `char_${crypto.randomUUID()}` as CharacterId
+
+// ... one helper per kind. Branded template-literal types:
+type CharacterId = `char_${string}`
+type LocationId = `loc_${string}`
+type LoreId = `lore_${string}`
+// ... etc.
+```
+
+The brand is compile-time only; at runtime the value is a plain
+string with the prefix.
+
+#### Why prefix universally
+
+- **Grep-friendliness everywhere.** Any ID in a SQL query, log
+  line, or error message reveals its kind without lookup.
+- **Generic placeholder substitution.** The substitution walker
+  recognizes LLM-facing IDs by their prefix-pattern alone — no
+  per-context-kind code, no Zod schema introspection, no
+  hand-maintained UUID-field registry. Storage uniformity makes the
+  pattern-based walker bulletproof.
+- **Stripe precedent.** Well-trodden convention; easy to onboard
+  contributors familiar with it.
+
+#### Why prefix-tagged UUIDs over sequential prefix IDs
+
+Earlier consideration: store IDs as `char_3`, `loc_5` (sequential
+counter, no UUID) so the LLM can copy them reliably. Rejected
+because: per-story counter coordination, branch-counter
+interaction, Vault-import renumbering with FK rewriting, and
+never-reuse-after-delete tracking all become real concerns. The
+prefix-tagged UUID model decouples LLM-side handling from storage
+— see [Placeholder substitution](#placeholder-substitution-llm-facing-handles)
+below.
+
+#### Placeholder substitution (LLM-facing handles)
+
+The LLM never sees prefix-tagged UUIDs in prompts. A substitution
+layer in the generation pipeline (per
+[`generation-pipeline.md → Run-scoped state`](./generation-pipeline.md#run-scoped-state--intermediates-and-per-kind-contexts))
+walks the assembled context before each LLM call, swapping
+UUIDs for short placeholders (`c1`, `c2`, `l1`, …) drawn from a
+per-kind counter scoped to the current LLM call. The map is
+discarded at run end.
+
+Vault import implications:
+
+- Importing a character template into story X: allocate a fresh
+  `char_<uuid>` for the import, or keep the original — both are
+  fine (UUID collision is astronomically improbable). Lean fresh
+  allocation so identity is always local to a story.
+- No FK rewriting elsewhere — nothing carries cross-story
+  references; everything is one story scope.
+
 ### Checkpoint model
 
 **Decided:** no first-class "checkpoint" concept. The old app used checkpoints

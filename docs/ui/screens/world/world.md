@@ -675,8 +675,8 @@ destructive direction obvious.
 Body is a single inline rename form, two rows stacked:
 
 ```
-ent_kael_1 (older, 12 turns ago):  [ Kael                       ]
-ent_kael_2 (newer, this turn):     [ Kael (the guardsman)       ]
+char_a1b2c3… (older, 12 turns ago):  [ Kael                       ]
+char_d4e5f6… (newer, this turn):     [ Kael (the guardsman)       ]
 ```
 
 Editing either field dirties the form. Save commits both rows

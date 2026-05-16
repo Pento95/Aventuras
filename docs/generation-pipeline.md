@@ -218,6 +218,148 @@ translating (intermediate), AND each change dispatches through the
 action layer (deltas). Persistent state ends up in SQLite via the
 action layer; the scratchpad copy lets later phases avoid diffing.
 
+### ID placeholder substitution
+
+Entity IDs are stored as prefix-tagged UUIDs (`char_<uuid>`,
+`loc_<uuid>`, etc. — see
+[`data-model.md → ID shape`](./data-model.md#id-shape--kind-prefixed-uuids-throughout)).
+The LLM never sees these directly. Before any LLM call that emits
+structured references to entities (per-turn narrative + piggyback,
+periodic classifier, wizard opening-generation, chapter-close
+phases), the substitution layer swaps UUIDs for short placeholders.
+
+**Contract:** prose never carries IDs — only character names.
+Structured emission (piggyback tagged block, classifier JSON output)
+carries placeholders.
+
+#### idMap on the context
+
+```ts
+type PerTurnContext = BaseContext & {
+  inputs: PerTurnInputs
+  intermediates: {
+    retrievalResult?: ...
+    narrativeResult?: ...
+    classificationResult?: ...
+    translationResult?: ...
+    idMap?: IdBiMap          // populated before LLM call, consumed on parse
+  }
+}
+```
+
+Every context type whose consumer LLM call emits entity-ID
+references carries an `idMap` field on its intermediates.
+Translation context doesn't — translation is prose-in/prose-out.
+
+#### Walker — generic, pattern-driven
+
+```ts
+const SUBSTITUTABLE_PREFIXES = [
+  'char',
+  'loc',
+  'item',
+  'fact',
+  'lore',
+  'thr',
+  'hap',
+  'chap',
+] as const
+const ID_PATTERN = new RegExp(
+  `^(${SUBSTITUTABLE_PREFIXES.join('|')})_` +
+    `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+)
+
+function substituteIds<T>(value: T, idMap: IdBiMap): T {
+  if (typeof value === 'string' && ID_PATTERN.test(value)) {
+    return (idMap.getPlaceholderFor(value) ?? idMap.allocate(value)) as T
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => substituteIds(v, idMap)) as T
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, substituteIds(v, idMap)]),
+    ) as T
+  }
+  return value
+}
+```
+
+The walker is type-agnostic — recursive descent, pattern-matches
+any string against the LLM-facing-prefix UUID pattern, swaps where
+it matches. Non-LLM-facing IDs (`entry_*`, `act_*`, `run_*`) don't
+match and pass through unchanged.
+
+#### IdBiMap
+
+```ts
+class IdBiMap {
+  private uuidToPlaceholder = new Map<string, string>()
+  private placeholderToUuid = new Map<string, string>()
+  private counters: Record<string, number> = {}
+
+  allocate(uuid: string): string {
+    const existing = this.uuidToPlaceholder.get(uuid)
+    if (existing) return existing
+    const kindPrefix = uuid.split('_')[0]
+    const placeholderPrefix = PLACEHOLDER_PREFIX_BY_KIND[kindPrefix]
+    const n = (this.counters[placeholderPrefix] ?? 0) + 1
+    this.counters[placeholderPrefix] = n
+    const placeholder = `${placeholderPrefix}${n}`
+    this.uuidToPlaceholder.set(uuid, placeholder)
+    this.placeholderToUuid.set(placeholder, uuid)
+    return placeholder
+  }
+
+  getPlaceholderFor(uuid: string): string | undefined { ... }
+  getUuidFor(placeholder: string): string | undefined { ... }
+}
+
+const PLACEHOLDER_PREFIX_BY_KIND = {
+  char: 'c',  loc: 'l',   item: 'i',  fact: 'f',
+  lore: 'lo', thr: 'th',  hap: 'hp', chap: 'ck',
+}
+```
+
+Placeholders look like `c1`, `c2`, `l1`, `lo1`, `ck1`, etc. — one
+character (for entities) or two characters (for the rest) plus a
+per-kind counter. Counter is scoped to the idMap, which is scoped
+to a single LLM call.
+
+#### Lifecycle
+
+```
+1. Retrieval / context assembly produces context with UUIDs
+2. substituteIds(context, idMap) walks recursively, swaps UUIDs → placeholders
+3. Liquid templates render against placeholder-bearing context
+   — pack authors read `entity.id` and get the placeholder
+4. LLM call streams; emits placeholders in structured output (names in prose)
+5. parseAndSubstitute(rawOutput, idMap) — reverse swap
+6. Action layer receives UUIDs as it always does
+```
+
+Substitution is **structured (data-side, pre-render)** — not regex
+post-processing on the rendered prompt string. Template-author API
+exposes `entity.id = placeholder` cleanly; UUID is never visible to
+template-rendering code.
+
+#### New-entity emission
+
+The classifier (or piggyback) creating a brand-new entity emits a
+full object — name, description, etc. — with **no `id` field**.
+Parse allocates the UUID. If the same response references the new
+entity again (e.g., new char appears in `<scene_entities>` AND in
+`<visual_changes>`), the LLM emits a temporary handle of its own
+choosing for the second reference; parse-time map mutates to
+register the temporary handle → UUID mapping.
+
+#### Failure modes
+
+Any unrecognized or malformed placeholder in LLM output → single
+recoverable error class. Phase yields `recoverable_error`; the
+retry tier handles it. Bare UUID emission from the LLM is a prompt
+bug, not a runtime case to handle.
+
 ### Writes
 
 **Directly to:** generation-store intermediates (scratchpad).
