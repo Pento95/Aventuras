@@ -197,7 +197,7 @@ AvatarFallback` exports stay available for custom layouts.
   `bg-base` (cyberpunk, fallen-down, parchment, catppuccin-latte);
   `bg-fg-muted` (Switch's off-track slot) is visible everywhere
   but takes on theme tint where `fg-muted` is colored rather than
-  achromatic — Royal goes purple, Aventuras Signature goes gold,
+  achromatic — Royal goes purple, Aventuras goes gold,
   Parchment goes brown — too prominent for a large avatar circle.
   `border-border` is calibrated by the registry to be visible
   against `bg-base` in every theme (it's the separator slot), so

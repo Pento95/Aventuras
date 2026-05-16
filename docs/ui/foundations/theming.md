@@ -76,7 +76,7 @@ The two surfaces map intuitively:
   Their identity is the name; localization would damage
   recognition.
 - **Descriptive themes** — Default Light, Default Dark, Parchment,
-  Aventuras Signature — declare `nameKey` (e.g.
+  Aventuras — declare `nameKey` (e.g.
   `'foundations.themes.defaultLight'`) so i18next can localize.
 
 The full `nameKey` policy across the curated gallery is canonical

@@ -325,8 +325,8 @@ export const themes: readonly Theme[] = [
     },
   },
   {
-    id: 'aventuras-signature',
-    name: 'Aventuras Signature',
+    id: 'aventuras',
+    name: 'Aventuras',
     mode: 'dark',
     accentOverridable: false,
     colors: {

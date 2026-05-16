@@ -179,7 +179,7 @@ contract.
    Cyberpunk (neon palette, color-only port — animated CRT effects
    dropped per the flat depth metaphor), Fallen Down (pure-black +
    neon yellow + monospace prose; bundled VT323 font dropped),
-   and Aventuras Signature (deep navy + warm cream, keyed to the
+   and Aventuras (deep navy + warm cream, keyed to the
    app icon — two-color identity, paired inverse with Parchment).
    First-launch default `themeId: 'default-light'`. Per-theme
    slot values + audit expectations canonical at

@@ -15,18 +15,18 @@ fantasy, stark-aesthetic, and a brand-keyed signature.
 
 ## Gallery roster
 
-| #   | id                    | name                | mode  | family     | source                     | accent-overridable |
-| --- | --------------------- | ------------------- | ----- | ---------- | -------------------------- | ------------------ |
-| 1   | `default-light`       | Default Light       | light | Default    | original                   | **yes**            |
-| 2   | `default-dark`        | Default Dark        | dark  | Default    | original                   | **yes**            |
-| 3   | `parchment`           | Parchment           | light | —          | original                   | no                 |
-| 4   | `catppuccin-latte`    | Catppuccin Latte    | light | Catppuccin | established                | no                 |
-| 5   | `catppuccin-mocha`    | Catppuccin Mocha    | dark  | Catppuccin | established                | no                 |
-| 6   | `tokyo-night`         | Tokyo Night         | dark  | —          | established                | no                 |
-| 7   | `royal`               | Royal               | dark  | —          | original                   | no                 |
-| 8   | `cyberpunk`           | Cyberpunk           | dark  | —          | original (color-only port) | no                 |
-| 9   | `fallen-down`         | Fallen Down         | dark  | —          | original (port)            | no                 |
-| 10  | `aventuras-signature` | Aventuras Signature | dark  | —          | original (icon-keyed)      | no                 |
+| #   | id                 | name             | mode  | family     | source                     | accent-overridable |
+| --- | ------------------ | ---------------- | ----- | ---------- | -------------------------- | ------------------ |
+| 1   | `default-light`    | Default Light    | light | Default    | original                   | **yes**            |
+| 2   | `default-dark`     | Default Dark     | dark  | Default    | original                   | **yes**            |
+| 3   | `parchment`        | Parchment        | light | —          | original                   | no                 |
+| 4   | `catppuccin-latte` | Catppuccin Latte | light | Catppuccin | established                | no                 |
+| 5   | `catppuccin-mocha` | Catppuccin Mocha | dark  | Catppuccin | established                | no                 |
+| 6   | `tokyo-night`      | Tokyo Night      | dark  | —          | established                | no                 |
+| 7   | `royal`            | Royal            | dark  | —          | original                   | no                 |
+| 8   | `cyberpunk`        | Cyberpunk        | dark  | —          | original (color-only port) | no                 |
+| 9   | `fallen-down`      | Fallen Down      | dark  | —          | original (port)            | no                 |
+| 10  | `aventuras`        | Aventuras        | dark  | —          | original (icon-keyed)      | no                 |
 
 ### First-launch default
 
@@ -55,7 +55,7 @@ density tokens + resolution mechanism.
 Per [`theming.md → Translation of theme names`](./theming.md#translation-of-theme-names):
 
 - **Declare `nameKey`** — Default Light, Default Dark, Parchment,
-  Aventuras Signature.
+  Aventuras.
 - **Omit `nameKey`** — Catppuccin Latte, Catppuccin Mocha, Tokyo
   Night, Royal, Cyberpunk, Fallen Down (proper-noun identities;
   localization damages recognition).
@@ -214,7 +214,7 @@ default-accent derivation pairs clear AA across the sample set.
 Warm cream paper canvas, deep ink-brown text, russet accent.
 Reads as hand-pressed paper + dip-pen ink. Pinned serif (Charter /
 Iowan / Source Serif at the top of the stack — system serifs
-that look most like print). Pairs with Aventuras Signature as
+that look most like print). Pairs with Aventuras as
 inverted partners (same warm-cream + deep palette, swapped
 modes).
 
@@ -537,10 +537,10 @@ is also not preserved per session-4's structurally-locked radii.
 
 ---
 
-## 10. Aventuras Signature
+## 10. Aventuras
 
-`id: 'aventuras-signature'` · dark · opinionated ·
-`nameKey: 'foundations.themes.aventurasSignature'`
+`id: 'aventuras'` · dark · opinionated ·
+`nameKey: 'foundations.themes.aventuras'`
 
 The brand statement. Deep navy canvas keyed to the [app icon's](../../../assets/images/icon.png)
 background hue; warm cream foreground keyed to the icon's mark

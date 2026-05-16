@@ -396,7 +396,7 @@
       monospace;
   }
 
-  [data-theme='aventuras-signature'] {
+  [data-theme='aventuras'] {
     --tint-hover: color-mix(in srgb, var(--fg-primary) 8%, transparent);
     --tint-press: color-mix(in srgb, var(--fg-primary) 14%, transparent);
     --bg-base: #0e2240;
