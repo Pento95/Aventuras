@@ -30,6 +30,8 @@ erDiagram
     happenings ||--o{ happening_awareness : "known by"
     entities ||--o{ happening_involvements : "participates in"
     entities ||--o{ happening_awareness : "aware of"
+    branches ||--o{ character_relationships : "owns snapshot of"
+    entities ||--o{ character_relationships : "linked in (a or b)"
 
     stories {
         text id PK
@@ -148,6 +150,20 @@ erDiagram
     }
     %% UNIQUE(branch_id, character_id, happening_id) — upsert semantics in classifier and user-edit paths; duplicates can't accumulate at the DB level
 
+    character_relationships {
+        text id PK "rel_${uuid}; needed as delta + translation target"
+        text branch_id FK "composite PK with id; relationships fork with branches"
+        text a_id FK "entity where kind=character; canonical-ordered (a_id < b_id)"
+        text b_id FK "entity where kind=character"
+        text kind "a's view of b — free-form LLM/user-authored; nullable until that POV is observed"
+        text inverse_kind "b's view of a — free-form; nullable until that POV is observed"
+        integer created_at
+        integer updated_at
+    }
+    %% CHECK (a_id < b_id) — canonical ordering invariant, enforced at write time + as DB backstop
+    %% CHECK (kind IS NOT NULL OR inverse_kind IS NOT NULL) — at least one POV must be known; UI delete = both nulled = row removed
+    %% UNIQUE(branch_id, a_id, b_id) — one row per pair per branch; gives clean UPSERT semantics in classifier and user-edit paths
+
     chapters {
         text id PK
         text branch_id FK
@@ -193,9 +209,9 @@ erDiagram
     translations {
         text id PK
         text branch_id FK "composite PK with id; translations fork with branches"
-        text target_kind "entity | lore | thread | happening | story_entry"
+        text target_kind "entity | lore | thread | happening | story_entry | character_relationship"
         text target_id "id in the target table; polymorphic FK (no DB constraint)"
-        text field "which field of the target row is translated (name, description, body, title, content, etc.); supports dotted paths into state JSON"
+        text field "which field of the target row is translated (name, description, body, title, content, kind, inverse_kind, etc.); supports dotted paths into state JSON"
         text language "ISO 639-1 code (en, es, ja, ...)"
         text translated_text
         integer created_at
@@ -240,7 +256,7 @@ erDiagram
         text action_id "groups deltas into one user-visible action (used for CTRL-Z batching)"
         integer log_position "append-only ordering within branch"
         text source "ai_classifier | user_edit | lore_agent | chapter_close"
-        text target_table "story_entries | entities | lore | threads | happenings | happening_involvements | happening_awareness | chapters | entry_assets | translations | branch_era_flips"
+        text target_table "story_entries | entities | lore | threads | happenings | happening_involvements | happening_awareness | character_relationships | chapters | entry_assets | translations | branch_era_flips"
         text target_id "id in target_table"
         text op "create | update | delete"
         json undo_payload "op=create: null; op=update: partial diff of changed fields with their PRE-change values; op=delete: full row to re-insert"
@@ -322,6 +338,7 @@ in storage but load-bearing for the placeholder substitution layer
 | Calendar definition            | `cal_`    |
 | Entry asset                    | `ast_`    |
 | Translation (singular PK case) | `tr_`     |
+| Character relationship         | `rel_`    |
 
 External IDs (provider responses from OpenAI / Anthropic / etc.)
 keep their native format unchanged — only IDs that originate inside
@@ -697,8 +714,163 @@ faction's dynamic-state slot (parallel to LocationState.condition);
 faction-level goals are coarser-grained than individual motivations.
 
 Member roster derives from inverse query on `character.faction_id`;
-inter-faction relationships fold into the deferred relationships-graph
-followup.
+inter-faction relationships are out of scope for v1 — only
+character-to-character relationships are modeled (see
+[Character-to-character relationships](#character-to-character-relationships)).
+
+#### Character-to-character relationships
+
+**Decided:** char→char relationships are first-class branch-scoped
+rows in a dedicated `character_relationships` table. Free-form `kind`
+text from both perspectives, accumulated over time as the classifier
+observes evidence.
+
+```sql
+CREATE TABLE character_relationships (
+  id TEXT PRIMARY KEY,             -- rel_${uuid}
+  branch_id TEXT NOT NULL,
+  a_id TEXT NOT NULL,              -- character entity; a_id < b_id (canonical)
+  b_id TEXT NOT NULL,              -- character entity
+  kind TEXT,                       -- a's view of b; nullable
+  inverse_kind TEXT,               -- b's view of a; nullable
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  CHECK (a_id < b_id),
+  CHECK (kind IS NOT NULL OR inverse_kind IS NOT NULL),
+  UNIQUE (branch_id, a_id, b_id)
+);
+CREATE INDEX idx_char_rel_branch_a ON character_relationships(branch_id, a_id);
+CREATE INDEX idx_char_rel_branch_b ON character_relationships(branch_id, b_id);
+```
+
+**One row per pair.** Symmetric AND asymmetric relationships share the
+shape — `kind`/`inverse_kind` carry the two perspectives independently
+("Aria → Kael: sister", "Kael → Aria: brother") and either may be
+null until that POV is observed. Single row keeps lookups cheap and
+gives clean UPSERT semantics.
+
+**Canonical ordering invariant: `a_id < b_id`.** Lexicographic string
+compare on the `char_${uuid}` IDs. Application write path always
+sorts `(subject, object)` from the classifier emission before insert;
+the slot the known `kind` text lands in flips per:
+
+```ts
+function normalizeForWrite(subjectId: EntityId, objectId: EntityId, kind: string) {
+  const [a_id, b_id] = subjectId < objectId ? [subjectId, objectId] : [objectId, subjectId]
+  const isSubjectA = subjectId === a_id
+  return {
+    a_id,
+    b_id,
+    kind: isSubjectA ? kind : null, // subject is a → kind = a's view of b
+    inverse_kind: isSubjectA ? null : kind, // subject is b → kind = b's view of a
+  }
+}
+```
+
+The DB-level `CHECK (a_id < b_id)` is a backstop against application
+bugs, not the primary enforcement.
+
+**UPSERT-merge across entries.** The classifier emits one perspective
+per entry. Subsequent entries that surface the inverse POV merge
+into the same row:
+
+| Entry | Classifier emits          | Row state after write                                     |
+| ----- | ------------------------- | --------------------------------------------------------- |
+| 1     | `(Kael, Aria, "sister")`  | `(a=Aria, b=Kael, kind=null, inverse_kind="sister")`      |
+| 2     | `(Aria, Kael, "brother")` | `(a=Aria, b=Kael, kind="brother", inverse_kind="sister")` |
+
+Both POVs accumulate without the classifier ever needing to know
+canonical ordering — the app's write path normalizes.
+
+**Lookup helper.** Always query both columns; normalize the
+perspective at read-time so callers see relationships from their own
+character's POV:
+
+```ts
+type RelationshipView = {
+  rowId: RelationshipId
+  otherId: EntityId
+  selfToOther: string | null // null until that POV is observed
+  otherToSelf: string | null
+}
+
+function getRelationships(characterId: EntityId, branchId: BranchId): RelationshipView[] {
+  const rows = db.select(
+    `
+    SELECT id, a_id, b_id, kind, inverse_kind
+    FROM character_relationships
+    WHERE branch_id = ? AND (a_id = ? OR b_id = ?)
+  `,
+    [branchId, characterId, characterId],
+  )
+
+  return rows.map((row) => {
+    const isA = row.a_id === characterId
+    return {
+      rowId: row.id,
+      otherId: isA ? row.b_id : row.a_id,
+      selfToOther: isA ? row.kind : row.inverse_kind,
+      otherToSelf: isA ? row.inverse_kind : row.kind,
+    }
+  })
+}
+```
+
+UI / LLM-prompt-injection paths decide how to render unknown
+perspectives ("Aria considers Kael a brother; Kael's view of Aria
+isn't recorded yet").
+
+**Authoring policy: v1 lean — classifier wins on prose evidence.**
+Both classifier and user write; classifier UPSERTs on subsequent
+contradicting prose. User edits "stick" only until classifier reads
+contradicting prose. Same policy as the rest of CharacterState (see
+the authoring matrix under
+[World-state storage](#world-state-storage)). No per-field
+provenance in v1 — the parked v1.5
+per-field work and the parked per-entity classifier-lock primitive
+(see [parked.md](./parked.md)) will both eventually layer over this
+shape without schema changes here.
+
+**Classifier prompt contract.** Emit `(subject_id, object_id, kind)`
+per entry, where subject is the character whose POV the prose
+expresses. **Only fill the perspective the entry shows** — do not
+infer the inverse from biology or convention. ("Kael called Aria
+sister" → write Kael's POV only; do NOT auto-write "brother" for
+Aria because she may not see Kael as her brother — estranged,
+adopted, denial.) Authored in the classifier prompt; tracked as an
+active followup.
+
+**Translation.** `kind` and `inverse_kind` are both translatable via
+the [translations](#translation) table — `target_kind =
+'character_relationship'`, `field` is either `'kind'` or
+`'inverse_kind'`. The polymorphic-target pattern needs no
+relationship-specific schema additions on the translations side.
+
+**Delta-log participation.** Every write (INSERT/UPDATE/DELETE)
+produces a delta under the entry's `action_id`; supports CTRL-Z
+reversal same as every other branch-scoped table. `character_relationships`
+is added to the `deltas.target_table` enum (line above).
+
+**Lifecycle on retirement.** Retired characters (per
+[retirement semantics](#characterstate-shape) — soft status change,
+not delete) keep their relationship rows as historical fact. UI dims
+or badges retired participants. No `ON DELETE CASCADE` since
+character entities aren't hard-deleted in v1.
+
+**Branch forking copies relationships.** Like every other
+branch-scoped table, fork copies the rows to the new branch; branches
+then diverge independently. Aria may still be Kael's sister in branch
+A while a user edit in branch B re-types it as "estranged" — no
+cross-branch coupling.
+
+**Out of scope for v1:**
+
+- Inter-faction relationships (member roster derives from
+  `character.faction_id`; richer faction-faction edges deferred).
+- Graph traversal primitives — "all of Aria's family transitively"
+  is a recursive query the caller writes, not a built-in helper.
+- Per-field provenance / classifier-lock — parked, both layer over
+  this shape without changes.
 
 #### Soft caps + compaction discipline
 

@@ -154,9 +154,50 @@ Decisions deferred to the design session:
 Lands before any history surface goes interactive in v1
 (World history tab, Plot history tab, future global delta-log).
 
+### Classifier prompt — character-to-character relationship extraction
+
+[`character_relationships`](./data-model.md#character-to-character-relationships)
+is now in the schema but the classifier prompt doesn't extract
+relationship rows yet. Needs a prompt-side contract:
+
+- Emit `(subject_id, object_id, kind)` per scene from the POV the
+  prose expresses.
+- **Single perspective per write.** Do NOT infer the inverse from
+  biology or convention. "Kael called Aria sister" → write Kael's
+  POV only; Aria's view may be different (estranged, adopted,
+  denial). The schema accumulates the other side when a later
+  entry surfaces it.
+- Update an existing row on contradicting prose ("Aria stopped
+  thinking of Kael as a brother — only as a rival") rather than
+  creating a duplicate.
+- Soft cap per scene: only the relationships the prose actually
+  surfaces; do not enumerate the cast pairwise.
+
+Lands when the classifier-prompt authoring surface is next touched.
+
 ---
 
 ## UX
+
+### Character Connections tab — UI design
+
+[`character_relationships`](./data-model.md#character-to-character-relationships)
+landed in the schema; the character-detail UI doesn't yet surface
+them. Needs a design pass on:
+
+- Tab placement on the character-detail surface (alongside Identity
+  / Carrying / Awareness? own tab?).
+- Row shape — render `selfToOther` + `otherToSelf` together so the
+  asymmetric case ("you see them as mentor; they see you as
+  student") is legible at a glance, with null-POV explicit.
+- Add/edit affordances — manual user-curated row creation, edit, and
+  delete (the v1 lean still has classifier UPSERT on contradicting
+  prose; the UI shouldn't pretend user edits are sticky).
+- Retired-participant rendering — relationship rows survive
+  retirement; UI dims/badges the retired side per
+  [retirement semantics](./data-model.md#characterstate-shape).
+
+Lands alongside the next character-detail UI iteration.
 
 ### Accent color picker UI
 

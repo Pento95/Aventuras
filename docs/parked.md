@@ -134,6 +134,41 @@ addressed by the memory design pass in
   `death` pin is invalidated by a later "actually alive" reveal.
   v1 floor: manual unpin.
 
+#### Per-entity classifier-lock — user-curated fields the classifier may not touch
+
+The v1 policy across all entity-state fields is "classifier wins on
+prose evidence" — user edits stick only until the classifier reads
+contradicting prose (per
+[Manual user edit vs classifier overwrite](./data-model.md#world-state-storage)).
+[`character_relationships`](./data-model.md#character-to-character-relationships)
+inherits this lean.
+
+For deliberately-curated entities (a hero whose `traits` are
+authored, a faction with a hand-tuned `agenda`, a relationship the
+user typed precisely), this means classifier drift undoes the
+curation on the next contradicting entry. The parked v1.5 per-field
+provenance work addresses this globally; a complementary primitive
+worth tracking separately:
+
+- **Per-entity classifier-lock.** User can mark an individual
+  entity (or relationship row) as "classifier may not write/update
+  this row." Classifier skips the row's UPSERT; only user edits
+  affect it. Distinct from global per-field provenance — this is
+  per-row, all-or-nothing, opt-in.
+
+Use case: "this character is my protagonist, I've spent time
+authoring them precisely — don't let the per-turn classifier
+rewrite their traits because the LLM described them in a slightly
+different way." Locks scoped per entity, surfaced in the entity
+edit UI.
+
+Schema impact: small — a boolean `classifier_locked` column on
+`entities` (and on `character_relationships` if applied there too).
+Application-side gating in the classifier write path.
+
+Lands: alongside or after the v1.5 per-field provenance work, once
+real demand surfaces from users hand-curating specific entities.
+
 ### UX (post-v1)
 
 #### Prompt-pack editor (desktop spec + mobile retrofit)
