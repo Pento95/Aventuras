@@ -113,6 +113,22 @@ cause is the server isn't running yet — start it and retry.
 - **Commits**: prefer multiple focused commits over one omnibus
   commit when work is logically separable. Never amend committed
   work; create a new commit instead.
+- **Commit messages**: subject ≤ 72 chars. Body optional and
+  ≤ ~15 lines when present. Answer _why_; name what the diff
+  doesn't show. Length matches substance — `chore:` / `fix:`
+  commits rarely need a body.
+
+  **Don't include**: diff restatement ("Updates X's prose about
+  Y…"), adversarial-pass enumerations, drift-pass / pre-commit-hook
+  fix lists, substrate or inventory sections that re-summarize the
+  doc being committed, mini-changelogs of sub-followups created.
+  These are process artifacts or duplicate the diff, the
+  exploration record, or [`followups.md`](./docs/followups.md).
+
+  **Do include** when relevant: resolved followup by name, the key
+  contract/architectural decision in one paragraph, new sub-followups
+  (one line each), pointer to the exploration record.
+
 - **File moves**: use `git mv` to preserve history. Update inbound
   references in the same commit.
 
