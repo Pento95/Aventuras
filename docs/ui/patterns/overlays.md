@@ -142,7 +142,7 @@ guard, keyboard / Esc handling) are canonical in
 Primitive-layer additions on top of that contract:
 
 - **Animation source.** Slide-in driven by motion tokens. Native
-  parity is the [NativeWind transition followup](../../followups.md#nativewind-transition--support-on-native)
+  parity is the [NativeWind transition followup](../foundations/motion.md#nativewind-transition--on-native)
   — Sheet's slide is the v1 surface forcing resolution.
 - **Gesture path.** Drag-to-dismiss is implemented via
   `react-native-gesture-handler` (Expo iOS / Android only). Electron
@@ -204,7 +204,7 @@ Primitive-layer additions:
 
 - **Animation source.** Fade + slight scale driven by motion
   tokens. Same native-parity caveat as Sheet
-  ([NativeWind transition followup](../../followups.md#nativewind-transition--support-on-native)).
+  ([NativeWind transition followup](../foundations/motion.md#nativewind-transition--on-native)).
 - **Trigger-out-of-view.** rn-primitives' default applies — popover
   follows the anchor or closes when the anchor scrolls out.
 
@@ -256,7 +256,7 @@ Tracked in [`followups.md`](../../followups.md):
 - **Sheet + Popover ARIA contract.** Roles, `aria-labelledby`,
   `aria-describedby`, popover modality semantics. See [Sheet + Popover ARIA contract](../../followups.md#sheet--popover-aria-contract).
 - **Native motion parity.** Sheet's slide animation depends on
-  the [NativeWind transition followup](../../followups.md#nativewind-transition--support-on-native).
+  the [NativeWind transition followup](../foundations/motion.md#nativewind-transition--on-native).
   Sheet is the v1 surface that forces resolution.
 
 These resolve at the first Sheet / Popover implementation pass.

@@ -153,7 +153,7 @@ Once the contract felt right, deliberately tried to break it:
   this. Implementation phase re-confirms before committing.
 - **Animation parity on native.** Sheet's slide animation depends
   on motion tokens firing on native, which is the
-  [NativeWind transition followup](../followups.md#nativewind-transition--support-on-native).
+  [NativeWind transition followup](../ui/foundations/motion.md#nativewind-transition--on-native).
   Sheet is the v1 surface that forces resolution — earlier than
   the phase 2 sketch projected ("right before Group F"). Surfacing
   in followup body so it's visible from there.
@@ -197,7 +197,7 @@ prerequisite called out in the followup.
   implementation pass. Filed under
   [`followups.md` → UX](../followups.md#sheet--popover-aria-contract).
 
-The [NativeWind transition followup](../followups.md#nativewind-transition--support-on-native)
+The [NativeWind transition followup](../ui/foundations/motion.md#nativewind-transition--on-native)
 is sharpened with a Sheet-specific dependency note rather than
 re-filed.
 

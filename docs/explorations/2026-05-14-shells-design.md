@@ -228,7 +228,7 @@ type EntityListPaneProps = {
   (`@tanstack/react-virtual` on web, `FlatList` on native — picked
   & validated in Autocomplete 2026-05-06; reader-narrative
   scroll-anchoring still open per
-  [followups → Reader narrative scroll-anchoring on prepend](../followups.md#reader-narrative-scroll-anchoring-on-prepend)).
+  [followups → Reader narrative scroll-anchoring on prepend](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)).
 - **Active-filter → addAction.label coupling** — consumer derives
   the label and passes it. Shell-side derivation would force the
   shell to know about kind enums, which is a leak.

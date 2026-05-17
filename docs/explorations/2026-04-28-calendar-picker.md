@@ -379,8 +379,8 @@ followups don't already cover:
   [`calendar-systems/spec.md → Open questions`](../calendar-systems/spec.md#open-questions).
 - Wizard full design → already pending per
   [`ui/README.md`](../ui/README.md) inventory entry #2.
-- Storybook setup → already in
-  [`followups.md → Storybook design-rules pattern setup`](../followups.md#storybook-design-rules-pattern-setup).
+- Storybook setup → deferred until patterns become consumers in
+  phase 3 (live embedding is the whole point).
 
 Resolving (removing from `followups.md`):
 

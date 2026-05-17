@@ -156,7 +156,7 @@ reusables baseline's `max-h-52 overflow-y-auto` + ScrollUpButton /
 ScrollDownButton — no work needed.
 
 Virtualization is the
-[virtual-list followup](../followups.md#reader-narrative-scroll-anchoring-on-prepend).
+[virtual-list followup](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts).
 Group B doesn't trigger it: Select's "if your list outgrows Sheet
 (medium), switch to Autocomplete" rule keeps option counts in
 ScrollView-friendly territory. Autocomplete's larger lists (200+
@@ -208,7 +208,7 @@ and Popover did:
   stripped per Aventuras's flat-depth principle.
 - Web entry / exit animations (`animate-in / fade-in-0 / zoom-in-95
 / slide-in-from-* / origin-(...)`) — stripped pending the
-  [NativeWind transition followup](../followups.md#nativewind-transition--support-on-native).
+  [NativeWind transition followup](../ui/foundations/motion.md#nativewind-transition--on-native).
   Native FadeIn / FadeOut retained via reanimated.
 - Dark-mode-only opacity tweaks (`dark:bg-input/30
 dark:active:bg-input/50 dark:hover:bg-input/50`) — stripped.

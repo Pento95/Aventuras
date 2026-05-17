@@ -343,8 +343,7 @@ for the cross-primitive size landscape.
 Live demos of each render mode + the auto-derivation rule belong in
 a `Patterns/Form controls/Select primitive` MDX page when component
 implementation begins. The page cites this principle as canonical
-and embeds component stories — no prose duplication. See
-[`followups.md → Storybook design-rules pattern setup`](../../followups.md#storybook-design-rules-pattern-setup).
+and embeds component stories — no prose duplication.
 
 ### Select — implementation contract
 
@@ -611,8 +610,7 @@ and "I agree" gating shapes that don't fit a SwitchRow.
 > **Speculative — no v1 wireframe consumer.** Checkbox shipped
 > ahead of demand to round out the choice-primitive set. If a real
 > consumer doesn't surface during phase 3 implementation, candidate
-> for park-or-drop. Tracked in
-> [`followups.md → Checkbox without v1 consumer`](../../followups.md#checkbox-without-v1-consumer).
+> for park-or-drop.
 
 Box dimensions bind to active density; same rationale as Switch.
 

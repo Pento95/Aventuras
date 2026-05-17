@@ -193,6 +193,16 @@ Build-time launch config may override the stored default to ON in
 session; this is launch-config-detail, not contract. Production
 builds always default OFF at the stored level.
 
+### Direct-console drift
+
+A `console.<level>` call outside the logger module bypasses the
+master gate (always fires, regardless of
+`app_settings.diagnostics.enabled`) and never lands in the
+in-memory `logEntries` slice. An ESLint rule banning direct
+`console.*` calls outside the logger module — with a narrow
+allowance for on-purpose dev-only paths — keeps the discipline
+enforced. Lands when the logger module is built.
+
 ## Structural sinks
 
 ### `httpCallSink`
@@ -314,6 +324,20 @@ effect:** API keys exist in unredacted form only at the actual
 `fetch()` boundary; they never reach the Zustand store, never
 appear in the diagnostics hub, never can leak via
 screenshot/share.
+
+**Denylist completeness.** As new providers ship with custom
+auth header names, the denylist must extend. Two mitigations
+keep it from drifting:
+
+- **Build-time test.** Walk all configured providers' header
+  schemas and assert each header name maps to "known-safe" or
+  "denylisted." Catches drift at PR time.
+- **Dev-build runtime warning.** When a header name matches a
+  heuristic regex (`/auth|key|token|secret|credential|cookie/i`)
+  but isn't on the denylist, emit a `logger.warn`. Catches
+  first-encounter drift at runtime.
+
+Both land when the HTTP wrapper + sink are built.
 
 ### `turnCaptureSink`
 

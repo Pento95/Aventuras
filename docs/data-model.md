@@ -839,8 +839,11 @@ expresses. **Only fill the perspective the entry shows** — do not
 infer the inverse from biology or convention. ("Kael called Aria
 sister" → write Kael's POV only; do NOT auto-write "brother" for
 Aria because she may not see Kael as her brother — estranged,
-adopted, denial.) Authored in the classifier prompt; tracked as an
-active followup.
+adopted, denial.) Update an existing row on contradicting prose
+("Aria stopped thinking of Kael as a brother — only as a rival")
+rather than creating a duplicate. Soft cap per scene: only the
+relationships the prose actually surfaces; do not enumerate the
+cast pairwise.
 
 **Translation.** `kind` and `inverse_kind` are both translatable via
 the [translations](#translation) table — `target_kind =

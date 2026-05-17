@@ -410,10 +410,8 @@ they don't drift loose:
   migrate `Toolbar.Sort` from `cn('h-9', className)` to
   `<Select size="xs">`; delete the stale multi-line comment block
   above that call.
-- Storybook coverage for `<Select size="xs">` — tracked under the
-  existing
-  [Storybook design-rules pattern setup](../followups.md#storybook-design-rules-pattern-setup)
-  followup.
+- Storybook coverage for `<Select size="xs">` — lands when
+  patterns become consumers in phase 3.
 
 ### Wireframes
 

@@ -15,18 +15,6 @@ for the placement rule.
 
 ## Data-model
 
-### Classifier delta validation
-
-The classifier output spec requires per-entry `delta ≥ 0` as a hard
-pipeline-layer invariant, per
-[`architecture.md → Classifier contract — metadata fields`](./architecture.md#classifier-contract--metadata-fields).
-Pipeline validation rejects negative deltas; on rejection, re-rolls
-once, then clamps to `0` with a logged anomaly. The validator lands
-alongside the classifier output Zod schema when classifier output
-validation is next touched. Promoted from implicit assumption to
-explicit hard contract by
-[`explorations/2026-05-17-manual-worldtime-correction.md`](./explorations/2026-05-17-manual-worldtime-correction.md).
-
 ### Memory architecture — design landed
 
 The memory pipeline (cadence stratification, retrieval ranker,
@@ -59,27 +47,6 @@ The "description revision suggestion-queue" sub-item stays
 deferred as a UI concern (independent of memory design) — until
 that UI lands, classifier writes description only at first
 introduction per the existing authorship contract.
-
-### Classifier prompt — character-to-character relationship extraction
-
-[`character_relationships`](./data-model.md#character-to-character-relationships)
-is now in the schema but the classifier prompt doesn't extract
-relationship rows yet. Needs a prompt-side contract:
-
-- Emit `(subject_id, object_id, kind)` per scene from the POV the
-  prose expresses.
-- **Single perspective per write.** Do NOT infer the inverse from
-  biology or convention. "Kael called Aria sister" → write Kael's
-  POV only; Aria's view may be different (estranged, adopted,
-  denial). The schema accumulates the other side when a later
-  entry surfaces it.
-- Update an existing row on contradicting prose ("Aria stopped
-  thinking of Kael as a brother — only as a rival") rather than
-  creating a duplicate.
-- Soft cap per scene: only the relationships the prose actually
-  surfaces; do not enumerate the cast pairwise.
-
-Lands when the classifier-prompt authoring surface is next touched.
 
 ---
 
@@ -149,46 +116,6 @@ Open questions for the design pass:
 Lands when classification awareness becomes the focus of its own
 design pass; not subsidiary to any single surface.
 
-### Reader narrative scroll-anchoring on prepend
-
-Library choice resolved on 2026-05-06:
-**`@tanstack/react-virtual`** on web (validated inside
-Autocomplete's portaled popover via Electron's RN-Web build) +
-**`FlatList`** on native. Variable-height rows handled by
-`measureElement` on web and FlatList's native layout on phone.
-
-What **isn't** resolved: when the reader narrative auto-loads older
-entries (insertion above the viewport), when a reasoning body
-expands above the current scroll, or when an above-the-fold entry's
-world-time footer label re-renders post-Save after a manual
-[world-time edit](./ui/screens/reader-composer/reader-composer.md#per-entry-world-time-footer)
-(label width change can wrap or de-wrap the footer row), the user's
-apparent scroll position must stay anchored — content above the
-fold can shift, but what's in front of the user must not jump.
-`@tanstack/react-virtual` does not preserve native browser
-scroll-anchoring across prepend out of the box; community recipes
-(measure prepended block, add equivalent top padding, scroll by
-the same delta, then drop the padding) work but need careful
-glue. FlatList's `maintainVisibleContentPosition` covers the
-native side. Lands when reader-composer is built and a real
-prepend stream exists to validate against.
-
-Reference: [reader narrative scroll model](./ui/screens/reader-composer/reader-composer.md#scroll-behavior).
-
-### Calendar swap-warning AlertDialog (W1 / W2 / W3)
-
-The [calendar picker pattern](./ui/patterns/calendar-picker.md#story-settings--swap-warnings)
-specifies a combined confirmation modal that fires on Story
-Settings calendar swaps — origin-tuple mismatch (W1), era support
-mismatch (W2), display-format change (W3). Intentionally NOT part
-of the `CalendarPicker` compound that shipped (the modal is a
-Story-Settings-specific composition layer wrapping the swap path).
-Build it as a dedicated `CalendarSwapDialog` compound on top of
-the AlertDialog primitive when Story Settings · Calendar tab
-lands. The Continue button label adapts (`Continue & re-pick origin`
-when W1 applies, `Continue & swap` otherwise) and modal sections
-render only the warnings that apply.
-
 ### Custom-font theme support
 
 Themes can declare font-family overrides in their registry entry
@@ -228,44 +155,6 @@ correctly. Until then, themes that declare font overrides
 function as color-only themes — not a v1 blocker, but worth
 calling out so the gallery contract isn't misread as
 "font-customization works today."
-
-### NativeWind transition-\* support on native
-
-The foundations explorer's MotionSamples section gates `transition-*`
-
-- `transform` animations to web only on phase 1 because the
-  combination triggered a `Maximum call stack` error on Android during
-  bring-up — likely an interaction between dynamic class names + the
-  NativeWind runtime fallback path, but not narrowed precisely.
-  Animations are static (a colored bar with no movement) on native.
-
-**Animation-API decision settled** (phase 2 Groups A + F):
-component-internal animations use **reanimated directly**
-(`useSharedValue` + `useAnimatedStyle` + `withRepeat` /
-`withTiming`) rather than depending on NativeWind transitions on
-native. Sheet's slide-in (Group A) and Skeleton's pulse (Group F)
-both ship via [`NativeOnlyAnimatedView`](../components/ui/native-only-animated-view.tsx)
-with web/native branches that emit CSS keyframes on web and
-reanimated worklets on native. Spinner (Group F) uses a similar
-per-platform dispatch (CSS `animate-spin` on web, RN
-`<ActivityIndicator>` on native — battle-tested platform shape
-beats wiring a custom rotation worklet for one consumer).
-
-Open characterization (low priority — primitives ship without it):
-
-- **Whether NativeWind's transition path actually fires on
-  native.** With static class names hoisted in MotionSamples,
-  reanimated babel-plugin in place, and reanimated 4 as a dep,
-  the transition should at least attempt to fire. Useful to
-  characterize: confirm whether transitions are silently no-op'd
-  or genuinely run on native, and whether the `Maximum call
-stack` blocker is fixed in current NativeWind / reanimated
-  versions. Outcome would unblock terser declarative styling
-  (`transition-colors duration-fast`) on a few state-feedback
-  surfaces — but doesn't unblock anything v1 needs.
-
-The MotionSamples web-gating remains in place until that
-characterization runs.
 
 ### Sheet keyboard handling on mobile
 
@@ -346,20 +235,6 @@ Decisions needed at gate-wiring time:
 Lands at the gate's own design pass — session 6's palette data
 is in hand, ready to inform the exempt-list shape.
 
-### Storybook design-rules pattern setup
-
-Storybook's tree is set up as **Foundations / Primitives /
-Patterns / Screens** (phase 1). What's still pending is the
-Patterns branch — MDX pages prose-citing the corresponding
-[`docs/ui/patterns/`](./ui/patterns/README.md) file as canonical
-(per the pattern README's dual-source rule) and embedding live
-component stories beneath — render-mode demos, side-by-side
-comparisons, accessibility checks.
-
-Lands when patterns become consumers in phase 3. Premature to
-scaffold before patterns exist; the live embedding is the whole
-point.
-
 ### Search scope on state fields
 
 Per
@@ -438,67 +313,6 @@ Provider/profile probably want the same shape but worth a dedicated
 pass: orphan handling on import, soft-warn vs hard-block tradeoffs,
 what happens to `default_provider_id` if the referenced provider is
 deleted, etc.
-
-### Settings screens — adopt SwitchRow pattern
-
-Story Settings and App Settings render their boolean toggles as a
-label + hint row with a switch on the right (per wireframes —
-both swept during the
-[mobile settings revisit](./explorations/2026-05-04-mobile-settings-revisit.md)
-to use SwitchRow consistently, replacing the older standalone-
-toggle-with-adjacent-label and `[off | on]` segment-as-boolean
-idioms). Group D shipped the
-[`SwitchRow` pattern](./ui/patterns/forms.md#switchrow-pattern) as
-the canonical row-tappable shape. The screen-side rework — wiring
-the pattern into Story Settings and App Settings panels,
-normalizing label / hint copy, ensuring the row spans the full
-panel width — lands as part of phase 3 settings implementation.
-Tracked here so it doesn't get lost between primitive landing
-(done) and screen integration (pending).
-
-Cross-platform: SwitchRow is the canonical shape on every tier
-(phone, tablet, desktop). Settings layouts should NOT use a
-standalone Switch with an adjacent label — that pattern is
-deprecated for v1. The
-[Switch primitive](./ui/patterns/forms.md#switch-primitive) stays
-exported as a building block for non-row cases (toolbar quick-
-toggles, inline status indicators) but no v1 wireframe needs that
-shape.
-
-### Checkbox without v1 consumer
-
-The Checkbox primitive (Phase 2 Group D) shipped without a v1
-wireframe consumer — added on speculation that a multi-select list
-or "I agree" gating shape would surface during phase 3 screen
-implementation. If phase 3 lands without a real consumer, candidate
-to park or drop (parallel to how standalone Radio was dropped from
-Group D in favor of Select.radio).
-
-Tracking surface: when reviewing each phase 3 screen, note any
-multi-select or boolean-list shape that would naturally use
-Checkbox. If the count stays at zero after all screens land, drop
-in a Phase 3 cleanup pass. If a consumer surfaces, this entry
-resolves silently — Checkbox stays.
-
-### EmbedderDownloadDialog
-
-- **EmbedderDownloadDialog driver effects for HF-id and import paths.**
-  The container's `downloading` and `verifying` effects currently guard
-  on `init.kind === 'catalog'`. The HF-id and import paths can enter
-  `downloading`/`verifying` states via the reducer but no effect drives
-  them through to completion. Wiring lands with the platform-specific
-  driver implementations per consumer (Onboarding Step 4 lands first
-  per [onboarding.md → Step 4](./ui/screens/onboarding/onboarding.md#step-4--pick-an-embedder)).
-- **EmbedderDownloadDialog init prop referential stability.**
-  Three container effects depend on the whole `init` object reference.
-  If a host re-renders mid-download with a structurally-equal but
-  newly-allocated `init` object, the effect's cleanup arm cancels the
-  in-flight download and the loop restarts from `files[0]`. The
-  cancellation flag preserves correctness-of-state but resets user
-  progress. Either narrow the effect deps to stable primitives
-  (`init.entry.id`, `init.entry.revision`) or document a host
-  requirement to memoize the `init` prop. Defer until a real consumer
-  surfaces the regression.
 
 ### CollisionResolveDialog
 
@@ -579,45 +393,3 @@ unspecified. Surfaced during the observability design
 session; lands as its own pass when the next set of Actions-menu
 candidates is ready (or when the menu's current sparseness
 becomes a UX friction in real use).
-
-### ESLint guardrail for `console.*` outside the logger
-
-[`observability.md → Logger contract`](./observability.md#logger-contract)
-specifies that subsystems route diagnostic emissions through
-`logger.<level>`, not direct `console.warn` / `console.error`.
-A `console.<level>` call outside the logger module bypasses the
-master gate (always fires, regardless of `app_settings.diagnostics.enabled`)
-and never lands in the in-memory `logEntries` slice. An ESLint
-rule banning these calls outside the logger module (and outside
-the rare on-purpose dev-only path) mitigates drift. Implementation
-followup; lands when the logger module is built.
-
-### Header denylist completeness gate
-
-The
-[HTTP call sink redaction contract](./observability.md#header-redaction)
-maintains a denylist of auth-style headers
-(`Authorization`, `X-API-Key`, `Cookie`, response `Set-Cookie`).
-As new providers ship with custom auth header names, the denylist
-must extend. Two implementation-time mitigations:
-
-- **Build-time test** that walks all configured providers' header
-  schemas and asserts each header name maps to "known-safe" or
-  "denylisted." Catches drift at PR time.
-- **Dev-build runtime warning** when a header name matches a
-  heuristic regex (`/auth|key|token|secret|credential|cookie/i`)
-  but isn't on the denylist. Catches first-encounter drift at
-  runtime.
-
-Implementation followup; lands when the HTTP wrapper + sink are
-built.
-
-### HTTP call cap calibration
-
-[`observability.md → Memory ceiling`](./observability.md#memory-ceiling)
-sets the `httpCalls` ring-buffer cap at 200. Translation-heavy
-turns can fire 8-10 calls each; ~20 turns cycle the buffer. The
-sink contract already protects calls whose owning turn is still
-in `turnCaptures` from eviction, but the default cap may need
-real-workload tuning. Implementation calibration; lands once
-real translation + embedding workloads measure call fan-out.

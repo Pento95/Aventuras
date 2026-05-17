@@ -127,8 +127,8 @@ contract: emit a measurable, deterministic layout transition;
 never pin its own height; let the parent's `measureElement`
 (web) or `maintainVisibleContentPosition` (native) track the
 shift. The
-[reader narrative scroll-anchoring](../../followups.md#reader-narrative-scroll-anchoring-on-prepend)
-followup covers the parent's mechanic.
+[reader narrative scroll-anchoring](../screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)
+section covers the parent's mechanic.
 
 ## Edit mode
 

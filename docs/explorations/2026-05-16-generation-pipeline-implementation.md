@@ -16,7 +16,7 @@ below the framework; pack authoring (templates, macros, filters);
 crash-recovery startup flow (the framework provides the marker
 table; the recovery code itself lives with the broader startup
 design, per
-[`followups.md → Crash recovery for in-flight transactions`](../followups.md#crash-recovery-for-in-flight-transactions)).
+[`followups.md → Crash recovery for in-flight transactions`](../generation-pipeline.md#crash-recovery-via-pipeline_runs-marker-table)).
 
 The canonical version lands in a new `docs/generation-pipeline.md`;
 much of architecture.md's current pipeline content moves out. See
@@ -1065,7 +1065,7 @@ Things deliberately probed before landing the design:
 - **Reverse-replay failure mid-abort** — SQLite txn either fully
   reverses or rolls back. Crash recovery on next startup is the
   safety net (depends on
-  [`followups.md → Crash recovery`](../followups.md#crash-recovery-for-in-flight-transactions)
+  [`followups.md → Crash recovery`](../generation-pipeline.md#crash-recovery-via-pipeline_runs-marker-table)
   landing). ✓ with dependency.
 - **Phase yields delta_emitted with FK dependency on
   not-yet-created row** — action layer rejects on FK violation;

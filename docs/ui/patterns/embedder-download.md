@@ -454,3 +454,21 @@ is not paraphrased — it's read verbatim as fetched.
   per
   [model-management.md → License attestation](../../memory/model-management.md#license-attestation);
   the dialog never disturbs them.
+- **Driver effects for HF-id and import paths.** The container's
+  `downloading` and `verifying` effects currently guard on
+  `init.kind === 'catalog'`. The HF-id and import paths can enter
+  `downloading` / `verifying` states via the reducer but no effect
+  drives them through to completion. Wiring lands with the
+  platform-specific driver implementations per consumer (Onboarding
+  Step 4 lands first per
+  [onboarding.md → Step 4](../screens/onboarding/onboarding.md#step-4--pick-an-embedder)).
+- **`init` prop referential stability.** Three container effects
+  depend on the whole `init` object reference. If a host re-renders
+  mid-download with a structurally-equal but newly-allocated `init`
+  object, the effect's cleanup arm cancels the in-flight download
+  and the loop restarts from `files[0]`. The cancellation flag
+  preserves correctness-of-state but resets user progress. Either
+  narrow the effect deps to stable primitives (`init.entry.id`,
+  `init.entry.revision`) or document a host requirement to memoize
+  the `init` prop. Defer until a real consumer surfaces the
+  regression.

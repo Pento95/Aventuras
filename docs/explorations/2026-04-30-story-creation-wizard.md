@@ -503,7 +503,7 @@ category). 80%+ of users skip the disclosure.
 **Long scroll.** No pagination chrome on the lore list — typical
 wizard counts are 0–5 rows; scroll handles the edge case (20+).
 Virtualization, if it bites, lands via the existing
-[virtual-list followup](../followups.md#reader-narrative-scroll-anchoring-on-prepend).
+[virtual-list followup](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts).
 
 **Validation:** any lore rows present must have `title` + `body`
 non-empty (per
@@ -1086,8 +1086,8 @@ Acknowledged but deliberately not parked:
   surfaces are designed.
 - Internationalization (i18next-bundled wizard copy). Implementation
   concern; not a design open question.
-- Storybook entries for wizard components. Tracked under existing
-  [Storybook design-rules pattern setup](../followups.md#storybook-design-rules-pattern-setup).
+- Storybook entries for wizard components. Land when patterns
+  become consumers in phase 3.
 
 ## What this design does not do
 

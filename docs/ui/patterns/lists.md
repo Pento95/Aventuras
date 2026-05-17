@@ -103,8 +103,8 @@ the reader narrative needs (auto-load-older + reasoning-body
 expansion) is a separate problem — `@tanstack/react-virtual` does
 not preserve native browser scroll-anchoring on prepend out of the
 box, and the recipe to keep the viewport stable lands when reader
-narrative is built. Tracked in
-[`followups.md`](../../followups.md#reader-narrative-scroll-anchoring-on-prepend).
+narrative is built. Implementation contract:
+[`reader-composer.md → Anchor preservation under shifts`](../screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts).
 
 ---
 

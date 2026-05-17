@@ -371,7 +371,7 @@ state. Same path as any in-flight pipeline abort.
 
 **Crash recovery** during chapter-close is the same as any
 in-flight transaction — see
-[`followups.md → Crash recovery for in-flight transactions`](../followups.md#crash-recovery-for-in-flight-transactions).
+[`followups.md → Crash recovery for in-flight transactions`](../generation-pipeline.md#crash-recovery-via-pipeline_runs-marker-table).
 
 ## Manual user-triggered close
 

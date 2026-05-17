@@ -150,6 +150,37 @@ multiply their duration by this constant.
 Color-token + structural-slot runtime parity was characterized
 during phase 1 foundations bring-up — see
 [`theming.md → Switching mechanism`](./theming.md#switching-mechanism)
-for the recorded findings. Motion-token runtime support on native
-is partial; the open work is tracked under
-[`followups.md → NativeWind transition-* support on native`](../../followups.md#nativewind-transition--support-on-native).
+for the recorded findings.
+
+### NativeWind `transition-*` on native
+
+The foundations explorer's MotionSamples section gates
+`transition-*` + `transform` animations to web only on phase 1
+because the combination triggered a `Maximum call stack` error on
+Android during bring-up — likely an interaction between dynamic
+class names and the NativeWind runtime fallback path, not narrowed
+precisely. Animations there are static (a colored bar with no
+movement) on native.
+
+**Animation-API decision settled** (phase 2 Groups A + F):
+component-internal animations use **reanimated directly**
+(`useSharedValue` + `useAnimatedStyle` + `withRepeat` /
+`withTiming`) rather than depending on NativeWind transitions on
+native. Sheet's slide-in (Group A) and Skeleton's pulse (Group F)
+both ship via
+[`NativeOnlyAnimatedView`](../../../components/ui/native-only-animated-view.tsx)
+with web/native branches that emit CSS keyframes on web and
+reanimated worklets on native. Spinner (Group F) uses a similar
+per-platform dispatch (CSS `animate-spin` on web, RN
+`<ActivityIndicator>` on native).
+
+Open characterization (low priority — primitives ship without it):
+whether NativeWind's transition path actually fires on native at
+all with static hoisted class names + reanimated babel-plugin +
+reanimated 4 in place. Useful to confirm whether transitions are
+silently no-op'd or genuinely run, and whether the `Maximum call
+stack` blocker is fixed in current NativeWind / reanimated
+versions. Outcome would unblock terser declarative styling
+(`transition-colors duration-fast`) on a few state-feedback
+surfaces — but doesn't unblock anything v1 needs. The MotionSamples
+web-gating remains in place until that characterization runs.

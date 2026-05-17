@@ -435,7 +435,7 @@ shouldn't manufacture a `nextRow` just to call it.
   the new row, and writes both in one delta-emitting transaction.
   The exact shape of the classifier-output structured response is
   pinned by the classifier-output Zod schema — landing alongside the
-  [classifier delta validation](../followups.md#classifier-delta-validation)
+  [classifier delta validation](../architecture.md#classifier-contract--metadata-fields)
   followup. This design depends on that work for the targeted-change
   vocabulary but doesn't constrain it.
 - **Lore-management agent** — chapter-close sub-jobs per
@@ -462,7 +462,7 @@ shouldn't manufacture a `nextRow` just to call it.
   [architecture.md → Walk algorithm](../architecture.md#walk-algorithm),
   `merge(state, undo_payload)` IS `applyUndoPayload`.
 - **Crash recovery** — per the
-  [crash recovery followup](../followups.md#crash-recovery-for-in-flight-transactions),
+  [crash recovery followup](../generation-pipeline.md#crash-recovery-via-pipeline_runs-marker-table),
   startup-time reverse-replay of orphaned `pipeline_runs` markers
   uses the same primitive.
 
@@ -482,7 +482,7 @@ the reader. The apply function's defensive `warn`-and-skip branches
 are the safety net, not the primary defense.
 
 **Lands together with
-[classifier delta validation](../followups.md#classifier-delta-validation)**
+[classifier delta validation](../architecture.md#classifier-contract--metadata-fields)**
 — both followups need the same Zod-layer infrastructure; one PR
 resolves both.
 

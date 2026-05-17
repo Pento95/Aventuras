@@ -304,14 +304,13 @@ the patterns/forms.md prose so the rule isn't read as
 
 **Followups in / out.**
 
-- **Out (partial resolution).**
-  [`Settings screens — adopt SwitchRow pattern`](../followups.md#settings-screens--adopt-switchrow-pattern)
-  remains open — it tracks the screen-side implementation work
-  (wiring SwitchRow into Story Settings panels, normalizing label
-  / hint copy, ensuring full-panel-width rows). This redesign
+- **Out (partial resolution).** The screen-side adoption of
+  SwitchRow (wiring it into Story Settings panels, normalizing
+  label / hint copy, ensuring full-panel-width rows) is implementation
+  work that happens when phase 3 settings ship. This redesign
   doesn't do that wiring, but firms the visual context SwitchRow
   sits inside on phone (sibling rows above and below stack
-  label-on-top). Followup entry stays.
+  label-on-top).
 - **In (none).** Nothing genuinely deferred by this design.
 
 **Patterns adopted on a new surface.** The new

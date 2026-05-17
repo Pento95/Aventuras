@@ -290,10 +290,12 @@ template. Sample render before/after gives a concrete preview.
 
 Rendered via the [AlertDialog primitive](./alert-dialog.md) with
 the W1 / W2 / W3 sub-warning blocks composed between header and
-footer. Lives outside the `CalendarPicker` compound — wrapper-level
-composition that the Story Settings host owns. Implementation
-deferred to the Story Settings build pass; see
-[`followups.md → Calendar swap-warning AlertDialog (W1 / W2 / W3)`](../../followups.md#calendar-swap-warning-alertdialog-w1--w2--w3).
+footer. Lives outside the `CalendarPicker` compound — built as a
+dedicated `CalendarSwapDialog` compound wrapping AlertDialog when
+the Story Settings · Calendar tab lands. The Continue button label
+adapts (`Continue & re-pick origin` when W1 applies,
+`Continue & swap` otherwise); modal sections render only the
+warnings that apply.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -371,5 +373,4 @@ Live demos of the picker primitive (per host integration), summary
 panel, and the W1 / W2 / W3 swap-modal variants belong in a
 `Patterns/Calendar picker` MDX page when component implementation
 begins. Page cites this file as canonical and embeds component
-stories. See
-[`followups.md → Storybook design-rules pattern setup`](../../followups.md#storybook-design-rules-pattern-setup).
+stories.

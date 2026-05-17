@@ -179,7 +179,7 @@ Not load-bearing for the design. The host wires it however the
 project's data layer prefers — TanStack Query keyed on
 `['diff', delta.id]` is the natural fit given the existing
 virtualization stack (per the
-[reader narrative scroll-anchoring on prepend](../followups.md#reader-narrative-scroll-anchoring-on-prepend)
+[reader narrative scroll-anchoring on prepend](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)
 followup's library notes), but the cache doesn't dictate.
 
 ### Request coalescing

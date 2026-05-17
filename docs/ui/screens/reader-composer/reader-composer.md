@@ -504,8 +504,10 @@ window:
 
 - Approaching the top of the loaded range (within ~one
   viewport-height of the topmost loaded entry) → auto-fetch the
-  next older chunk (~50 entries). Content prepends; native browser
-  scroll-anchoring keeps visible content stable.
+  next older chunk (~50 entries). Content prepends; the user's
+  apparent scroll position must stay anchored (see
+  [Anchor preservation under shifts](#anchor-preservation-under-shifts)
+  for the cross-platform implementation requirement).
 - Approaching the bottom of the loaded range (within ~one
   viewport-height of the bottommost loaded entry, when that isn't
   the live edge) → auto-fetch the next forward chunk. Content
@@ -653,6 +655,34 @@ already exposes per-chapter jumps via the chapter popover.
 Scroll-chrome buttons stay focused on terminal endpoints (top /
 bottom of branch); chapter-anchored navigation lives with chapter
 chrome.
+
+### Anchor preservation under shifts
+
+Three content-shift scenarios can push above-the-fold content
+without the user asking for it; in all three, the user's apparent
+scroll position must stay anchored — content above the fold can
+shift, but what's in front of the user must not jump.
+
+- **Prepend on auto-load older.** A `~50`-entry block prepends
+  above the viewport when the user nears the top of the loaded
+  range.
+- **Reasoning body expansion above the fold.** An entry above the
+  current scroll has its reasoning region toggled open (whether by
+  the user or via remount).
+- **World-time footer label re-render.** A manual world-time edit
+  on an entry above the fold can change the footer label's pixel
+  width, wrapping or de-wrapping the footer row.
+
+**Native (FlatList) — `maintainVisibleContentPosition`** handles
+all three transparently at the FlatList level. No additional glue.
+
+**Web (`@tanstack/react-virtual`)** does NOT preserve native
+browser scroll-anchoring across prepend or in-place height
+changes. The implementation measures the prepended (or expanded)
+block, adds equivalent top padding before the layout commit,
+scrolls by the same delta, then drops the padding on the next
+frame. Validate against a real prepend stream once
+reader-composer is wired against live data.
 
 ## Browse rail — collapse / expand
 

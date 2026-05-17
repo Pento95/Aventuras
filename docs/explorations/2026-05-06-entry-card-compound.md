@@ -149,7 +149,7 @@ is: emit a measurable, deterministic layout transition; never
 pin its own height; let the parent's `measureElement` or
 `maintainVisibleContentPosition` track the shift.
 
-The [reader narrative scroll-anchoring on prepend](../followups.md#reader-narrative-scroll-anchoring-on-prepend)
+The [reader narrative scroll-anchoring on prepend](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)
 followup covers the parent's mechanic; EntryCard ships
 compatible.
 

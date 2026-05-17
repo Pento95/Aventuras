@@ -51,7 +51,7 @@ Sheet / Popover pair from Group A.
 
 This is the most complex single primitive in phase 2 — keyboard
 nav, focus trap, scroll behavior, virtualization for long lists
-([virtual-list library choice](../followups.md#reader-narrative-scroll-anchoring-on-prepend)
+([virtual-list library choice](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)
 becomes ripe here), accent / focus-ring styling, accessible-name /
 value coupling. Lands as one focused phase 2 pass.
 
@@ -162,7 +162,7 @@ only the font dimension is inert).
 
 Phase 1's MotionSamples gates animations to web only. Tracked
 under
-[`followups.md → NativeWind transition-* support on native`](../followups.md#nativewind-transition--support-on-native).
+[`followups.md → NativeWind transition-* support on native`](../ui/foundations/motion.md#nativewind-transition--on-native).
 
 Decisions phase 2 needs:
 
@@ -224,7 +224,7 @@ Worth surfacing here so they're not discovered mid-implementation:
    primitive with a mode prop, or two siblings? Calendar picker is
    the next consumer — its shape decision feeds back into this.
 4. **Native virtualization library choice.** Per
-   [`followups.md → Virtual-list library choice`](../followups.md#reader-narrative-scroll-anchoring-on-prepend).
+   [`followups.md → Virtual-list library choice`](../ui/screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts).
    Becomes load-bearing during Select implementation (long lists +
    measured rows + scroll-anchoring). Decide before Group B starts.
 5. **Cross-platform spinner shape.** Phase 1 uses RN's
