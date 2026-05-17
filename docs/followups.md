@@ -11,42 +11,10 @@ the two files is normal as scope clarifies; see
 [`conventions.md → Followups vs parked`](./conventions.md#followups-vs-parked)
 for the placement rule.
 
----
-
-## Data-model
-
-### Memory architecture — design landed
-
-The memory pipeline (cadence stratification, retrieval ranker,
-chapter-close pipeline with lore-mgmt sub-jobs, embedding
-infrastructure, pinning, per-type budgets) is designed in
-[`docs/memory/`](./memory/README.md). Substantially resolves what
-was the "Lore-management agent shape" entry and the nested
-"State-field write contract — architecture" sub-entry; both
-removed with this commit.
-
-**What's still open** lives in the memory folder's own followups:
-
-- [v1-blocking memory work](./memory/followups.md#v1-blocking) —
-  threshold tuning, embedder production integration, embedding
-  compute lifecycle, background classifier UX, memory probe
-  implementation (contract + screen UX landed; see
-  [`memory/probe.md`](./memory/probe.md)), Matryoshka
-  effective-dim implementation (contract + UI landed; see
-  [`memory/retrieval.md → Matryoshka effective dim`](./memory/retrieval.md#matryoshka-effective-dim)),
-  lore-creation cap tuning.
-- [Parked / post-v1 items](./memory/followups.md#parked--post-v1) —
-  multi-axis salience, pin-contradiction reconciliation, spillover
-  policy, polymorphic naming, etc.
-
-The previously-listed "lore.priority retrieval semantics" sub-item
-resolves: priority is 0-100, integrated into the ranker as
-`sim_blend × (priority/100) + kw_boost` per
-[`docs/memory/retrieval.md → The ranker`](./memory/retrieval.md#the-ranker).
-The "description revision suggestion-queue" sub-item stays
-deferred as a UI concern (independent of memory design) — until
-that UI lands, classifier writes description only at first
-introduction per the existing authorship contract.
+Subsystem-scoped followups live in their subsystem's followups
+file — currently
+[`memory/followups.md`](./memory/followups.md) for memory-pipeline
+work. This top-level file tracks cross-cutting items only.
 
 ---
 
@@ -128,33 +96,32 @@ fonts that aren't bundled with the app. Both web (Electron, RN-Web
 in Storybook) and Android fall through to the same system
 sans-serif default for every theme.
 
-Concretely needs:
+Open design questions:
 
-- **Native font bundling.** Use `expo-font` to load the canonical
-  font files (Charter / Lora / etc. — whichever the curated themes
-  declare) at app startup. Decide whether fonts ship in the app
-  bundle or load lazily on first use of a font-overridable theme.
-- **Web font loading.** Decide whether to ship the same font files
-  via `@font-face` in `global.css` (or a separate font CSS), use a
-  CDN-hosted variant, or accept system-fallback rendering on web.
-  Has implications for first-paint cost on Electron.
-- **License + bundle-size accounting.** Charter, Lora, etc. each
-  have their own license terms and weight. Need to confirm
-  redistribution rights before bundling.
+- **Bundling strategy.** Ship font files in the app bundle (larger
+  binary, fonts available immediately) or load lazily on first use
+  of a font-overridable theme (smaller binary, first-render
+  fallback flicker)?
+- **Web loading strategy.** `@font-face` in `global.css`, separate
+  font CSS, CDN-hosted variants, or accept system-fallback on web?
+  Each has different first-paint implications for Electron.
 - **Per-platform font-stack reconciliation.** A stack like
   `Charter, "Iowan Old Style", "Source Serif", Georgia, ...` falls
-  through differently across iOS, Android, and web. May want
-  per-platform stacks in the registry rather than one stack that
-  hopes for the best.
-- **Reduced-data-mode / first-launch UX.** What does the user see
+  through differently across iOS, Android, and web. Single stack
+  with hopeful fallbacks vs per-platform stacks in the registry?
+- **First-launch / reduced-data-mode UX.** What does the user see
   before custom fonts finish loading? Acceptable to render system
   sans first then re-flow once fonts arrive?
 
+License + bundle-size accounting (redistribution rights for
+Charter / Lora / etc., binary-weight impact) is implementation
+work that follows from the bundling-strategy decision.
+
 Lands when a v1 surface depends on a custom-font theme rendering
-correctly. Until then, themes that declare font overrides
-function as color-only themes — not a v1 blocker, but worth
-calling out so the gallery contract isn't misread as
-"font-customization works today."
+correctly. Until then, themes that declare font overrides function
+as color-only themes — not a v1 blocker, but worth calling out so
+the gallery contract isn't misread as "font-customization works
+today."
 
 ### Sheet keyboard handling on mobile
 

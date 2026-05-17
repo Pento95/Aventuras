@@ -93,7 +93,7 @@ ships, classifier never updates description after first
 introduction; user is the only ongoing editor. Stale descriptions
 are the user's problem until they edit — acceptable v1 floor.
 The suggestion-queue UI design folds into the
-[Memory architecture — design landed](../followups.md#memory-architecture--design-landed)
+[Memory architecture — design landed](../memory/followups.md)
 followup.
 
 ### 2. CharacterState — 10 top-level fields (15 leaf slots)

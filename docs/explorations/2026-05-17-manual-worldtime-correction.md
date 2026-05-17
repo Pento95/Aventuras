@@ -339,7 +339,7 @@ remain valid after the design lands and need no edit.
   interplay) are all answered.
 
 **Generated (added to
-[`followups.md → Data-model`](../followups.md#data-model) in the
+[`followups.md → Data-model`](../followups.md) in the
 integration commit):**
 
 - **Classifier delta validation.** Pipeline-layer enforcement that
