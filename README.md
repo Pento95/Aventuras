@@ -65,7 +65,7 @@ here:
   Native Web, Electron 41.
 - **Styling**: NativeWind 4 + Tailwind 3 with shadcn-style theme
   CSS variables.
-- **Storage**: `expo-sqlite` (local-first; no backend).
+- **Storage**: `expo-sqlite` (no external backend).
 - **Build / dev**: pnpm 10, Node 24, Vite (via Storybook), TypeScript.
 - **Quality**: ESLint 9, Prettier 3, remark (doc lint), lefthook
   (pre-commit hooks), Vitest + Playwright (story tests).

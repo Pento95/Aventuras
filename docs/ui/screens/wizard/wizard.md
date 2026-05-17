@@ -686,7 +686,7 @@ the user is creating on drives the pre-selected option:
 - Mobile → smallest curated dim that's `≥ 512` (typical: 1024).
 - Desktop → model native dim (no truncation suggested).
 
-Aventuras is local-first; a story stays on the device where it was
+Aventuras is local; a story stays on the device where it was
 created. The suggestion reflects that reality. The pre-selection
 shows a `← suggested` annotation on the matching row; the user can
 override either way.

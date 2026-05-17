@@ -1343,7 +1343,7 @@ zero query benefit (no JOIN ever runs against this data — it's
 loaded once into Zustand at boot).
 
 **Encryption at rest — deferred.** API keys live unencrypted in
-the `providers[].apiKey` JSON. v1 is local-first with no network
+the `providers[].apiKey` JSON. v1 is local with no network
 exposure of the DB; the threat model that justifies encryption
 hasn't materialized. Tracked in
 [followups.md](./parked.md#encryption-at-rest-for-provider-keys).

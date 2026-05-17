@@ -30,7 +30,7 @@ Items numbered in install order — each layer composes with the previous.
 
 ### 1. SQLite + Drizzle ORM
 
-Local-first. All user config and data lives in SQLite. No env vars, no BaaS.
+Local data. All user config and data lives in SQLite. No env vars, no BaaS.
 
 - `expo-sqlite` for the underlying driver (works on iOS, Android, and under Electron via the same adapter)
 - `drizzle-orm` for TypeScript-first queries — schema as source of truth; types flow from schema definitions
@@ -83,7 +83,7 @@ Provider-agnostic LLM layer. Same shape as the old app — proven choice.
 - `ai` for the core API + `@ai-sdk/anthropic` / `@ai-sdk/openai` / `@ai-sdk/google` per supported provider
 - `generateObject({ schema: zodSchema })` for structured outputs when the provider supports them; fall back to `generateText` + `jsonrepair` + `zodSchema.parse()` otherwise
 - `streamText` / `streamObject` for incremental rendering during AI replies
-- Provider + model + API key are per-story settings (`stories.settings` in the data model), with keys persisted in SQLite per the local-first strategy
+- Provider + model + API key are per-story settings (`stories.settings` in the data model), with keys persisted in SQLite per the local data strategy
 
 ### 6. js-tiktoken
 
@@ -173,7 +173,7 @@ Reconsider if cross-device sync lands (below) — polling a remote source for de
 
 ### Cross-device sync via Google Drive
 
-Optional feature: sync a user's stories + assets to their own Google Drive via the Drive REST API (BYO-OAuth, no server we operate). Matches the local-first ethos — user owns their data on their own cloud storage.
+Optional feature: sync a user's stories + assets to their own Google Drive via the Drive REST API (BYO-OAuth, no server we operate). Matches the local ethos — user owns their data on their own cloud storage.
 
 **Architectural fit is good:** the delta log is inherently sync-friendly. Deltas are UUID-identified, append-only, and already represent any narrative state change. Assets are content-addressed by sha256, so binary sync can dedupe naturally.
 

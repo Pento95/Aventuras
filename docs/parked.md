@@ -759,7 +759,7 @@ signal? Lands with the World panel · Overview detail design pass.
 #### Encryption at rest for provider keys
 
 Provider API keys live in SQLite (per data strategy). Encryption
-mechanism deferred — not blocking v1 since this is a local-first app
+mechanism deferred — not blocking v1 since this is a local app
 with no network exposure of the DB. Lean: explore once a real
 threat model surfaces (export-leak, multi-user shared machine, etc.).
 
@@ -1151,7 +1151,7 @@ similar) would let external triggers — share sheets, notification
 taps, calendar reminders — open a specific story / surface
 directly. Scoped out of v1 per
 [`ui/foundations/mobile/platform.md`](./ui/foundations/mobile/platform.md);
-the local-first app has no immediate consumer beyond manual
+the local app has no immediate consumer beyond manual
 sharing.
 
 Lands if integrations surface real demand: e.g., a "share story

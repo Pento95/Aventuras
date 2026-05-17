@@ -22,7 +22,7 @@ Design record:
 anomalies, performance), plus the structural surfaces that consume
 those contracts.
 
-**Out:** end-user analytics (we're local-first), external crash
+**Out:** end-user analytics, external crash
 reporting (none, by data strategy — see
 [`tech-stack.md`](./tech-stack.md)), business-state surfaces (Plot,
 World — domain surfaces that incidentally show classifier output),
@@ -469,7 +469,7 @@ from headers; prompt bodies opt-in or auto-truncated).
 **No external reporting.** Purely local. The diagnostics layer
 does not phone home, does not submit crash reports to third
 parties, does not ship telemetry. The user's diagnostic data
-stays on their device. This matches the local-first data strategy
+stays on their device. This matches the local data strategy
 (see [`tech-stack.md`](./tech-stack.md)).
 
 ## Performance budget

@@ -372,7 +372,7 @@ the platform the user is creating on:
   enough headroom that the quality tail outweighs the
   cost reduction.
 
-Aventuras is local-first; a story stays on the device where it
+Aventuras is local; a story stays on the device where it
 was created. The suggestion reflects that reality. The user can
 override either way — picking native on mobile is fine if the
 user has signal that the device handles it.

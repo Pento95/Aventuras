@@ -1,6 +1,6 @@
 # Aventuras
 
-Local-first cross-platform AI-collaborative writing app. Mobile via
+Cross-platform AI-collaborative writing app. Mobile via
 Expo, desktop via Electron. Single Expo app shared across platforms;
 Electron wraps the web build. Domain core: Stories → branches →
 entries + entities + lore + threads + happenings (with awareness
