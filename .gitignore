@@ -65,3 +65,31 @@ superpowers/
 # Python virtualenvs (poc-embedder, future PoCs)
 **/.venv/
 **/__pycache__/
+
+# ── GSD baseline (auto-generated) ──
+.gsd
+.gsd-id
+.mcp.json
+.bg-shell/
+Thumbs.db
+*.swp
+*.swo
+*~
+*.code-workspace
+.env
+.env.*
+!.env.example
+.next/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+vendor/
+*.log
+coverage/
+.cache/
+tmp/
+.agents/
+skills-lock.json
