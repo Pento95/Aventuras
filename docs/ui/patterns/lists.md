@@ -23,6 +23,9 @@ Used by:
   History; empty list-pane state)
 - [Wizard · step 3 lore list](../screens/wizard/wizard.md#initial-lore--list-with-inline-editor)
   (lists pattern — long scroll, virtualization conditional)
+- [Diagnostics Hub · Delta log tab](../screens/diagnostics/diagnostics.md#tab-5--delta-log)
+  (cursor-walking history pattern + virtualization on the
+  `deltas` table query)
 
 ---
 
@@ -66,7 +69,8 @@ Where it applies in v1:
 - [World panel · History tab](../screens/world/world.md#history-tab)
   — per-entity delta log
 - Plot panel · History tab — per-thread / per-happening delta log
-- Future global delta-log observability panel
+- [Diagnostics Hub · Delta log tab](../screens/diagnostics/diagnostics.md#tab-5--delta-log)
+  — story-scoped (default branch-scoped), unscoped across rows
 
 ### Threshold
 

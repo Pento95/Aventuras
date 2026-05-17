@@ -35,11 +35,14 @@ gets its own probe shape later.
 
 Off by default, opt-in via a two-level gate:
 
-- **App level** — `app_settings.probe_mode_enabled`. Hidden flag in
-  App Settings · Advanced. Master switch.
-- **Story level** — `stories.settings.probe_mode_active`. Per-story
-  toggle in Story Settings · Memory. No-op when the app-level flag
-  is off.
+- **App level** — `app_settings.diagnostics.enabled`. The master
+  gate for the whole diagnostics layer (see
+  [`observability.md → Gating model`](../observability.md#gating-model));
+  memory probe captures only write when this is on AND the
+  per-story toggle below is on.
+- **Story level** — `stories.settings.probe_mode_active`.
+  Per-story toggle in Story Settings · Memory. No-op when the
+  app-level master is off.
 
 Both must be on for new captures to write. Existing captures stay
 inspectable when either toggle flips off; only new-capture writes
@@ -375,10 +378,12 @@ Landed in [`data-model.md`](../data-model.md):
 
 - New table `probe_captures` per the
   [Capture format](#capture-format) shape above.
-- New field `app_settings.diagnostics.probe_mode_enabled` (boolean
-  inside the existing diagnostics JSON, not promoted to a column —
-  matches the placement pattern of every other debug toggle).
-  Default `false`.
+- Memory probe's app-level gate is `app_settings.diagnostics.enabled`
+  (boolean inside the existing diagnostics JSON, not promoted to a
+  column — matches the placement pattern of every other debug
+  toggle). Default `false`. This is the same master gate that
+  controls the broader diagnostics layer per
+  [`observability.md → Gating model`](../observability.md#gating-model).
 - New field `stories.settings.probe_mode_active` (boolean inside
   the existing settings JSON). Default `false`.
 

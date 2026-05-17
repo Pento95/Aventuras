@@ -1,0 +1,280 @@
+<!-- prettier-ignore -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Diagnostics Hub</title>
+<style>
+  :root {
+    --ink: #333;
+    --ink-muted: #888;
+    --ink-faint: #aaa;
+    --line: #bbb;
+    --line-soft: #ddd;
+    --bg: #fafafa;
+    --bg-region: #fff;
+    --bg-highlight: #eef;
+    --warn: #c94;
+    --warn-bg: #fdf3e3;
+    --danger: #c66;
+    --danger-bg: #fcebeb;
+    --ok: #4a8;
+    --ok-bg: #ecf6f1;
+    --info: #4060a0;
+    --info-bg: #e8eef8;
+  }
+  html, body { margin: 0; padding: 0; font: 13px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; color: var(--ink); background: var(--bg); }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+
+  .screen-label { padding: 8px 16px; background: #eee; border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-muted); }
+  .screen-label strong { color: var(--ink); }
+
+  .review-bar { padding: 8px 16px; background: #f5f0e6; border-bottom: 1px solid #e3d8c0; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 11px; }
+  .review-bar .rb-label { text-transform: uppercase; letter-spacing: 0.08em; color: #7a6a40; font-weight: 600; font-size: 10px; }
+  .review-bar .rb-group { display: flex; gap: 4px; align-items: center; }
+  .rb-btn { padding: 3px 9px; border: 1px solid #d8c99a; border-radius: 3px; background: #fff; color: #5a4820; font-size: 11px; cursor: pointer; }
+  .rb-btn.active { background: #7a6a40; color: #fff; border-color: #7a6a40; }
+  .rb-note { margin-left: auto; font-size: 10px; color: #967; font-style: italic; }
+
+  .vp-stage { flex: 1; padding: 12px; background: var(--bg); display: flex; justify-content: center; box-sizing: border-box; min-height: 0; }
+  .vp-stage-wrap { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; min-height: 0; flex: 1; }
+  .vp-stage-meta { font-size: 11px; color: var(--ink-muted); font-family: monospace; }
+  .vp-stage-meta strong { color: var(--ink); }
+  .viewport { container-type: inline-size; background: var(--bg-region); border: 1px solid var(--line); border-radius: 4px; width: 100%; max-width: 1280px; transition: max-width 0.25s ease; overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+  /* top-bar — app-level chrome */
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--bg-region); }
+  .icon-back { width: 28px; height: 28px; border: 1px dashed var(--line); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--ink-muted); }
+  .crumbs { font-size: 14px; color: var(--ink); font-weight: 500; }
+  .topbar-right { margin-left: auto; display: flex; gap: 8px; }
+  .icon-btn { width: 30px; height: 30px; border: 1px dashed var(--line); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--ink-muted); font-size: 14px; }
+
+  /* story selector — story-anchored tabs */
+  .story-strip { display: flex; align-items: center; gap: 10px; padding: 8px 20px; border-bottom: 1px solid var(--line-soft); background: var(--bg); font-size: 12px; }
+  .story-strip .ss-label { color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+  .story-strip .ss-picker { padding: 3px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-region); color: var(--ink); cursor: pointer; }
+  .story-strip .ss-picker:hover { background: var(--bg-highlight); }
+
+  /* tab strip */
+  .tabs { display: flex; gap: 0; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg-region); position: relative; }
+  .tab { padding: 10px 14px; font-size: 13px; color: var(--ink-muted); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-bottom: -1px; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+  .tab .tab-count { font-size: 11px; color: var(--ink-faint); background: var(--bg); border-radius: 999px; padding: 1px 7px; }
+  .tab.active .tab-count { color: var(--ink-muted); }
+  .tab.warn-count .tab-count { background: var(--warn-bg); color: var(--warn); }
+
+  /* tab-body wrapper */
+  .body-wrap { flex: 1; overflow: auto; padding: 0; }
+
+  /* filter row (Logs tab body) */
+  .filter-row { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--line-soft); background: var(--bg); flex-wrap: wrap; font-size: 12px; }
+  .filter-row .fr-group { display: flex; align-items: center; gap: 6px; }
+  .filter-row .fr-label { font-size: 10px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .filter-row select, .filter-row input { padding: 3px 6px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-region); font: inherit; color: var(--ink); }
+  .filter-row input.search { width: 180px; }
+  .filter-row .fr-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .fr-chip { padding: 2px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-region); font-size: 11px; color: var(--ink-muted); cursor: pointer; }
+  .fr-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* log entry list */
+  .log-list { display: flex; flex-direction: column; }
+  .log-row { display: grid; grid-template-columns: 80px 80px 1fr 120px 90px; align-items: baseline; gap: 12px; padding: 8px 20px; border-bottom: 1px solid var(--line-soft); font-size: 12px; cursor: pointer; }
+  .log-row:hover { background: var(--bg-highlight); }
+  .log-row .lr-time { font-family: ui-monospace, monospace; color: var(--ink-muted); font-size: 11px; }
+  .log-row .lr-level { padding: 1px 6px; border-radius: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; text-align: center; }
+  .log-row .lr-level.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+  .log-row .lr-level.error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .log-row .lr-level.debug { background: var(--bg); color: var(--ink-muted); border: 1px solid var(--line-soft); }
+  .log-row .lr-kind { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ink); }
+  .log-row .lr-kind .kind-sub { color: var(--ink-muted); }
+  .log-row .lr-fields { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-row .lr-action { font-family: ui-monospace, monospace; font-size: 11px; padding: 1px 6px; border: 1px solid var(--info); border-radius: 3px; background: var(--info-bg); color: var(--info); text-align: center; cursor: pointer; }
+  .log-row .lr-action.empty { border: 1px dashed var(--line-soft); background: transparent; color: var(--ink-faint); cursor: default; }
+
+  /* empty state */
+  .empty-pane { padding: 60px 20px; text-align: center; color: var(--ink-muted); }
+  .empty-pane p { margin: 0 0 12px; font-style: italic; }
+  .empty-pane .empty-cta { padding: 6px 14px; border: 1px solid var(--ink); border-radius: 3px; background: var(--ink); color: #fff; cursor: pointer; }
+
+  /* tab placeholder (other tabs) */
+  .tab-placeholder { padding: 40px 20px; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 12px; }
+  .tab-placeholder strong { color: var(--ink-muted); font-style: normal; }
+
+  /* mode visibility */
+  body[data-mode="master-off"] .story-strip,
+  body[data-mode="master-off"] .tabs,
+  body[data-mode="master-off"] .body-wrap { display: none; }
+  body[data-mode="master-off"] .off-pane { display: flex; }
+  body[data-mode="hub"] .off-pane,
+  body[data-mode="hub-empty"] .off-pane { display: none; }
+
+  body[data-mode="hub"] .tab-body-other { display: none; }
+  body[data-mode="hub-empty"] .filter-row,
+  body[data-mode="hub-empty"] .log-list { display: none; }
+  body[data-mode="hub-empty"] .empty-pane { display: block; }
+  body[data-mode="hub"] .empty-pane { display: none; }
+
+  .off-pane { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 60px 20px; color: var(--ink-muted); text-align: center; }
+  .off-pane p { margin: 0; font-style: italic; }
+  .off-pane a { color: var(--ink); text-decoration: underline; }
+</style>
+</head>
+<body data-mode="hub">
+<div class="screen-label">Wireframe · <strong>Diagnostics Hub</strong> · low-fidelity surface inventory · <strong>Logs tab</strong> shown as representative body · per-tab detail passes follow</div>
+
+<div class="review-bar">
+  <span class="rb-label">Mode</span>
+  <span class="rb-group">
+    <button class="rb-btn active" data-mode-btn="hub">Hub (Logs tab active)</button>
+    <button class="rb-btn" data-mode-btn="hub-empty">Buffers empty</button>
+    <button class="rb-btn" data-mode-btn="master-off">Master toggle off</button>
+  </span>
+  <span class="rb-note">Hub-level structural sketch. Per-tab bodies designed in their own detail passes.</span>
+</div>
+
+<div class="vp-stage">
+  <div class="vp-stage-wrap">
+    <div class="vp-stage-meta">surface · <strong>App Settings → Actions menu → Open Diagnostics Hub</strong> · gated by <strong>app_settings.diagnostics.enabled</strong></div>
+
+    <div class="viewport">
+
+      <!-- Top-bar — app-level chrome -->
+      <div class="topbar">
+        <div class="icon-back">←</div>
+        <div class="crumbs">Diagnostics</div>
+        <div class="topbar-right">
+          <div class="icon-btn" title="Actions menu">⚲</div>
+        </div>
+      </div>
+
+      <!-- Story selector strip (only for story-anchored tabs; visible always in this sketch) -->
+      <div class="story-strip">
+        <span class="ss-label">Story</span>
+        <button class="ss-picker">The Tower of Aria ▾</button>
+        <span class="ss-label" style="margin-left: 16px;">Branch</span>
+        <button class="ss-picker">main ▾</button>
+      </div>
+
+      <!-- Tab strip -->
+      <div class="tabs">
+        <div class="tab">Memory probe</div>
+        <div class="tab">Per-turn inspector <span class="tab-count">12</span></div>
+        <div class="tab">Call log <span class="tab-count">87</span></div>
+        <div class="tab active warn-count">Logs <span class="tab-count">3</span></div>
+        <div class="tab">Delta log</div>
+      </div>
+
+      <!-- Body wrapper -->
+      <div class="body-wrap">
+
+        <!-- Filters (Logs tab) -->
+        <div class="filter-row">
+          <div class="fr-group">
+            <span class="fr-label">Level</span>
+            <div class="fr-chips">
+              <span class="fr-chip active">warn</span>
+              <span class="fr-chip active">error</span>
+              <span class="fr-chip">debug</span>
+            </div>
+          </div>
+          <div class="fr-group">
+            <span class="fr-label">Subsystem</span>
+            <div class="fr-chips">
+              <span class="fr-chip active">classifier</span>
+              <span class="fr-chip active">retrieval</span>
+              <span class="fr-chip active">provider</span>
+              <span class="fr-chip">embedder</span>
+              <span class="fr-chip">pipeline</span>
+              <span class="fr-chip">+3 more</span>
+            </div>
+          </div>
+          <div class="fr-group">
+            <span class="fr-label">Kind</span>
+            <input class="search" type="text" placeholder="filter by kind…">
+          </div>
+        </div>
+
+        <!-- Log entries -->
+        <div class="log-list">
+          <div class="log-row">
+            <span class="lr-time">14:02:18</span>
+            <span class="lr-level warn">warn</span>
+            <span class="lr-kind"><span class="kind-sub">classifier.</span>delta_clamped</span>
+            <span class="lr-fields">{ originalDelta: -1800, finalDelta: 0, entryId: "e_…ka4" }</span>
+            <span class="lr-action" title="Open per-turn inspector">tr_a3kf</span>
+          </div>
+          <div class="log-row">
+            <span class="lr-time">14:02:17</span>
+            <span class="lr-level warn">warn</span>
+            <span class="lr-kind"><span class="kind-sub">provider.</span>retry_succeeded</span>
+            <span class="lr-fields">{ attempt: 2, latencyMs: 1840, status: 200 }</span>
+            <span class="lr-action" title="Open per-turn inspector">tr_a3kf</span>
+          </div>
+          <div class="log-row">
+            <span class="lr-time">14:02:16</span>
+            <span class="lr-level error">error</span>
+            <span class="lr-kind"><span class="kind-sub">retrieval.</span>knn_error</span>
+            <span class="lr-fields">{ reason: "vec0_index_corrupt", typeFilter: "happening" }</span>
+            <span class="lr-action" title="Open per-turn inspector">tr_a3kf</span>
+          </div>
+          <div class="log-row">
+            <span class="lr-time">13:58:04</span>
+            <span class="lr-level warn">warn</span>
+            <span class="lr-kind"><span class="kind-sub">retrieval.</span>row_skipped_stale</span>
+            <span class="lr-fields">{ rowId: "ent_…9z2", typeFilter: "entity" }</span>
+            <span class="lr-action" title="Open per-turn inspector">tr_92mp</span>
+          </div>
+          <div class="log-row">
+            <span class="lr-time">13:58:04</span>
+            <span class="lr-level warn">warn</span>
+            <span class="lr-kind"><span class="kind-sub">retrieval.</span>row_skipped_stale</span>
+            <span class="lr-fields">{ rowId: "ent_…1f7", typeFilter: "entity" }</span>
+            <span class="lr-action" title="Open per-turn inspector">tr_92mp</span>
+          </div>
+          <div class="log-row">
+            <span class="lr-time">13:51:12</span>
+            <span class="lr-level warn">warn</span>
+            <span class="lr-kind"><span class="kind-sub">embedder.</span>staleness_detected</span>
+            <span class="lr-fields">{ rowId: "ent_…1f7", expectedHash: "sha1:…b3" }</span>
+            <span class="lr-action empty">—</span>
+          </div>
+          <div class="log-row">
+            <span class="lr-time">13:48:09</span>
+            <span class="lr-level warn">warn</span>
+            <span class="lr-kind"><span class="kind-sub">provider.</span>rate_limited</span>
+            <span class="lr-fields">{ retryAfterMs: 8000, source: "provider:anthropic-main" }</span>
+            <span class="lr-action empty">—</span>
+          </div>
+        </div>
+
+        <!-- Empty buffer state (mode: hub-empty) -->
+        <div class="empty-pane">
+          <p>No log entries captured yet.</p>
+          <p style="font-size: 11px;">Trigger a turn or wait for a background event to populate the log.</p>
+        </div>
+
+      </div>
+
+      <!-- Master-off state -->
+      <div class="off-pane">
+        <p>Diagnostics is off.</p>
+        <p style="font-size: 12px;">Turn on the master toggle in <a href="#">App Settings → Diagnostics</a> to enable capture across all hub tabs.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Review-bar mode switching
+  document.querySelectorAll('[data-mode-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.modeBtn;
+      document.body.dataset.mode = mode;
+      document.querySelectorAll('[data-mode-btn]').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+</script>
+</body>
+</html>

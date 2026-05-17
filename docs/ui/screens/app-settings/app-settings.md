@@ -597,31 +597,63 @@ Version + OS + license + opensource credits + repo link. Lightweight.
 
 ## APP · Diagnostics
 
-Debug toggles, view-logs button, performance stats, raw-settings
-export. Power-user / debug surface. Heavier observability tooling
-(global delta-log browser) lives in its own future panel — see
-followups.
+Configuration surface for the observability layer. Toggles + a
+performance-stats / raw-settings-export pane. Navigation into the
+hub itself (which subsumes the previously-placeholdered
+view-logs button) lives in the global Actions (⚲) menu, not in
+this tab body — see
+[Diagnostics Hub](../diagnostics/diagnostics.md).
 
-### Memory probe mode (master gate)
+### Enable diagnostics capture (master gate)
 
 Toggle bound to
-[`app_settings.diagnostics.probe_mode_enabled`](../../../data-model.md#diagram).
-Off by default. Master gate for the
-[memory probe](../memory-probe/memory-probe.md) — when on, stories
-whose own
-[`stories.settings.probe_mode_active`](../../../data-model.md#diagram)
-is on capture per-turn retrieval state for diagnostic inspection;
-when off, no captures are written across any story.
+[`app_settings.diagnostics.enabled`](../../../data-model.md#diagram).
+Off by default. Master gate for the entire diagnostics layer
+(memory probe captures, the in-memory diagnostics store, console
+mirroring) per
+[`observability.md → Gating model`](../../../observability.md#gating-model).
+When off:
 
-The toggle affects writes only — captures already written stay
-inspectable until explicitly cleared. Adds a small per-turn
-serialization cost (light captures: <10 ms typical) only on
-stories where both flags are on; turning the master flag off zeros
-that cost across the whole app.
+- Every diagnostics sink (`logger`, `httpCallSink`,
+  `turnCaptureSink`) no-ops at function entry.
+- Memory probe captures stop writing across every story.
+- The Diagnostics Hub entry in the Actions menu is hidden.
+- The three in-memory ring buffers (`turnCaptures`, `httpCalls`,
+  `logEntries`) wipe immediately on toggle-off.
 
-Inline footer copy: short paragraph plus an `Open memory probe →`
-link that routes to the probe screen scoped to the most-recently-
-opened story (or a story-list picker if none).
+When on:
+
+- Sinks become active. Subsystems' emissions populate the
+  buffers; UI subscribes and renders live.
+- Memory probe writes occur for stories whose
+  [`stories.settings.probe_mode_active`](../../../data-model.md#diagram)
+  is also on.
+- The Diagnostics Hub entry appears in the Actions menu.
+
+Persisted `probe_captures` are NOT wiped on toggle-off (memory
+probe's existing rule); only the in-memory buffers vaporize.
+
+### Include debug-level emissions
+
+Secondary toggle bound to
+`app_settings.diagnostics.debug_level_enabled`. Default off.
+Disabled (grayed) when the master gate is off; meaningful only
+when master is on. When off, `logger.debug(...)` calls no-op;
+`warn` and `error` still flow.
+
+### Memory probe — per-story activation
+
+Inline reference to the
+[memory probe per-story toggle](../../../memory/probe.md#scope)
+on each story's Story Settings · Memory tab. App-level here is
+the gate above; per-story activation is the second half. Short
+explanatory copy plus an inline link to the most-recently-opened
+story's Story Settings (or a story picker if none).
+
+### Performance stats + raw-settings export
+
+Existing power-user pane content. Independent of the master
+toggle.
 
 ## Save session
 
@@ -759,7 +791,8 @@ expression itself.
   Or inline in the Keys row? Defer until we have a concrete custom
   endpoint to validate against.
 - **Diagnostics tab depth** — currently lightweight. Likely grows
-  over time (debug flags, retry counts, cache stats, schema
-  inspector). Eventually overlaps with the planned global delta-log
-  observability panel — boundary lands with the
-  [Observability / debug UI followup](../../../parked.md#observability--debug-ui).
+  over time (cache stats, schema inspector, additional power-user
+  config knobs). Observability surfaces themselves live in the
+  [Diagnostics Hub](../diagnostics/diagnostics.md) (Actions menu
+  entry), not in this tab body; this tab body stays a configuration
+  surface.

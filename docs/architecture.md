@@ -385,8 +385,10 @@ populates the new entry's metadata:
   added to the previous entry's `worldTime`. The delta is
   **non-negative — `delta ≥ 0` is a hard pipeline-layer invariant**.
   Validation rejects classifier outputs with negative deltas; on
-  rejection, re-roll once, then clamp to `0` with a logged anomaly
-  if re-roll also fails. **For detected flashback / memory framing
+  rejection, re-roll once, then clamp to `0` and emit
+  `logger.warn('classifier.delta_clamped', { originalDelta, finalDelta: 0, entryId })`
+  if re-roll also fails (see
+  [`observability.md → Logger contract`](./observability.md#logger-contract)). **For detected flashback / memory framing
   ("she remembered...", "25 years earlier..."), the classifier emits
   0** — main-timeline clock doesn't advance during recalled scenes.
   Cumulative monotonicity holds when written by the classifier
@@ -605,3 +607,11 @@ Flag for future sessions:
   loading current story on app launch.
 - **Secrets storage** — API keys in SQLite (per data strategy), whether
   encrypted at rest, how they flow from settings UI into AI SDK calls
+- **Observability + debugging** — substrate designed in
+  [`observability.md`](./observability.md); hub UI in
+  [`ui/screens/diagnostics/diagnostics.md`](./ui/screens/diagnostics/diagnostics.md).
+  Logger contract, structural sinks, gating, and the per-turn
+  inspector / call log / logs / delta-log tab inventory all live
+  there. This doc cross-refs the logger via the classifier
+  contract above; deeper subsystem-side emission inventories
+  follow as each subsystem ships.

@@ -283,19 +283,6 @@ character entities. Same `happening_awareness` data, queried from the
 character end. Pending; add when the character-kind detail tabs get
 their next pass.
 
-#### Observability / debug UI
-
-Standalone panel exposing the global `deltas` log for power-user
-debugging — what happened to the data layer, when, by which agent
-(classifier / lore-mgmt / user_edit / chapter-close). Likely a
-chronological scroll with filters by source, target_table,
-action_id. Distinct from per-entity History tab (World, Plot) which
-already scopes the log to one row's lineage.
-
-No external services. Larger topic touching debugging, logging, and
-observability — own design pass. Surfaced during Plot panel
-brainstorm.
-
 #### Asset gallery
 
 A per-story gallery of all images attached to entries
@@ -1176,6 +1163,101 @@ The work itself is straightforward — Expo Router supports URL
 schemes natively; route mapping plus a launch-time deep-link
 handler. Schema cost is also small (URL templates per surface).
 Held parked because v1 doesn't have a consumer that benefits.
+
+#### Observability — file-based persistent logger
+
+The [observability layer](./observability.md) ships in-memory
+ring buffers for `httpCalls`, `logEntries`, and `turnCaptures`.
+On app quit, these vaporize. A user / engineer who wants to
+look at "what happened before the crash" or "what did the system
+log during yesterday's session" has no recourse.
+
+File-based logging adds a rotating log file (Electron: app data
+dir; RN: sandbox storage) as a second sink alongside the
+in-memory ring buffer. Same `logger` interface, same record
+shape; the new sink writes to disk. Rotation policy (size-based?
+time-based?), retention, redaction of sensitive payloads
+(prompts, headers) all need design.
+
+Held parked because v1 has no concrete consumer — the in-memory
+ring buffer covers active debugging, and "post-crash forensics"
+is speculative until users actually report needing it. Lands if
+real signal surfaces.
+
+#### Observability — manual export to JSON file
+
+User affordance to save the current ring-buffer contents (full
+buffer or a filtered subset) to a JSON file. For triage, bug
+reports, "let me look at this later" workflows. Lives in the
+Diagnostics Hub as an export button per-tab.
+
+The feature owns its own redaction policy — API keys are already
+redacted at sink-time, but the export's "what to include in the
+prompt body" question (auto-truncate, opt-in for full bodies,
+strip nothing) needs explicit design. Until that design exists,
+the user can workaround by screenshotting the hub.
+
+Held parked because v1 dev/power-user workflow stays in the live
+hub. Lands when a "share my diagnostic state" use case becomes
+concrete.
+
+#### Observability — pin-to-keep per-row affordance
+
+Per-row affordance on Call log / Logs / Per-turn inspector to
+flag a single ring-buffer entry to survive FIFO eviction.
+Bounded count (cap 20-50) of pinned entries lives in
+`localStorage` or a tiny `pinned_diagnostics` table. Lightweight
+selective persistence without committing to whole-stream archive.
+
+Useful when investigating a hard-to-reproduce issue across
+multiple sessions — pin the one anomalous turn, keep working,
+return to it later. Held parked until the in-memory ring-buffer
+model's limitations bite real workflows.
+
+#### Observability — cross-window aggregator on Electron
+
+Each Electron window has its own renderer with its own
+`diagnosticsStore`. A user with multiple windows open sees per-
+window state in each hub instance; window A doesn't show window
+B's calls. Acceptable for v1 (multi-window is uncommon), but a
+cross-window aggregator (combining per-window state into a
+unified hub view via main-process IPC) is the natural extension.
+
+Implementation cost is real: main-process recorder + IPC channel
+
+- per-window store reconciliation. Held parked until multi-
+  window debugging becomes a recurring friction.
+
+#### Observability — `progressCall` for streaming live byte count
+
+[`httpCallSink`](./observability.md#httpcallsink) currently
+captures streamed responses as one transition at stream end (body
+accumulated in the wrapper, `completeCall` fires once with the
+final body). The UI shows "in-flight" throughout and resolves at
+end.
+
+A future `progressCall(id, { chunks, bytes })` API would let the
+wrapper emit incremental progress to the sink, enabling a live
+byte-counter or token-counter UI in the Call log row during
+streaming. Useful for "is this stream actually progressing or
+hung?" debugging.
+
+Held parked because v1's binary in-flight / completed model is
+sufficient for the most common debugging cases. Lands if "stream
+appears hung" turns out to be a recurring v1 issue.
+
+#### Observability — performance metrics dashboard tab
+
+The [Per-turn inspector](./ui/screens/diagnostics/diagnostics.md#tab-2--per-turn-inspector)
+surfaces per-turn performance (phase timing, call counts, token
+usage on individual calls). A sibling tab aggregating across
+turns — mean / p95 latency per phase, mean tokens-per-turn, plot
+trends over the last N turns — is the natural next view.
+
+Held parked because v1 single-turn inspection covers the
+debugging case; aggregate analysis is the "I'm tuning
+performance" workflow, which isn't a v1 motivator. Lands when
+performance tuning becomes a focused workflow.
 
 ### Two-stage touch feedback (light hover + stronger press)
 

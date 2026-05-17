@@ -424,7 +424,7 @@ Per-story activation of the [memory probe](../memory-probe/memory-probe.md).
 Bound to
 [`stories.settings.probe_mode_active`](../../../data-model.md#diagram).
 No-op while
-[`app_settings.diagnostics.probe_mode_enabled`](../../../data-model.md#diagram)
+[`app_settings.diagnostics.enabled`](../../../data-model.md#diagram)
 is off — when the master flag is off, the toggle here is disabled
 with a hint linking to App Settings · Diagnostics.
 

@@ -83,9 +83,9 @@ Buckets are coarse-grained on purpose. Per-table breakdown reads as
 pedantic in a consent modal; "world-state changes" is the
 load-bearing summary. The
 [delta log](../../../../data-model.md#entry-mutability--rollback)
-holds the full per-table record for anyone digging deeper (a future
-[delta-log debug surface](../../../../parked.md#observability--debug-ui)
-will expose it; deferred).
+holds the full per-table record for anyone digging deeper; the
+[Diagnostics Hub · Delta log tab](../../diagnostics/diagnostics.md#tab-5--delta-log)
+exposes the global view (gated by the diagnostics master toggle).
 
 ## Cross-chapter case
 

@@ -17,6 +17,9 @@ Used by:
 - [Plot panel](../screens/plot/plot.md) — happenings + threads
   detail panes.
 - [World panel](../screens/world/world.md#tabs--per-kind-composition).
+- [Diagnostics Hub](../screens/diagnostics/diagnostics.md#tab-strip)
+  — five tabs (Memory probe, Per-turn inspector, Call log, Logs,
+  Delta log).
 - Anywhere else a surface needs sibling-section navigation.
 
 ## Scope

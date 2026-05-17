@@ -20,6 +20,9 @@ Used by:
   (import counterparts: Clone built-in / From JSON / From scratch)
 - [Story list · Story import](../screens/story-list/story-list.md#story-import)
   (import counterparts for stories)
+- [Diagnostics Hub · Per-turn inspector](../screens/diagnostics/diagnostics.md#tab-2--per-turn-inspector)
+  (raw JSON viewer for classifier output + expanded row payloads
+  on Call log + Logs tabs)
 
 ---
 

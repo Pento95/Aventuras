@@ -24,8 +24,8 @@ Used by:
   delta log filtered to one entity (or branch-scoped view).
 - [Plot — history tab](../screens/plot/plot.md#mobile-expression) —
   delta log filtered to threads and happenings.
-- Future global delta-log surface — same compound, no host-side
-  filter.
+- [Diagnostics Hub · Delta log tab](../screens/diagnostics/diagnostics.md#tab-5--delta-log)
+  — story-scoped (branch-scoped by default), unscoped across rows.
 
 ## Compound API
 

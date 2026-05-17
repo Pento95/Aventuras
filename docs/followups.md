@@ -649,3 +649,58 @@ Open sub-questions:
 
 Lands when translation phase is built. The framework already supports
 the degradation pattern; this followup pins the policy.
+
+### Actions menu broader design pass
+
+The
+[Diagnostics Hub](./ui/screens/diagnostics/diagnostics.md)
+adds a single entry (`Open Diagnostics Hub`) to the global Actions
+(⚲) menu. The menu has not yet had a focused design pass — its
+full inventory, organizational shape (groups, separators, mobile
+expression), and contextual variants per screen are
+unspecified. Surfaced during the observability design
+session; lands as its own pass when the next set of Actions-menu
+candidates is ready (or when the menu's current sparseness
+becomes a UX friction in real use).
+
+### ESLint guardrail for `console.*` outside the logger
+
+[`observability.md → Logger contract`](./observability.md#logger-contract)
+specifies that subsystems route diagnostic emissions through
+`logger.<level>`, not direct `console.warn` / `console.error`.
+A `console.<level>` call outside the logger module bypasses the
+master gate (always fires, regardless of `app_settings.diagnostics.enabled`)
+and never lands in the in-memory `logEntries` slice. An ESLint
+rule banning these calls outside the logger module (and outside
+the rare on-purpose dev-only path) mitigates drift. Implementation
+followup; lands when the logger module is built.
+
+### Header denylist completeness gate
+
+The
+[HTTP call sink redaction contract](./observability.md#header-redaction)
+maintains a denylist of auth-style headers
+(`Authorization`, `X-API-Key`, `Cookie`, response `Set-Cookie`).
+As new providers ship with custom auth header names, the denylist
+must extend. Two implementation-time mitigations:
+
+- **Build-time test** that walks all configured providers' header
+  schemas and asserts each header name maps to "known-safe" or
+  "denylisted." Catches drift at PR time.
+- **Dev-build runtime warning** when a header name matches a
+  heuristic regex (`/auth|key|token|secret|credential|cookie/i`)
+  but isn't on the denylist. Catches first-encounter drift at
+  runtime.
+
+Implementation followup; lands when the HTTP wrapper + sink are
+built.
+
+### HTTP call cap calibration
+
+[`observability.md → Memory ceiling`](./observability.md#memory-ceiling)
+sets the `httpCalls` ring-buffer cap at 200. Translation-heavy
+turns can fire 8-10 calls each; ~20 turns cycle the buffer. The
+sink contract already protects calls whose owning turn is still
+in `turnCaptures` from eviction, but the default cap may need
+real-workload tuning. Implementation calibration; lands once
+real translation + embedding workloads measure call fan-out.

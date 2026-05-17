@@ -285,7 +285,7 @@ erDiagram
         json appearance "{ themeId, readerFontScale, accentOverride?, density } — density: 'default'|'compact'|'regular'|'comfortable' (sentinel 'default' resolves per tier; see ui/foundations/spacing.md#density-toggle)"
         text ui_language "ISO 639-1; defaults to OS locale on first launch"
         integer onboarding_completed_at "set on first dismissal of the onboarding wizard (Finish, Skip, or Step 2 footer-link exit); null = wizard renders as root on next boot"
-        json diagnostics "debug toggles, retry counts, view-logs prefs. Includes probe_mode_enabled boolean (master gate for the memory probe; off by default — per-story activation in stories.settings.probe_mode_active is no-op while this is off). See docs/memory/probe.md → Scope"
+        json diagnostics "debug toggles, retry counts. Includes enabled boolean (master gate for the diagnostics layer — memory probe captures, the in-memory diagnostics store, console mirroring; off by default) and debug_level_enabled boolean (secondary gate for debug-level log emissions; off by default; meaningful only when enabled is on). Per-story memory probe activation in stories.settings.probe_mode_active is no-op while enabled is off. See docs/observability.md → Gating model"
         integer created_at
         integer updated_at
     }
@@ -1083,7 +1083,7 @@ stories.settings: {
     chapters: number                 // chapter summaries pool
   }
   effectiveDim?: number              // Matryoshka effective dim — null = use model native dim, <N> = truncate stored vectors and queries to N. Set at story creation, locked thereafter same as embedding_model_id and retrievalMode. Provider-only (local model is small enough that truncation isn't worth the quality tail). See docs/memory/retrieval.md → Matryoshka effective dim
-  probe_mode_active: boolean        // per-story activation of the memory probe. No-op while app_settings.diagnostics.probe_mode_enabled is off. Default false. See docs/memory/probe.md
+  probe_mode_active: boolean        // per-story activation of the memory probe. No-op while app_settings.diagnostics.enabled is off. Default false. See docs/memory/probe.md and docs/observability.md → Gating model
 
   // Composer
   composerModesEnabled: boolean     // adventure-only; creative ignores

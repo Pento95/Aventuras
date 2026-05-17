@@ -205,7 +205,7 @@ visibility:
 - `[flip era]` renders only when the active calendar has
   `eras !== null`. See [Era flip](#era-flip) below.
 - `[probe]` renders only when probe mode is active at both
-  `app_settings.diagnostics.probe_mode_enabled` and
+  `app_settings.diagnostics.enabled` and
   `stories.settings.probe_mode_active`. Off by default — the
   affordance is hidden, not greyed-out, to keep the daily-use
   reader uncluttered for users who don't tune. See
