@@ -34,6 +34,16 @@ Focus on real issues:
 - accidental unrelated churn
 - docs/code mismatch introduced by this change
 
+Structure introduced by this change:
+- does each new or modified file have one clear responsibility with a
+  well-defined interface
+- are units decomposed so they can be understood and tested
+  independently
+- does the implementation follow the file structure the plan defined
+- did this change create new files that are already large, or
+  significantly grow existing ones — judge only what this change
+  contributed, not pre-existing file size
+
 Also check Aventuras-specific rules:
 - local patterns are followed
 - ownership boundaries were respected

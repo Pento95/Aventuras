@@ -2,15 +2,15 @@
 name: aventuras-slice-execute-subagents
 description: >-
   Execute an approved Aventuras slice implementation plan with
-  subagents. Use for an approved `.impl-plans/` plan that decomposes
-  into several dependency-free task clusters with disjoint write
-  ownership, where parallel workers and review loops pay off, or when
-  the developer asks for subagent execution. The controller validates
-  approval, readiness, execution gates, scope, and evidence;
-  dispatches fresh workers for independent task clusters with disjoint
-  write ownership; runs spec-compliance and code-quality review loops;
-  integrates changes; verifies with fresh evidence. Does not commit; a
-  closing skill offers that.
+  subagents. Use for an approved `.impl-plans/` plan large enough that
+  a fresh worker per task cluster and an independent two-stage review
+  per cluster improve quality, or when the developer asks for subagent
+  execution. The controller validates approval, readiness, execution
+  gates, scope, and evidence; dispatches one fresh worker per cluster
+  in dependency order; runs spec-compliance and code-quality review
+  loops; integrates changes; verifies with fresh evidence. Workers run
+  one at a time, never in parallel. Does not commit; a closing skill
+  offers that.
 ---
 
 # Aventuras Slice Execute With Subagents
@@ -18,12 +18,18 @@ description: >-
 Execute one approved Aventuras slice plan with a controller/worker
 model adapted from Superpowers `subagent-driven-development`.
 
-`aventuras-slice-plan` recommends one of the two execution skills
-when a plan is approved. This skill fits a plan that decomposes into
-several dependency-free clusters with disjoint write ownership, where
-parallel workers and per-cluster review pay off. For a small or
-tightly-coupled slice, use `aventuras-slice-execute` instead. Honor a
-direct developer choice over the plan's recommendation.
+The controller dispatches a fresh worker for each task cluster, one at
+a time, and runs a two-stage review after each — spec compliance, then
+code quality. A fresh worker per cluster keeps each worker focused on
+exactly the context the controller curated, and keeps the controller's
+own context lean for coordination.
+
+`aventuras-slice-plan` recommends one of the two execution skills when
+a plan is approved. This skill fits a larger or multi-cluster slice,
+where fresh context per cluster and independent per-cluster review
+keep quality high. For a small or tightly-coupled slice, use
+`aventuras-slice-execute` instead. Honor a direct developer choice
+over the plan's recommendation.
 
 ## Hard Gates
 
@@ -42,7 +48,8 @@ direct developer choice over the plan's recommendation.
 - Do not invoke `aventuras-design` autonomously. If canonical product
   or architecture uncertainty appears, stop and recommend a
   developer-run design session.
-- Do not dispatch workers with overlapping write ownership.
+- Do not run more than one implementer worker at a time; workers
+  never run in parallel.
 - Do not tell workers to read the whole plan. Give each worker the
   exact curated cluster text and context it needs.
 - Do not commit, and do not let a worker commit. The closing handoff
@@ -50,6 +57,43 @@ direct developer choice over the plan's recommendation.
   developer approval only.
 - Do not claim completion without fresh verification evidence produced
   after the last edit.
+
+## Execution Posture
+
+Workers run sequentially. Dispatch one implementer at a time and take
+its cluster through the full cycle — implement, spec review, code
+quality review, integration — before dispatching the next. Never run
+implementers in parallel: keeping parallel write sets safely disjoint
+costs more worker freedom than it returns, and a shared working tree
+makes concurrent edits unsafe. If parallel execution is ever wanted,
+it belongs in a separate skill.
+
+Within that sequential order, execute continuously. Between clusters
+that completed cleanly — implementation done, both reviews passed,
+verification green — proceed straight to the next cluster. Do not
+insert discretionary check-ins, "should I continue?" prompts, or
+progress summaries; the developer asked for the slice to be executed.
+This does not loosen the Hard Gates or the workflow's stop points: a
+real blocker, an unmet gate, a plan or design problem, or a
+`Scope: out` conflict still stops execution and is reported.
+
+## Model Selection
+
+Match each worker's model to its role; use the least capable model
+that can do the job well, and reserve costly models for work that
+needs them.
+
+- Mechanical clusters — isolated functions, a complete spec, one or
+  two files: a fast, cheap model. Most clusters are mechanical when
+  the plan is well-specified.
+- Integration and judgment clusters — multi-file coordination,
+  pattern matching, debugging: a standard model.
+- Review and design work — the spec and code-quality reviewers, the
+  final whole-slice reviewer, and any cluster needing design judgment
+  or broad codebase understanding: the most capable model available.
+
+When a worker returns `BLOCKED` on a reasoning issue, re-dispatch with
+a more capable model rather than retrying the same one.
 
 ## Workflow
 
@@ -127,9 +171,8 @@ its own right.
 
 ### 3. Extract Work Units
 
-Use Task Clusters as the default dispatch unit because they already
-encode risk, verification boundaries, dependencies, and
-parallel-safety.
+Use Task Clusters as the dispatch unit because they already encode
+risk, verification boundaries, and dependencies.
 
 For each cluster, extract:
 
@@ -151,32 +194,40 @@ Use `references/implementer-prompt.md` when dispatching each worker.
 
 Dispatch rules:
 
-- Use worker agents for code-edit clusters.
-- Give every worker disjoint ownership.
-- Tell workers they are not alone in the codebase, must not revert
-  others' edits, and must adjust to concurrent changes.
-- Tell workers to edit files directly in their workspace and report
+- Dispatch one implementer worker at a time. Take a cluster through
+  its full cycle — implement, both reviews, integration — before
+  dispatching the next.
+- Order clusters so every `Depends on` edge is satisfied;
+  dependency-free clusters may be taken in any safe order.
+- Match the worker's model to the cluster — see Model Selection.
+- Each worker edits only its cluster's owned files. Tell workers that
+  earlier clusters and the user may already have changed files, and
+  they must not revert edits they did not make.
+- Tell workers to edit files directly in the workspace and report
   changed paths.
-- Tell workers to leave commits alone unless the user explicitly asked
-  for commits.
+- Tell workers to leave commits alone; the commit is offered later by
+  `aventuras-slice-finish`.
 - Give workers the exact verification expected for their cluster.
-- Do not dispatch dependent clusters until their dependencies pass
-  review and verification.
-- Parallelize only dependency-free clusters with non-overlapping write
-  sets.
+- Answer a worker's questions fully before it proceeds; never rush a
+  worker into implementation.
 
 Accepted worker statuses:
 
 - `DONE` — proceed to spec compliance review.
 - `DONE_WITH_CONCERNS` — read concerns; resolve correctness, scope, or
   route concerns before review. Note lower-risk observations.
-- `NEEDS_CONTEXT` — provide missing context and re-dispatch.
-- `BLOCKED` — classify as context gap, reasoning issue, oversized
-  cluster, plan problem, design problem, or environment problem.
+- `NEEDS_CONTEXT` — the worker has questions or is missing context.
+  Answer fully, supply the missing context, and re-dispatch.
+- `BLOCKED` — classify and respond: a context gap re-dispatches with
+  the missing context; a reasoning issue re-dispatches with a more
+  capable model; an oversized cluster is split if the split is
+  mechanical, else returned to planning; a plan problem returns to
+  `aventuras-slice-plan`; a design problem is handed to a
+  developer-run `aventuras-design` session; an environment problem
+  stops execution and is reported.
 
-If a worker reports that the plan is wrong, stop and return to
-planning. If a canonical spec decision is needed, recommend a
-developer-run `aventuras-design` session.
+Never re-dispatch a cluster to the same model without changing
+something — more context, a more capable model, or a smaller cluster.
 
 ### 5. Review Each Cluster
 
@@ -193,17 +244,17 @@ acceptable `DONE_WITH_CONCERNS`:
    integration risk, and accidental churn.
 
 If either reviewer finds issues, send the findings back to the same
-implementer when possible or dispatch a targeted fix worker with
-disjoint ownership. Re-run the same review stage after fixes. Do not
-advance to dependent clusters while review issues remain.
+implementer when possible, or dispatch a targeted fix worker scoped to
+the same files. Re-run the same review stage after fixes. Do not
+advance to the next cluster while review issues remain.
 
 ### 6. Controller Integration
 
 The controller owns integration:
 
-- review worker diffs before continuing
-- resolve merge, formatting, and import conflicts without reverting
-  unrelated user or worker changes
+- review the worker's diff before continuing
+- resolve any formatting or import drift without reverting unrelated
+  user or earlier-cluster changes
 - run cluster-level verification when practical
 - track dependency edges from the plan
 - update your task list only after implementation, review, and
@@ -212,10 +263,13 @@ The controller owns integration:
 
 ### 7. Final Whole-Slice Verification
 
-After all clusters pass local reviews:
+After every cluster has passed its per-cluster reviews:
 
-- Run a final whole-slice review against the full plan and evidence
-  matrix.
+- Dispatch a fresh read-only reviewer over the whole integrated
+  slice, using `references/final-reviewer-prompt.md`. It checks the
+  full diff against the plan, the slice acceptance criteria, the
+  evidence matrix, and `Scope: out` — fresh eyes the controller
+  cannot provide, since the controller integrated the work.
 - Run every applicable evidence-matrix command/check after the last
   edit.
 - Run any extra checks made necessary by implementation discoveries.
@@ -225,8 +279,8 @@ After all clusters pass local reviews:
 - Add or recommend a brief slice-doc `Implementation notes` entry only
   if a durable rationale emerged; never write a task log there.
 
-If verification fails, fix and re-run, or report the blocker. Do not
-claim completion on partial evidence.
+If the final review or any verification fails, fix and re-run, or
+report the blocker. Do not claim completion on partial evidence.
 
 ## Completion Report
 
@@ -235,7 +289,7 @@ When done, report concisely:
 - plan path and slice
 - clusters executed and worker statuses
 - changed file groups
-- review outcomes
+- review outcomes, including the final whole-slice review
 - evidence commands/checks and pass/fail results
 - unresolved risks or skipped checks, if any
 - any implementation note added or recommended
@@ -259,3 +313,4 @@ finishing.
 - `references/implementer-prompt.md` — worker dispatch template
 - `references/spec-reviewer-prompt.md` — spec compliance review
 - `references/code-quality-reviewer-prompt.md` — quality review
+- `references/final-reviewer-prompt.md` — whole-slice final review

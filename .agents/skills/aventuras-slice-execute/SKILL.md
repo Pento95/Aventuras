@@ -20,12 +20,12 @@ session. This skill is for implementation, not planning. It assumes
 `.impl-plans/`.
 
 `aventuras-slice-plan` recommends one of the two execution skills
-when a plan is approved. This skill fits a small or tightly-coupled
-slice, or a plan whose clusters mostly share files and must stay
-coherent. Use `aventuras-slice-execute-subagents` instead when the
-plan decomposes into several dependency-free clusters with disjoint
-write ownership. Honor a direct developer choice over the plan's
-recommendation.
+when a plan is approved. This skill fits a small, single-cluster, or
+tightly-coupled slice that one working context can carry cleanly. Use
+`aventuras-slice-execute-subagents` instead for a larger or
+multi-cluster slice, where a fresh worker per cluster and independent
+per-cluster review improve quality. Honor a direct developer choice
+over the plan's recommendation.
 
 ## Hard Gates
 

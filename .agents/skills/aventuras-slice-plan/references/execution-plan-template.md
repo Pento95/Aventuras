@@ -76,8 +76,8 @@ developer owns).
 ## Task Clusters
 
 Batched by risk and verification boundary. Declare ordering with
-`Depends on`; clusters with no edge between them are parallel-safe —
-the execution skill decides how to dispatch them.
+`Depends on`; clusters with no edge between them are order-independent
+— the execution skill decides the order.
 
 1. Cluster name
    - Goal:

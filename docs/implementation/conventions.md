@@ -199,8 +199,8 @@ turns the slice contract into a run-specific execution plan:
 - Translate acceptance criteria into a verification / evidence
   matrix.
 - Pick the implementation route at module or file-boundary level.
-- Decide whether subagents are useful, and if so, assign explicit
-  read or write ownership.
+- Decompose the work into task clusters, batched by risk and
+  verification boundary, with explicit ordering dependencies.
 - Confirm scope boundaries, especially anything listed under
   **Scope: out**.
 

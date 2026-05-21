@@ -95,8 +95,8 @@ later assumptions.
 Avoid a plan that stacks several risky changes before the first
 verification point. If a cluster is too broad to verify cleanly, split
 it. Declare each cluster's ordering dependencies on other clusters;
-clusters with no dependency edge between them are parallelizable, which
-is the signal the execution skill needs to dispatch work.
+clusters with no dependency edge between them are order-independent,
+which tells the execution skill it may take them in any safe order.
 
 ### Map Evidence Before Work Starts
 
@@ -347,14 +347,18 @@ Two execution skills consume the plan:
   Fits a small or tightly-coupled slice, or a plan whose clusters
   mostly share files and must stay coherent.
 - `aventuras-slice-execute-subagents` — runs the plan with a
-  controller, parallel workers, and per-cluster review loops. Fits a
-  plan that decomposes into several dependency-free clusters with
-  disjoint write ownership, where parallelism and review pay off.
+  controller that dispatches one fresh worker per cluster, each
+  followed by spec and code-quality review. Fits a larger or
+  multi-cluster slice, where fresh context per cluster and
+  independent review keep quality high and the controller's context
+  lean.
 
-Read the Task Clusters and pick the better fit: count the clusters
-with no dependency edge between them and disjoint files, and weigh
-slice size and risk. Record the choice and a one-line reason in the
-plan's `## Recommended Executor` section.
+Read the Task Clusters and pick the better fit: a small,
+single-cluster, or tightly-coupled slice suits the inline skill; a
+larger multi-cluster slice, or one where per-cluster review
+materially de-risks the work, suits the subagent skill. Record the
+choice and a one-line reason in the plan's `## Recommended Executor`
+section.
 
 Then present both skills to the developer with the recommendation and
 its reasoning, and let them choose. Hand off to the chosen skill only
