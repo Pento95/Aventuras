@@ -50,6 +50,10 @@ This structure informs the task decomposition. Each task should produce self-con
 - "Run the tests and make sure they pass" - step
 - "Commit" - step
 
+## Plan Template
+
+Write the plan from the project template at `references/execution-plan-template.md`. It defines the full plan structure for this repo's slice workflow — the header and task layout detailed below, plus the project sections: Execution gate, Decisions (carried from aventuras-brainstorming), Evidence Matrix, Skill Plan, and Recommended Executor.
+
 ## Plan Document Header
 
 **Every plan MUST start with this header:**

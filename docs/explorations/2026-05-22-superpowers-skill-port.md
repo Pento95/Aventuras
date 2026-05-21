@@ -87,6 +87,13 @@ ported `SKILL.md`.
   canonical spec decision, `aventuras-brainstorming` offers the
   `aventuras-design` route to the developer; it never invokes the
   design workflow or edits a canonical doc itself.
+- **Plan template salvaged from attempt 1.** The discarded first
+  attempt's execution-plan template — Evidence Matrix, Decisions
+  block, Skill Plan, Execution gate — was adapted into a `references/`
+  template under `aventuras-writing-plans`, giving the plan a
+  project-shaped output format superpowers' `writing-plans` lacks. The
+  attempt's heavier readiness state machine was deliberately not
+  taken.
 
 ## Relationship to existing skills
 
