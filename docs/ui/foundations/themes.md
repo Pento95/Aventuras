@@ -72,11 +72,15 @@ NativeWind 4 runtime context (Expo native).
 
 - **Disabled pair.** `--bg-disabled` neutralizes `--bg-raised`
   toward `--bg-base`; `--fg-disabled` desaturates `--fg-muted`
-  one more step. Targets 3:1 (WCAG-exempt; readable).
+  one more step. Intentionally low-contrast — WCAG exempts
+  inactive components, so the audit reports the pair without
+  gating it (see
+  [`color.md → Author-judged signals`](./color.md#author-judged-signals)).
 - **Border slots.** `--border` reads as a subtle delta from
   `--bg-raised`; `--border-strong` runs ~1.5–2× the delta. Both
-  clear the 3:1 non-text floor against `--bg-base` and
-  `--bg-raised`.
+  are intentionally subtle per the flat-depth aesthetic and sit
+  below 3:1 against the canvas — author-judged, not gated (see
+  [`color.md → Author-judged signals`](./color.md#author-judged-signals)).
 - **Recently-classified bg.** Authored as a warm tint
   perceivably distinct from `--bg-base` while still clearing
   AA 4.5:1 against `--fg-primary` per
@@ -137,19 +141,19 @@ cascades through the
 --fg-muted:       #71717a
 --fg-disabled:    #a1a1aa
 
---accent:         #3b82f6
---accent-hover:   #2563eb
+--accent:         #2563eb
+--accent-hover:   #1d4ed8
 --accent-fg:      #ffffff
 
---success:        #16a34a   --success-fg: #ffffff
---warning:        #d97706   --warning-fg: #ffffff
+--success:        #15803d   --success-fg: #ffffff
+--warning:        #b45309   --warning-fg: #ffffff
 --danger:         #dc2626   --danger-fg:  #ffffff
---info:           #0284c7   --info-fg:    #ffffff
+--info:           #0369a1   --info-fg:    #ffffff
 
 --border:         #e4e4e7
 --border-strong:  #a1a1aa
 
---focus-ring:     #3b82f6
+--focus-ring:     #2563eb
 --selection-bg:   #dbeafe
 
 --recently-classified-bg: #fef3c7
@@ -185,19 +189,19 @@ modes.
 --fg-muted:       #71717a
 --fg-disabled:    #52525b
 
---accent:         #3b82f6
---accent-hover:   #60a5fa
+--accent:         #2563eb
+--accent-hover:   #1d4ed8
 --accent-fg:      #ffffff
 
 --success:        #22c55e   --success-fg: #052e16
 --warning:        #f59e0b   --warning-fg: #422006
---danger:         #ef4444   --danger-fg:  #450a0a
+--danger:         #f87171   --danger-fg:  #450a0a
 --info:           #38bdf8   --info-fg:    #0c1d3a
 
 --border:         #27272a
 --border-strong:  #3f3f46
 
---focus-ring:     #3b82f6
+--focus-ring:     #2563eb
 --selection-bg:   #1e3a8a
 
 --recently-classified-bg: #422006
@@ -237,7 +241,7 @@ modes).
 --accent-fg:      #f5e6c4
 
 --success:        #4a6b2e   --success-fg: #f5e6c4
---warning:        #b8560e   --warning-fg: #f5e6c4
+--warning:        #9a4a0c   --warning-fg: #f5e6c4
 --danger:         #8b1d1d   --danger-fg:  #f5e6c4
 --info:           #1e5e7e   --info-fg:    #f5e6c4
 
@@ -253,8 +257,9 @@ modes).
 `tokens.fonts.--font-reading: '"Charter", "Iowan Old Style", "Source Serif Pro", Georgia, "Cambria", "Liberation Serif", "Noto Serif", serif'`
 
 **Audit expectations** — clears AAA 7:1 on body prose
-(`#3a2818` × `#f5e6c4` ≈ 11.7:1); clears non-text targets across
-borders and focus.
+(`#3a2818` × `#f5e6c4` ≈ 11.7:1); clears the focus and accent
+non-text targets. `--warning` darkened to `#9a4a0c` so
+`--warning-fg` clears AA 4.5.
 
 ---
 
@@ -275,18 +280,18 @@ with it from IDE / terminal use.
 --bg-disabled:    #ccd0da
 
 --fg-primary:     #4c4f69    /* Text */
---fg-secondary:   #6c6f85    /* Subtext 0 */
---fg-muted:       #8c8fa1    /* Overlay 1 */
+--fg-secondary:   #5c5f77    /* Subtext 1 */
+--fg-muted:       #6c6f85    /* Subtext 0 */
 --fg-disabled:    #9ca0b0    /* Overlay 0 */
 
 --accent:         #1e66f5    /* Blue */
 --accent-hover:   #1852c4
---accent-fg:      #eff1f5
+--accent-fg:      #ffffff
 
---success:        #40a02b    /* Green */    --success-fg: #eff1f5
---warning:        #df8e1d    /* Yellow */   --warning-fg: #eff1f5
---danger:         #d20f39    /* Red */      --danger-fg:  #eff1f5
---info:           #04a5e5    /* Sky */      --info-fg:    #eff1f5
+--success:        #40a02b    /* Green */    --success-fg: #ffffff
+--warning:        #df8e1d    /* Yellow */   --warning-fg: #ffffff
+--danger:         #d20f39    /* Red */      --danger-fg:  #ffffff
+--info:           #04a5e5    /* Sky */      --info-fg:    #ffffff
 
 --border:         #bcc0cc    /* Surface 1 */
 --border-strong:  #acb0be    /* Surface 2 */
@@ -301,7 +306,13 @@ with it from IDE / terminal use.
 (sits **right at the AAA 7:1 threshold** — Catppuccin's
 canonical values land at the edge; depending on rounding the
 audit utility may report this as `pass` or `warn`). All non-text
-targets clear 3:1.
+targets clear 3:1. `--fg-secondary` / `--fg-muted` are re-mapped
+down the canonical gray ladder (to `Subtext 1` / `Subtext 0`) to
+clear the text floor. The `--success` / `--warning` / `--info`
+semantic pills are **audit-exempt**: Catppuccin's mid-luminance
+Green / Yellow / Sky cannot reach AA 4.5 as filled pills with any
+foreground, and the verbatim-Catppuccin decision is honored over
+the floor.
 
 ---
 
@@ -370,7 +381,7 @@ canonical to clear 3:1 non-text against `--bg-base`.
 
 --fg-primary:     #c0caf5
 --fg-secondary:   #a9b1d6
---fg-muted:       #565f89    /* Tokyo's "Comments" */
+--fg-muted:       #737aa2    /* Tokyo's "dark5" */
 --fg-disabled:    #3b415a
 
 --accent:         #7aa2f7    /* Blue */
@@ -392,7 +403,9 @@ canonical to clear 3:1 non-text against `--bg-base`.
 ```
 
 **Audit expectations** — body prose `#c0caf5` × `#1a1b26` ≈ 11.6:1
-(clears AAA 7:1). Non-text targets clear 3:1.
+(clears AAA 7:1). Non-text targets clear 3:1. `--fg-muted` is
+re-mapped from canonical `comment` to canonical `dark5`
+(`#737aa2`) — `comment` fell below the muted-text floor.
 
 ---
 
@@ -574,9 +587,9 @@ warm-cream + deep palette, swapped modes).
 --accent-hover:   #c0b594
 --accent-fg:      #0e2240    /* near-bg navy on cream */
 
---success:        #a3b88c    /* sage */          --success-fg: #0e2240
+--success:        #98c96e    /* green */         --success-fg: #0e2240
 --warning:        #d4a85a    /* warm amber */    --warning-fg: #0e2240
---danger:         #d49494    /* muted coral */   --danger-fg:  #0e2240
+--danger:         #d97070    /* clear red */     --danger-fg:  #0e2240
 --info:           #94b8d4    /* cool steel */    --info-fg:    #0e2240
 
 --border:         #2a3d5e

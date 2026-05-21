@@ -86,8 +86,10 @@ records each addition's existence and the per-pattern semantics.
 
 ## Contrast targets
 
-WCAG-derived. Three rungs: text-on-background, non-text contrast
-(WCAG 1.4.11 for UI components), faint-signal exception. The
+WCAG-derived. Three tiers: gated text-on-background pairs, gated
+non-text contrast (WCAG 1.4.11 for UI components), and
+author-judged signals — intentionally low-contrast elements the
+audit reports but never fails. The
 [theme audit utility](#theme-audit-utility) checks every pair below.
 
 ### Text-on-background
@@ -98,40 +100,52 @@ WCAG-derived. Three rungs: text-on-background, non-text contrast
 | `--fg-primary` × `--bg-raised` / `--bg-sunken` / `--bg-overlay`                | AA 4.5:1    | AA 4.5:1 | text on cards / system-entry / popovers                    |
 | `--fg-secondary` × `--bg-base`                                                 | AA 4.5:1    | AA 4.5:1 | captions, sub-labels                                       |
 | `--fg-muted` × `--bg-base`                                                     | AA 4.5:1    | 3:1      | placeholders may relax to 3:1; other muted use aims higher |
-| `--fg-disabled` × `--bg-disabled`                                              | 3:1         | 3:1      | WCAG exempts disabled; floor is "still readable"           |
 | `--accent-fg` × `--accent`                                                     | AA 4.5:1    | AA 4.5:1 | button text — load-bearing for accent-override auto-flip   |
+| `--accent-fg` × `--accent-hover`                                               | AA 4.5:1    | AA 4.5:1 | button text in the hover state                             |
 | `--success-fg` / `--warning-fg` / `--danger-fg` / `--info-fg` × their state bg | AA 4.5:1    | AA 4.5:1 | semantic pills / banners                                   |
 | `--fg-primary` × `--selection-bg`                                              | AA 4.5:1    | AA 4.5:1 | text under text-selection                                  |
 | `--fg-primary` × `--recently-classified-bg`                                    | AA 4.5:1    | AA 4.5:1 | row content with the classifier tint applied               |
 
 The body-prose **AAA 7:1** target is reach-where-feasible.
-Opinionated palettes that fail it (Catppuccin Latte and similar)
-remain valid — AA 4.5:1 is the firm floor; AAA is documented as
-"aim for it on body prose" so theme authors prioritize the right
-pair when tuning. The audit utility reports both rungs separately.
+Opinionated palettes that fall short of it remain valid —
+AA 4.5:1 is the firm floor; AAA is documented as "aim for it on
+body prose" so theme authors prioritize the right pair when
+tuning. The audit utility reports both rungs separately.
 
 ### Non-text contrast (WCAG 1.4.11)
 
 | Pair                                                          | Target | Notes                                                        |
 | ------------------------------------------------------------- | ------ | ------------------------------------------------------------ |
-| `--border` × `--bg-base` and × `--bg-raised`                  | 3:1    | structural form-field / separator borders                    |
-| `--border-strong` × `--bg-raised`                             | 3:1    | emphasized boundaries                                        |
 | `--focus-ring` × `--bg-base` / `--bg-raised` / `--bg-overlay` | 3:1    | keyboard focus across every surface a control can land on    |
 | `--accent` × `--bg-base`                                      | 3:1    | accent as button bg, perceivable as a control against canvas |
-| `--selection-bg` × `--bg-base`                                | 3:1    | selection visible without text content as a tell             |
 
 The focus-ring × accent pair is **not** in the audit set — the
 locked focus recipe (below) renders rings with positive
 `outline-offset`, so the ring sits on the surrounding canvas, not
 on the button's accent fill.
 
-### Faint-signal exception
+### Author-judged signals
 
-- `--recently-classified-bg` × `--bg-base` — **author-judged.**
-  Intentionally subtle; gating by a strict ratio fights the design
-  intent (the tint must whisper, not shout). The audit utility
-  surfaces the value but does not fail; review by eyeball at
-  theme-author time.
+Several elements are **intentionally low-contrast** — gating them
+by a ratio fights the design intent. The audit reports their
+contrast but never fails on them; perceivability is reviewed by
+eyeball at theme-author time. WCAG 1.4.11 component
+identification is carried by `--focus-ring` (gated above), not by
+these.
+
+- `--border` / `--border-strong` × `--bg-*` — resting hairline
+  separators; the flat-depth aesthetic wants them subtle. No theme
+  clears 3:1 against the canvas, and bumping them would read as
+  heavy rules.
+- `--selection-bg` × `--bg-base` — a text-selection tint (canvas
+  mixed with ~20–30% accent). The gated `--fg-primary` ×
+  `--selection-bg` pair keeps selected text readable; the tint's
+  own visibility against canvas is author-judged.
+- `--fg-disabled` × `--bg-disabled` — a disabled control. WCAG
+  explicitly exempts inactive components; disabled is low-contrast
+  by intent.
+- `--recently-classified-bg` × `--bg-base` — intentionally subtle;
+  the tint must whisper, not shout.
 
 ## State treatments
 
@@ -316,6 +330,11 @@ selection-bg stays close to bgBase.
 - **Accent at exactly the WCAG 0.5 threshold.** The flip is
   deterministic (`< 0.5` → white, `>= 0.5` → near-black) — at the
   bisector, behavior is consistent run-to-run.
+- **Dark-theme hover contrast.** `accentHover` lightens for
+  `mode: 'dark'`. A light-enough user accent can yield a derived
+  `--accent-hover` on which the auto-flipped `--accent-fg` drops
+  below AA 4.5 in the button hover state. Tracked in
+  [`followups.md`](../../followups.md#accent-hover-contrast-on-dark-theme-overrides).
 
 ## Curated accent palette
 
@@ -477,8 +496,9 @@ For each theme in the registry:
 2. **Non-text pairs.** Every pair in
    [Contrast targets → Non-text contrast](#non-text-contrast-wcag-1411) —
    computes contrast, fails below 3:1.
-3. **Faint-signal pair.** `--recently-classified-bg` × `--bg-base` —
-   reports the contrast value for review; **never fails**.
+3. **Author-judged signals.** Every pair in
+   [Author-judged signals](#author-judged-signals) — reports each
+   contrast value for review; **never fails**.
 4. **Accent-overridable themes only — derivation sweep.** Runs
    `deriveAccent` against every value in the
    [Curated accent palette](#curated-accent-palette) plus a
@@ -491,7 +511,12 @@ For each theme in the registry:
 ### Output shape
 
 Plaintext table per theme. Columns: **pair**, **ratio**,
-**status** (`pass` / `warn` / `fail`). Footer summary: total fails
+**status** (`pass` / `warn` / `fail` / `exempt`). The `exempt`
+status marks pairs that fail by canonical design and are knowingly
+accepted — currently Catppuccin Latte's `--success` / `--warning` /
+`--info` semantic-pill pairs, whose mid-luminance canonical fills
+cannot reach AA 4.5 with any foreground (the verbatim-Catppuccin
+decision is honored over the floor). Footer summary: total fails
 per theme; **exit code 0 even on fails** (no CI gate).
 
 ### Out of scope
