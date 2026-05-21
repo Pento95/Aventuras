@@ -13,17 +13,21 @@ Write comprehensive implementation plans assuming the engineer has zero context 
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
-**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+**Announce at start:** "I'm using the aventuras-writing-plans skill to create the implementation plan."
 
 **Context:** If working in an isolated worktree, it should have been created via the `aventuras-using-git-worktrees` skill at execution time.
 
-**Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
+**Save plans to:** `.impl-plans/<milestone>-<slice-stem>.md` — the slice's path identifier from `docs/implementation/conventions.md` with the `/` flattened to `-`. For slice `M01/02-drizzle-schema` the file is `.impl-plans/M01-02-drizzle-schema.md`.
 
-- (User preferences for plan location override this default)
+- `.impl-plans/` is git-ignored. The plan is run-specific working state shared between the developer and the executing agent — not project documentation.
+
+## Input
+
+The input is one slice doc plus the open questions resolved in `aventuras-brainstorming`. Read the slice doc, its parent milestone, and the decisions carried over from brainstorming.
 
 ## Scope Check
 
-If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
+A slice is a PR-sized unit — one slice, one plan. If the slice turns out too large for one PR, `aventuras-brainstorming` should have flagged it for a split; if it slipped through, stop and recommend a slice split rather than planning an oversized slice.
 
 ## File Structure
 
@@ -128,25 +132,25 @@ Every step must contain the actual content an engineer needs. These are **plan f
 
 ## Self-Review
 
-After writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.
+After writing the complete plan, look at the slice doc with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.
 
-**1. Spec coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? List any gaps.
+**1. Slice coverage:** Skim each requirement in the slice doc — Goal, Scope: in, Acceptance criteria. Can you point to a task that implements it? List any gaps.
 
 **2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 
-If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
+If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a slice requirement with no task, add the task.
 
 ## Execution Handoff
 
 After saving the plan, offer execution choice:
 
-**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**
+**"Plan complete and saved to `.impl-plans/<filename>.md`. Two execution options:**
 
 **1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration
 
-**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
+**2. Inline Execution** - Execute tasks in this session using aventuras-executing-plans, batch execution with checkpoints
 
 **Which approach?"**
 
