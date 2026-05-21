@@ -67,21 +67,3 @@ unspecified. Surfaced during the observability design
 session; lands as its own pass when the next set of Actions-menu
 candidates is ready (or when the menu's current sparseness
 becomes a UX friction in real use).
-
-### Accent-hover contrast on dark-theme overrides
-
-The accent-derivation algorithm
-([`color.md → Accent-derivation algorithm`](./ui/foundations/color.md#accent-derivation-algorithm))
-computes `--accent-hover` by lightening the accent for
-`mode: 'dark'` themes. A user who sets a light-enough custom
-accent on Default Dark can produce a derived `--accent-hover` on
-which the auto-flipped white `--accent-fg` drops below AA 4.5 —
-the hover state of a primary button. The hand-authored default
-themes avoid this (Default Dark's hover darkens instead); the
-derivation does not.
-
-Surfaced during the 2026-05-21 contrast-contract re-validation,
-which added `--accent-fg × --accent-hover` to the audited pair
-set. Lands with the accent-override system's next pass — likely a
-mode-aware clamp so the derived hover never crosses the
-white / near-black auto-flip boundary the base accent sits on.

@@ -253,30 +253,38 @@ practice.
 
 ### Per-output algorithm
 
-**1. `accentHover` — HSL lightness delta, mode-aware.**
+**1. `accentFg` — better-contrasting foreground.**
+
+```
+cWhite = contrastRatio('#ffffff', accent)
+cBlack = contrastRatio('#0a0a0a', accent)
+return cWhite >= cBlack ? '#ffffff' : '#0a0a0a'
+```
+
+Returns whichever of white or near-black contrasts better with
+the accent — the optimal choice for any input, with no threshold
+heuristic. `#0a0a0a` (not pure `#000000`) avoids harsh contrast;
+symmetric with shadcn's pattern. Hand-authored themes wanting a
+different fg shade keep `accentOverridable: false`.
+
+**2. `accentHover` — HSL lightness delta, away from the text.**
 
 ```
 hsl = toHSL(accent)
-delta = mode === 'light' ? -10 : +10   // light themes darken; dark themes lighten
+delta = accentFg === '#ffffff' ? -10 : +10   // move away from the button text
 hsl.L = clamp(hsl.L + delta, 0, 100)
 return toHex(hsl)
 ```
 
+The delta direction follows `accentFg`: white text darkens the
+hover, near-black text lightens it. Because HSL lightness is
+monotonic with relative luminance at fixed hue and saturation,
+this guarantees `accentFg × accentHover ≥ accentFg × accent` — a
+hover can only improve button-text contrast, never break it.
+
 Magnitude `±10` (HSL L percentage points) is the locked constant.
 5% is too subtle on muted hues; 15% jumps; 10% is consistently
 perceivable across saturated and pastel inputs.
-
-**2. `accentFg` — WCAG relative-luminance threshold, auto-flip.**
-
-```
-L_rel = relativeLuminance(accent)
-return L_rel < 0.5 ? '#ffffff' : '#0a0a0a'
-```
-
-The 0.5 bisection is WCAG-canonical. `#0a0a0a` (not pure
-`#000000`) avoids harsh contrast; symmetric with shadcn's pattern.
-Hand-authored themes wanting a different fg shade keep
-`accentOverridable: false`.
 
 **3. `focusRing` — direct passthrough.**
 
@@ -305,12 +313,12 @@ selection-bg stays close to bgBase.
 
 ### Constants summary
 
-| Output        | Color space | Constant                                       |
-| ------------- | ----------- | ---------------------------------------------- |
-| `accentHover` | HSL         | `±10` L delta, sign by mode                    |
-| `accentFg`    | WCAG L_rel  | threshold `0.5`; outputs `#ffffff` / `#0a0a0a` |
-| `focusRing`   | —           | direct passthrough                             |
-| `selectionBg` | RGB linear  | accent share `0.20` (light) / `0.30` (dark)    |
+| Output        | Color space   | Constant                                    |
+| ------------- | ------------- | ------------------------------------------- |
+| `accentFg`    | WCAG contrast | better-contrasting of `#ffffff` / `#0a0a0a` |
+| `accentHover` | HSL           | `±10` L delta, sign follows `accentFg`      |
+| `focusRing`   | —             | direct passthrough                          |
+| `selectionBg` | RGB linear    | accent share `0.20` (light) / `0.30` (dark) |
 
 ### Known limitations
 
@@ -327,14 +335,12 @@ selection-bg stays close to bgBase.
   `#000000` or `#ffffff` produces `accentHover` clamped to the
   same value (no perceived hover state). Documented; not blocked.
   UX degrades gracefully.
-- **Accent at exactly the WCAG 0.5 threshold.** The flip is
-  deterministic (`< 0.5` → white, `>= 0.5` → near-black) — at the
-  bisector, behavior is consistent run-to-run.
-- **Dark-theme hover contrast.** `accentHover` lightens for
-  `mode: 'dark'`. A light-enough user accent can yield a derived
-  `--accent-hover` on which the auto-flipped `--accent-fg` drops
-  below AA 4.5 in the button hover state. Tracked in
-  [`followups.md`](../../followups.md#accent-hover-contrast-on-dark-theme-overrides).
+- **Mid-luminance accent.** For an accent of mid relative
+  luminance (gray-ish, around `#777`) no foreground reaches
+  AA 4.5; `accentFg` picks the better option but it bottoms at
+  ≈ 4.48 — 0.02 under the floor, within rounding. The band is
+  narrow; accepted, not gated. Same family as a mid-luminance
+  filled pill, which no text can host at AA.
 
 ## Curated accent palette
 
@@ -354,18 +360,18 @@ need yet.
 
 ### Why mode-agnostic
 
-The derivation algorithm above already absorbs mode-aware
-adjustments — `accentHover` darkens on light themes and lightens
-on dark; `selectionBg` mixes at 0.20 / 0.30 by mode. The base
-accent value is mode-agnostic by design, so a single set of hex
-values works for both light and dark theme rendering.
+The derivation absorbs what varies — `selectionBg` mixes toward
+the canvas at a mode-aware ratio, and `accentFg` / `accentHover`
+adapt to the accent's own luminance. The base accent value is
+mode-agnostic by design, so a single set of hex values works for
+both light and dark theme rendering.
 
 ### Selection criteria
 
 Every value in the palette must:
 
-1. Produce `accentFg × accent ≥ 4.5:1` after the WCAG 0.5 auto-flip
-   in [`deriveAccent`](#accent-derivation-algorithm) — every swatch
+1. Produce `accentFg × accent ≥ 4.5:1` after the auto-flip in
+   [`deriveAccent`](#accent-derivation-algorithm) — every swatch
    yields a button that reads.
 2. Produce `--accent × --bg-base ≥ 3:1` against every theme's
    canvas (light + dark) — swatch perceivable as a control surface

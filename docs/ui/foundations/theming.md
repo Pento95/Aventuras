@@ -182,8 +182,10 @@ has set `accentOverride`, the user-supplied color drives the
 accent token group. Five tokens cascade from one input:
 
 - `--accent` — direct from user input.
-- `--accent-hover` — derived: HSL lightness delta, mode-aware
-  (darken for `mode: 'light'`, lighten for `mode: 'dark'`).
+- `--accent-hover` — derived: HSL lightness delta whose direction
+  follows `--accent-fg` (darken when the text is white, lighten
+  when near-black), so the hover never reduces button-text
+  contrast.
 - `--accent-fg` — derived: WCAG contrast auto-flip. White if
   accent is dark enough, near-black otherwise. Preserves
   readability if the user picks a low-contrast accent.
