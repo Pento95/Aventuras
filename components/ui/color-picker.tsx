@@ -189,7 +189,7 @@ function CustomChip({
       <>
         {trigger}
         <Sheet open={open} onOpenChange={onOpenChange} ariaLabel="Custom color">
-          <SheetContent anchor="bottom" size="short">
+          <SheetContent anchor="bottom" size="auto">
             <CustomEditor
               initial={initial}
               customWarning={customWarning}
