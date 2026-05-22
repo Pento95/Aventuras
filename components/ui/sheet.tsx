@@ -116,6 +116,14 @@ type SheetPanelProps = ComponentProps<typeof DialogPrimitive.Content> & {
   slideExit: LayoutAnimation
   nativePanelStyle: ViewStyle
   avoidKeyboard: boolean
+  // ARIA values are captured by the parent (SheetContent) before the rn-primitives
+  // Portal and passed in as props — rn-primitives' native Portal doesn't propagate
+  // arbitrary React contexts, so calling useSheetA11y() inside the portaled tree fails.
+  ariaLabel?: string
+  ariaLabelledBy?: string
+  ariaDescribedBy?: string
+  onOpenAutoFocus?: AutoFocusHandler
+  onCloseAutoFocus?: AutoFocusHandler
 }
 
 function SheetPanel({
@@ -127,12 +135,15 @@ function SheetPanel({
   slideExit,
   nativePanelStyle,
   avoidKeyboard,
+  ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...contentProps
 }: SheetPanelProps) {
   const { onOpenChange } = DialogPrimitive.useRootContext()
   const { height: screenHeight } = useWindowDimensions()
-  const { ariaLabel, ariaLabelledBy, ariaDescribedBy, onOpenAutoFocus, onCloseAutoFocus } =
-    useSheetA11y()
 
   const dragOffset = useSharedValue(0)
   const animatedDragStyle = useAnimatedStyle(
@@ -288,6 +299,9 @@ function SheetContent({
   const nativePanelStyle = getNativePanelStyle(anchor, size, insets.top, screenHeight)
   // Default true for bottom; ignored entirely for right (desktop, no soft keyboard).
   const effectiveAvoidKeyboard = isBottom && (avoidKeyboard ?? true)
+  // Resolved BEFORE the portal — rn-primitives' native Portal drops custom contexts.
+  const { ariaLabel, ariaLabelledBy, ariaDescribedBy, onOpenAutoFocus, onCloseAutoFocus } =
+    useSheetA11y()
 
   return (
     <DialogPrimitive.Portal hostName={portalHost}>
@@ -318,6 +332,11 @@ function SheetContent({
             slideExit={slideExit}
             nativePanelStyle={nativePanelStyle}
             avoidKeyboard={effectiveAvoidKeyboard}
+            ariaLabel={ariaLabel}
+            ariaLabelledBy={ariaLabelledBy}
+            ariaDescribedBy={ariaDescribedBy}
+            onOpenAutoFocus={onOpenAutoFocus}
+            onCloseAutoFocus={onCloseAutoFocus}
             className={className}
             {...props}
           >
