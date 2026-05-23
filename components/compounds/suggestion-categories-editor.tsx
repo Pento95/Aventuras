@@ -264,6 +264,19 @@ const RowContent = memo(function RowContent({
 
 const textareaMinHeightStyle = { minHeight: PROMPT_HINT_MIN_HEIGHT } as const
 
+// Uniform collapsed-row height for drag-target math. Inner row (drag handle
+// + accordion trigger) is enforced at PHONE_ROW_CONTENT_HEIGHT_PX via the
+// hard-coded `collapsedRowHeightStyle` below; AccordionItem's 1px bottom
+// border brings the total per-slot delta to PHONE_ROW_HEIGHT_PX. Hard-coding
+// both values keeps them paired — drift between the assumed constant and
+// the actual rendered height was the source of the "row shifts down by few
+// pixels on release" flicker (transforms of -ROW_H against a slot of
+// different actual size).
+const PHONE_ROW_CONTENT_HEIGHT_PX = 44
+const PHONE_ROW_BORDER_PX = 1
+const PHONE_ROW_HEIGHT_PX = PHONE_ROW_CONTENT_HEIGHT_PX + PHONE_ROW_BORDER_PX
+const collapsedRowHeightStyle = { height: PHONE_ROW_CONTENT_HEIGHT_PX } as const
+
 // Web: @dnd-kit/sortable item wrapper. Reads sortable transform/transition and
 // applies the standard reorder visual. Keyboard sensor uses
 // sortableKeyboardCoordinates so Space / arrow keys reorder accessibly.
@@ -372,12 +385,6 @@ function PhoneRowSummary({
 function dotColorStyle(color: string) {
   return { backgroundColor: color }
 }
-
-// Uniform-row-height assumption for drag-target math. The collapsed Accordion
-// row + drag handle padding sits around this; the editor accepts minor off-by-
-// one on drop with very tall expanded rows (user can re-drop). Pulled out as
-// a constant so a future re-measure pass has one knob.
-const PHONE_ROW_HEIGHT_PX = 56
 
 type PhoneDragShared = {
   activeId: ReturnType<typeof useSharedValue<string | null>>
@@ -545,7 +552,7 @@ function PhoneAccordionRow({
   return (
     <Animated.View style={animatedStyle}>
       <AccordionItem value={id}>
-        <View className="flex-row items-center gap-1">
+        <View className="flex-row items-center gap-1" style={collapsedRowHeightStyle}>
           {/* GestureDetector wraps the drag handle so only the handle picks
               up gestures — the AccordionTrigger sibling keeps its tap-to-
               expand behavior unchanged. Long-press at the handle (≥400ms)
