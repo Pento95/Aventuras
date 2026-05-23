@@ -16,16 +16,18 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Trash2 } from 'lucide-react-native'
-import { memo, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react'
+import {
+  memo,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, {
-  Easing,
-  LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated'
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { runOnJS } from 'react-native-worklets'
 
 import {
@@ -382,14 +384,17 @@ type PhoneDragShared = {
   dragY: ReturnType<typeof useSharedValue<number>>
 }
 
-// Release transition: linear easing + matched durations on the row's layout
-// animation AND the worklet's translateY → 0 ramp let the two cancel out so
-// the dragged row visually holds still while the DOM reorder lands.
-// Linear (rather than ease-in-out) because any easing mismatch between the
-// layout interpolator and withTiming causes a visible wobble.
-const RELEASE_DURATION_MS = 200
-const RELEASE_EASING = Easing.linear
-const ROW_LAYOUT_TRANSITION = LinearTransition.duration(RELEASE_DURATION_MS).easing(RELEASE_EASING)
+// Release pattern: no animations on the transition. The matched
+// layout+transform cancellation approach kept showing motion because the
+// React commit (layout change) and the worklet's transform clear ran on
+// different ticks — a frame gap where layout had moved but transform
+// hadn't created visible drift regardless of easing match. Instead we
+// keep transforms at their drag-state values UNTIL React commits the
+// reorder, then clear them via useLayoutEffect inside the same commit
+// cycle. Before paint, both the new layout and the cleared transforms
+// are in place, so the painted frame goes directly from drag-state
+// visual (correct via transforms on old layout) to post-reorder visual
+// (correct via natural new layout) with no intermediate state.
 
 function PhoneAccordionRow({
   rowState,
@@ -458,30 +463,19 @@ function PhoneAccordionRow({
       }
     })
 
-  // Three branches: no drag in progress (everyone animates translateY back to
-  // 0 in sync with the row layout transition — see RELEASE_DURATION_MS), I'm
-  // the active row (translateY directly from gesture), or I'm a sibling that
-  // needs to make space for the active row (translateY ±PHONE_ROW_HEIGHT_PX,
-  // spring-animated). The "make space" rule: if active dragged DOWN past me,
-  // I shift UP one slot; if dragged UP past me, I shift DOWN one slot.
+  // Three branches: no drag in progress (everyone at translateY 0 instantly),
+  // I'm the active row (translateY directly from gesture), or I'm a sibling
+  // that needs to make space for the active row (translateY ±PHONE_ROW_HEIGHT_PX
+  // instantly). The "make space" rule: if active dragged DOWN past me, I
+  // shift UP one slot; if dragged UP past me, I shift DOWN one slot.
   //
-  // The activeId == null branch is the release-snap path: layout animation
-  // moves the row from its OLD DOM position to its NEW DOM position over
-  // RELEASE_DURATION_MS with linear easing, while withTiming animates the
-  // residual translateY from its prior shifted value down to 0 over the same
-  // duration and easing. The sum (layoutY + translateY) stays constant, so
-  // every row visually holds at its release-time position throughout the
-  // transition — no flash between the React re-render and the worklet
-  // re-evaluation.
+  // Instant transforms throughout — release-time flicker isn't an animation
+  // problem (those just defer the visible motion), it's a synchronization
+  // problem between the React commit cycle and the UI thread. The fix lives
+  // in finalizeReorder + the useLayoutEffect bridge below.
   const animatedStyle = useAnimatedStyle(() => {
     if (drag.activeId.value == null) {
-      return {
-        transform: [
-          {
-            translateY: withTiming(0, { duration: RELEASE_DURATION_MS, easing: RELEASE_EASING }),
-          },
-        ],
-      }
+      return { transform: [{ translateY: 0 }] }
     }
     if (drag.activeId.value === id) {
       return {
@@ -511,7 +505,7 @@ function PhoneAccordionRow({
   })
 
   return (
-    <Animated.View style={animatedStyle} layout={ROW_LAYOUT_TRANSITION}>
+    <Animated.View style={animatedStyle}>
       <AccordionItem value={id}>
         <View className="flex-row items-center gap-1">
           {/* GestureDetector wraps the drag handle so only the handle picks
@@ -734,25 +728,51 @@ function PhoneList({
   const activeStartIndex = useSharedValue(-1)
   const virtualIndex = useSharedValue(-1)
   const dragY = useSharedValue(0)
+  // Set true by finalizeReorder when a reorder is in flight, consumed by the
+  // useLayoutEffect below. ref (not state) so toggling doesn't trigger an
+  // extra render cycle.
+  const pendingReleaseRef = useRef(false)
 
   const finalizeReorder = useCallback(
     (fromId: string, toIdx: number) => {
       const fromIdx = categories.findIndex((c) => c.id === fromId)
-      if (fromIdx < 0 || toIdx < 0) {
+      if (fromIdx < 0 || toIdx < 0 || toIdx === fromIdx) {
+        // No reorder needed (out-of-bounds id, or dropped on starting slot).
+        // Safe to clear immediately — no layout change is coming, so there's
+        // no synchronization gap to bridge.
         activeId.value = null
         dragY.value = 0
         return
       }
-      // dragY is guaranteed to be exactly (V - A) * ROW_H by the snap-to-grid
-      // logic in the gesture's onUpdate, so committing the reorder + clearing
-      // activeId in the same frame lets the matched layout+transform release
-      // pair hold visual position constant for the full RELEASE_DURATION_MS
-      // (see ROW_LAYOUT_TRANSITION + the worklet's null branch).
-      if (toIdx !== fromIdx) onReorder(arrayMove(categories, fromIdx, toIdx))
-      activeId.value = null
+      // Reorder needed. Critically: DO NOT clear the shared values here. The
+      // active row + siblings are visually at their post-reorder positions
+      // via their drag-state transforms applied to the OLD layout. The
+      // moment we clear those transforms, visual jumps back to OLD layout +
+      // 0 = original natural positions — and React's commit doesn't land
+      // until the next tick, so a frame paints with that wrong state. Let
+      // the useLayoutEffect below clear the values AFTER React commits the
+      // new layout, so both happen in the same paint cycle.
+      pendingReleaseRef.current = true
+      onReorder(arrayMove(categories, fromIdx, toIdx))
     },
     [categories, onReorder, activeId, dragY],
   )
+
+  // Bridge: fires synchronously after React commits the new categories array
+  // (new DOM layout in place) but BEFORE the next paint. Clearing the shared
+  // values here means the worklet re-evaluates to translateY 0 while layout
+  // is already at the new position — both reach paint in the same frame,
+  // visual goes directly from drag-state (correct via transforms on old
+  // layout) to post-reorder (correct via natural new layout) with no
+  // intermediate flash.
+  useLayoutEffect(() => {
+    if (!pendingReleaseRef.current) return
+    pendingReleaseRef.current = false
+    activeId.value = null
+    dragY.value = 0
+    activeStartIndex.value = -1
+    virtualIndex.value = -1
+  }, [categories, activeId, dragY, activeStartIndex, virtualIndex])
 
   const handlePickUp = useCallback(
     (id: string, startIndex: number) => {
