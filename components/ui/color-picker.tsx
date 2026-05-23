@@ -1,10 +1,12 @@
 import * as PopoverPrimitive from '@rn-primitives/popover'
+import { Check } from 'lucide-react-native'
 import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react'
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native'
 import LibColorPicker, { HueSlider, Panel1 } from 'reanimated-color-picker'
 
 import { Button } from '@/components/ui/button'
 import { Heading } from '@/components/ui/heading'
+import { Icon } from '@/components/ui/icon'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -49,6 +51,31 @@ function fillStyle(color: string): ViewStyle {
   return { backgroundColor: color }
 }
 
+// YIQ contrast heuristic — converts the swatch background to perceived
+// brightness and decides whether the overlaid Check should be dark or light.
+// Cheaper than WCAG relative luminance and well within tolerance for picking
+// a foreground glyph color against a solid swatch.
+function isLightColor(hex: string): boolean {
+  const raw = hex.startsWith('#') ? hex.slice(1) : hex
+  let r = 0
+  let g = 0
+  let b = 0
+  if (raw.length === 3) {
+    r = parseInt(raw[0]! + raw[0]!, 16)
+    g = parseInt(raw[1]! + raw[1]!, 16)
+    b = parseInt(raw[2]! + raw[2]!, 16)
+  } else if (raw.length === 6) {
+    r = parseInt(raw.slice(0, 2), 16)
+    g = parseInt(raw.slice(2, 4), 16)
+    b = parseInt(raw.slice(4, 6), 16)
+  }
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 128
+}
+
+// Slightly transparent so the Check reads as an overlay rather than a hard
+// shape — keeps the swatch color legible while still clearly marking selection.
+const CHECK_OVERLAY_STYLE = { opacity: 0.85 } as const
+
 const STATIC_STYLES = StyleSheet.create({
   pickerWrapper: { width: '100%' },
   panel: { height: 160, borderRadius: 8 },
@@ -78,6 +105,12 @@ function SwatchButton({
   const ringClass = selected ? 'border-border-strong' : 'border-border'
   const dashed = kind === 'none' ? 'border-dashed' : ''
   const isEmpty = kind === 'custom-empty'
+  // Show the Check overlay on any swatch that represents a committable value
+  // when it's the current selection — both curated palette swatches and the
+  // 'none' fallback chip (selected when value === null). The 'custom-empty'
+  // chip is the editor trigger, never a selection target, so it stays as '+'.
+  const showCheck = selected && !isEmpty && color != null
+  const checkTint = color != null && isLightColor(color) ? '#000000' : '#ffffff'
 
   return (
     <Pressable
@@ -94,6 +127,9 @@ function SwatchButton({
       {...slotProps}
     >
       {isEmpty ? <Text size="sm">+</Text> : null}
+      {showCheck ? (
+        <Icon as={Check} size="sm" color={checkTint} style={CHECK_OVERLAY_STYLE} />
+      ) : null}
     </Pressable>
   )
 }
