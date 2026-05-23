@@ -309,6 +309,13 @@ _selection_ (the consumer's committed value, surfaced via
 `selectedRowIds` — see below), _highlight_ (the substrate's keyboard
 cursor, empty on open), and _initial scroll_.
 
+**`renderRow` width convention.** The substrate's row Pressable is
+`w-full flex-row`; a consumer's row root needs `w-full` (or
+`flex-1`) too so its own children — particularly trailing-aligned
+cells — get redistributed across the full row instead of clustering
+around the auto-sized content width. `flex-1` inside the consumer
+only works once the consumer's root has claimed a width.
+
 **`selectedRowIds` — committed-value affordance.** Consumers that
 have a notion of "current selection" (a model picker, a single-select
 list) pass the row ids that mirror that value. The substrate paints

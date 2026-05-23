@@ -151,7 +151,11 @@ type PickerRowProps = {
 function PickerRow({ row, onFavoriteToggle }: PickerRowProps) {
   const { modelRef, providerName, capabilities, isFavorite, source, brokenFavorite } = row.data
   return (
-    <View className="flex-row items-center gap-2">
+    // w-full so the inner View claims the Pressable's full width — otherwise it
+    // sizes to content and the trailing-aligned caps column floats short of the
+    // right edge (the flex-1 below only redistributes _remaining_ space, which
+    // is zero when the parent itself is auto-width).
+    <View className="w-full flex-row items-center gap-2">
       <FavoriteToggle isFavorite={isFavorite} onToggle={() => onFavoriteToggle(modelRef)} />
       {brokenFavorite ? <Icon as={TriangleAlert} size="sm" className="text-warning" /> : null}
       {/* min-w-0 lets the flex child shrink past its text intrinsic width so
