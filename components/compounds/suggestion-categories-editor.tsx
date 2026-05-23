@@ -31,7 +31,6 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated'
 import { runOnJS } from 'react-native-worklets'
@@ -390,10 +389,15 @@ type PhoneDragShared = {
   dragY: ReturnType<typeof useSharedValue<number>>
 }
 
-// Sibling spring config — snappy enough that mid-drag shifts feel responsive
-// but not so stiff they feel mechanical. By release time, springs are usually
-// settled at their target shift; the bridge clears them in either case.
-const SIBLING_SPRING = { damping: 22, stiffness: 240, mass: 0.7 } as const
+// Sibling shift animation. Uses withTiming rather than withSpring because
+// any underdamped spring overshoots its target ±PHONE_ROW_HEIGHT_PX, which
+// momentarily compresses the visual gap between the shifted sibling and its
+// neighbor — perceived as "less padding above the row". Timing has no
+// overshoot by construction, so the gap stays exactly ROW_H throughout the
+// shift. ease-out-cubic matches the muscle-memory of weight settling into
+// place.
+const SIBLING_DURATION_MS = 150
+const SIBLING_EASING = Easing.out(Easing.cubic)
 
 // Release "settle" — the active row's dragY animates from raw finger position
 // to the exact target slot offset over RELEASE_SETTLE_MS, giving the user a
@@ -522,14 +526,19 @@ function PhoneAccordionRow({
     let shift = 0
     if (V > A && index > A && index <= V) shift = -PHONE_ROW_HEIGHT_PX
     else if (V < A && index < A && index >= V) shift = PHONE_ROW_HEIGHT_PX
-    // Spring-smoothed shift: siblings glide into and out of "making space"
-    // for the active row. Safe to spring (rather than snap instant) because
+    // Timing-smoothed shift: siblings glide into and out of "making space"
+    // for the active row without spring overshoot (which would momentarily
+    // compress the visual gap with their neighbor — see SIBLING_DURATION_MS
+    // notes above). Safe even if the timing is mid-flight at release because
     // the bridge clears all shared values atomically with the layout commit
-    // — even if a sibling's spring is mid-flight at release, the next paint
-    // has translateY 0 against the new layout, and the visual handoff has
-    // no intermediate frame to flicker through.
+    // — the next paint has translateY 0 against the new layout, no
+    // intermediate frame to flicker through.
     return {
-      transform: [{ translateY: withSpring(shift, SIBLING_SPRING) }],
+      transform: [
+        {
+          translateY: withTiming(shift, { duration: SIBLING_DURATION_MS, easing: SIBLING_EASING }),
+        },
+      ],
     }
   })
 
