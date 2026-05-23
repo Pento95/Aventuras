@@ -648,6 +648,27 @@ function PhoneList({
       return next
     })
   }, [])
+
+  // Auto-expand newly-added rows so the user can fill in the empty label without an extra
+  // tap on phone. Initial mount seeds prevIdsRef with current ids, so existing rows don't
+  // get auto-expanded on first paint. Deleted ids are left in the set — harmless because
+  // they're not rendered, and the small leak isn't worth a cleanup pass.
+  const prevIdsRef = useRef<Set<string>>(new Set(categories.map((c) => c.id)))
+  useEffect(() => {
+    const currentIds = new Set(categories.map((c) => c.id))
+    const newIds: string[] = []
+    for (const id of currentIds) {
+      if (!prevIdsRef.current.has(id)) newIds.push(id)
+    }
+    prevIdsRef.current = currentIds
+    if (newIds.length === 0) return
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      for (const id of newIds) next.add(id)
+      return next
+    })
+  }, [categories])
+
   const density = useDensity()
   const sortableList = useSortableList<SuggestionCategory>({
     data: categories,
