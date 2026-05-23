@@ -13,16 +13,15 @@ for the placement rule.
 
 ## UX
 
-- **`SearchableOverlayList` — `@tanstack/react-virtual`, web sticky headers, `initialScrollRowId`.**
-  Shipped v1 uses RN's `SectionList` on native (free sticky section headers
-  via `stickySectionHeadersEnabled`) and a plain `ScrollView` on web (CSS
-  `position: sticky` covers headers; no virtualization). The
+- **`SearchableOverlayList` — `initialScrollRowId`.**
+  The
   [substrate spec](./ui/patterns/searchable-overlay-list.md#implementation-notes)
-  mandates `@tanstack/react-virtual` on web for any source-list size and
-  describes `initialScrollRowId` (open-time scroll-into-view, mid-viewport).
-  Land these when the Autocomplete refactor (component-inventory →
-  Primitives — needs revision) consumes the substrate — that's the consumer
-  with 1000+ source lists where web virtualization actually pays off.
+  describes `initialScrollRowId` (open-time scroll-into-view, mid-viewport) for
+  consumers that want to anchor a particular row in view when the overlay opens
+  (favorites, active model, etc.). Not implemented in v1. The shipped substrate
+  already has the virtualization plumbing (`@tanstack/react-virtual` web,
+  `SectionList` native) that this would build on — call
+  `virtualizer.scrollToIndex(idx, { align: 'center' })` on open.
 
 - **Sheet keyboard avoidance — swap to `react-native-keyboard-controller`.**
   Sheet currently wraps content in RN's built-in `KeyboardAvoidingView`

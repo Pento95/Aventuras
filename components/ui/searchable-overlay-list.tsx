@@ -1,5 +1,6 @@
 import * as PopoverPrimitive from '@rn-primitives/popover'
 import { Portal } from '@rn-primitives/portal'
+import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual'
 import { Search, X } from 'lucide-react-native'
 import {
   useCallback,
@@ -16,7 +17,6 @@ import {
 import {
   Platform,
   Pressable,
-  ScrollView,
   SectionList,
   View,
   type NativeSyntheticEvent,
@@ -344,35 +344,186 @@ function RowListWeb<T>({
       </div>
     )
   }
-  const rowClass = variant === 'sheet' ? ROW_PHONE : ROW_DESKTOP
-  // `role="listbox"` is a web-only DOM attribute; RN's Role union doesn't include it.
-  const webProps = { role: 'listbox' } as object
   return (
-    <ScrollView {...webProps} className={className} style={style} nativeID={listboxId}>
-      {sections.map((section) => (
-        <View key={section.id}>
-          {section.header != null ? (
-            <View
-              className={cn(
-                'bg-bg-overlay px-row-x-md py-1',
-                section.sticky && 'sticky top-0 z-10',
-              )}
-            >
-              {typeof section.header === 'string' ? (
-                <Text variant="muted" size="xs" className="uppercase tracking-wide">
-                  {section.header}
-                </Text>
-              ) : (
-                section.header
-              )}
-            </View>
-          ) : null}
-          {section.rows.map((row, rowIdx) => {
-            const highlighted = row.id === highlightedId
-            const isLastInSection = rowIdx === section.rows.length - 1
+    <VirtualizedRowList<T>
+      sections={sections}
+      highlightedId={highlightedId}
+      onActivate={onActivate}
+      renderRow={renderRow}
+      variant={variant}
+      listboxId={listboxId}
+      rowIdPrefix={rowIdPrefix}
+      className={className}
+      style={style}
+    />
+  )
+}
+
+// Flat-index virtualization model: sections + rows expand into one array of
+// `{kind: 'header' | 'row', ...}` items, each occupying one virtual slot. Sticky-marked
+// section headers stay in the virtual range via `rangeExtractor` (per @tanstack/react-virtual's
+// sticky pattern) and render with `position: sticky` instead of the usual absolute
+// + transform. This is the web equivalent of native SectionList's stickySectionHeadersEnabled.
+type FlatItem<T> =
+  | { kind: 'header'; sectionId: string; header: ReactNode; sticky: boolean }
+  | { kind: 'row'; sectionId: string; row: Row<T>; isLastInSection: boolean }
+
+function flattenForVirtualizer<T>(sections: Section<T>[]): FlatItem<T>[] {
+  const items: FlatItem<T>[] = []
+  for (const section of sections) {
+    if (section.header != null) {
+      items.push({
+        kind: 'header',
+        sectionId: section.id,
+        header: section.header,
+        sticky: !!section.sticky,
+      })
+    }
+    section.rows.forEach((row, idx) => {
+      items.push({
+        kind: 'row',
+        sectionId: section.id,
+        row,
+        isLastInSection: idx === section.rows.length - 1,
+      })
+    })
+  }
+  return items
+}
+
+const STICKY_HEADER_STYLE: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  left: 0,
+  zIndex: 1,
+  width: '100%',
+}
+
+function translateRowStyle(y: number): CSSProperties {
+  return {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    transform: `translateY(${y}px)`,
+  }
+}
+
+function virtualTrackStyle(totalSize: number): CSSProperties {
+  return { position: 'relative', width: '100%', height: totalSize }
+}
+
+type VirtualizedRowListProps<T> = {
+  sections: Section<T>[]
+  highlightedId: string | null
+  onActivate: (row: Row<T>) => void
+  renderRow: (row: Row<T>, state: { highlighted: boolean }) => ReactNode
+  variant: 'inline' | 'sheet'
+  listboxId: string
+  rowIdPrefix: string
+  className?: string
+  style?: ViewStyle
+}
+
+function VirtualizedRowList<T>({
+  sections,
+  highlightedId,
+  onActivate,
+  renderRow,
+  variant,
+  listboxId,
+  rowIdPrefix,
+  className,
+  style,
+}: VirtualizedRowListProps<T>) {
+  const items = useMemo(() => flattenForVirtualizer(sections), [sections])
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const stickyIndexes = useMemo(
+    () => items.flatMap((it, i) => (it.kind === 'header' && it.sticky ? [i] : [])),
+    [items],
+  )
+  const activeStickyIndexRef = useRef(-1)
+
+  const rangeExtractor = useCallback(
+    (range: Range) => {
+      activeStickyIndexRef.current =
+        [...stickyIndexes].reverse().find((i) => range.startIndex >= i) ?? -1
+      const indexes = new Set(defaultRangeExtractor(range))
+      if (activeStickyIndexRef.current >= 0) indexes.add(activeStickyIndexRef.current)
+      return [...indexes].sort((a, b) => a - b)
+    },
+    [stickyIndexes],
+  )
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 40,
+    overscan: 8,
+    rangeExtractor,
+  })
+
+  // Keep the keyboard-highlighted row inside the viewport while the user arrows
+  // through long lists. `align: 'auto'` only scrolls when out of view.
+  useEffect(() => {
+    if (highlightedId == null) return
+    const idx = items.findIndex((it) => it.kind === 'row' && it.row.id === highlightedId)
+    if (idx >= 0) virtualizer.scrollToIndex(idx, { align: 'auto' })
+  }, [highlightedId, items, virtualizer])
+
+  const rowClass = variant === 'sheet' ? ROW_PHONE : ROW_DESKTOP
+  const webProps = { role: 'listbox' } as object
+  const virtualItems = virtualizer.getVirtualItems()
+
+  return (
+    <div
+      ref={parentRef}
+      id={listboxId}
+      className={cn('overflow-y-auto', className)}
+      style={style as CSSProperties}
+      {...webProps}
+    >
+      <div style={virtualTrackStyle(virtualizer.getTotalSize())}>
+        {virtualItems.map((virtualRow) => {
+          const item = items[virtualRow.index]!
+          const isSticky = item.kind === 'header' && item.sticky
+          const isActiveSticky = isSticky && activeStickyIndexRef.current === virtualRow.index
+          const wrapperStyle = isActiveSticky
+            ? STICKY_HEADER_STYLE
+            : translateRowStyle(virtualRow.start)
+
+          if (item.kind === 'header') {
             return (
+              <div
+                key={virtualRow.key}
+                ref={virtualizer.measureElement}
+                data-index={virtualRow.index}
+                style={wrapperStyle}
+              >
+                <View className="bg-bg-overlay px-row-x-md py-1">
+                  {typeof item.header === 'string' ? (
+                    <Text variant="muted" size="xs" className="uppercase tracking-wide">
+                      {item.header}
+                    </Text>
+                  ) : (
+                    item.header
+                  )}
+                </View>
+              </div>
+            )
+          }
+
+          const row = item.row
+          const highlighted = row.id === highlightedId
+          return (
+            <div
+              key={virtualRow.key}
+              ref={virtualizer.measureElement}
+              data-index={virtualRow.index}
+              style={wrapperStyle}
+            >
               <Pressable
-                key={row.id}
                 nativeID={`${rowIdPrefix}-${row.id}`}
                 role="option"
                 aria-selected={highlighted}
@@ -381,19 +532,18 @@ function RowListWeb<T>({
                 className={cn(
                   ROW_BASE,
                   rowClass,
-                  // Hairline divider under each row except the last in its section.
-                  !isLastInSection && 'border-b border-border',
+                  !item.isLastInSection && 'border-b border-border',
                   highlighted && 'bg-tint-hover',
                   row.disabled && 'opacity-50',
                 )}
               >
                 {renderRow(row, { highlighted })}
               </Pressable>
-            )
-          })}
-        </View>
-      ))}
-    </ScrollView>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
