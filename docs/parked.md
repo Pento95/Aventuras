@@ -1489,6 +1489,85 @@ Lands as one design pass once two or more triggers fire
 concurrently — they share enough query-layer machinery that
 piecemeal work is wasteful.
 
+#### Multi-device sync for power users
+
+v1 ships single-device only — local SQLite is canonical and not
+replicated. Power users with more than one device hit a friction
+wall (laptop edits unreachable from phone, phone notes unreachable
+from desktop). Speculative post-v1 feature: opt-in multi-device
+mode pointing devices at a self-hosted always-on node (homelab
+container, NAS, small VPS) reached over Tailscale or similar
+private network. Default install stays single-device; multi-device
+is a configuration the user opts into.
+
+**Architectural fork.**
+
+- **Local store with delta sync (preferred shape).** Devices keep
+  their own local SQLite for offline reads and writes; deltas
+  ship to the always-on node, which propagates to other devices.
+  Offline editing on mobile is preserved. The sync engine is the
+  hard problem. The existing [delta log](./data-model.md) is the
+  natural transport unit — it's already designed to carry
+  forward-replayable state changes.
+- **Always-remote.** Device has no local DB; every read / write
+  hits the homelab over the network. Trivially solves
+  multi-device (one DB) but breaks offline-on-mobile, which is
+  half the v1 value prop. Rejected unless real signal shows
+  users would accept the trade.
+
+**Open questions for the design pass.**
+
+- **SQLite stack choice.** v1 uses `expo-sqlite`. The cleanest
+  off-the-shelf path for "homelab DB plus device replicas" is
+  libsql's `sqld` server with `@libsql/client`'s embedded-replica
+  mode; Drizzle's `drizzle-orm/libsql/http` adapter supports it.
+  Adopting that means swapping `expo-sqlite` for `@libsql/client`
+  across both platforms, and libsql's RN / Expo support is less
+  battle-tested. Worth a spike before committing. Alternative:
+  keep `expo-sqlite`, build a thin custom sync service that
+  ingests the delta log directly — more work, full control over
+  conflict semantics.
+- **Schema-migration coordination.** When device A updates the
+  app and runs a local migration, device B (older version) and
+  the homelab DB need a compatibility story. Workable patterns:
+  forward-only delta versioning with N-to-N-1 replay, force-update
+  gates on devices behind the homelab schema, or epoch-versioned
+  schema with cross-boundary replay. Whichever lands constrains
+  the sync protocol shape.
+- **Conflict resolution semantics.** Single user across two
+  devices has low conflict frequency, but concurrent edits (phone
+  offline, desktop online, phone reconnects later) need a rule.
+  Naive last-write-wins per row is the libsql-server default; the
+  delta log plus domain-aware merge rules (entity-state field
+  merging, awareness-link union) is the custom-service path's
+  win.
+- **Deployment friction.** "Deploy a container on your homelab"
+  is heavier than it sounds — TLS / cert renewal, backups,
+  recovery when the SSD dies. The design either ships a
+  one-command deployment artifact (Docker image with sane
+  defaults) or accepts this is a developer-only feature.
+
+**Alternative shape — CR-SQLite peer-to-peer (no server).**
+[CR-SQLite](https://github.com/vlcn-io/cr-sqlite) is a SQLite
+extension adding CRDT semantics so two SQLite files converge
+without a central authority. Two devices on the same LAN or both
+on Tailscale could sync directly when both are online. Distinct
+from the always-on-node path because P2P requires both devices
+online simultaneously to merge — the homelab rendezvous is what
+makes "edit on phone offline, read on desktop later" work without
+ceremony. Constrains schema: every column is effectively a
+registered CRDT type (LWW, counter, set), so the data-model needs
+a per-column CRDT-shape audit before adoption. Drizzle support is
+informal — community examples exist, no first-party adapter.
+Lands as a separate "manual merge" affordance if signal surfaces
+for users who want occasional cross-device sync without running a
+server, or as a complement to the homelab path above (one option
+for "I have always-on infra", one for "I don't").
+
+Lands when real demand surfaces from users running the app across
+multiple devices — not before. v1 single-device floor is the
+right default for the assumed common case.
+
 ### Two-stage touch feedback (light hover + stronger press)
 
 Some mobile apps (Discord noted) ship a two-stage feedback on

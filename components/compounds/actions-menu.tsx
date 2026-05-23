@@ -240,22 +240,31 @@ function ActionsMenu({
     [emptyLabel],
   )
 
+  // Wrap in a single, content-sized View so the menu reads as one flex item to
+  // its parent. Without this, the substrate's phone branch returns a Fragment
+  // containing the trigger AND a Sheet whose Root renders an empty View on
+  // native — `justify-between` parents then see THREE flex children and pin
+  // the invisible View to the right edge, floating the trigger mid-row. The
+  // picker dodges this only because it already wraps the substrate in its
+  // own View (className passthrough); the menu needs the same insulation.
   return (
-    <SearchableOverlayList<MenuRowData>
-      searchPlacement="in-overlay"
-      open={open}
-      onOpenChange={setOpen}
-      ariaLabel={triggerLabel}
-      searchPlaceholder={searchPlaceholder}
-      sections={sections}
-      onQueryChange={setQuery}
-      renderTrigger={renderTrigger}
-      renderRow={renderRow}
-      renderEmpty={renderEmpty}
-      onActivate={handleActivate}
-      autofocusSearch="except-phone"
-      sheetSize="tall"
-    />
+    <View className="shrink-0">
+      <SearchableOverlayList<MenuRowData>
+        searchPlacement="in-overlay"
+        open={open}
+        onOpenChange={setOpen}
+        ariaLabel={triggerLabel}
+        searchPlaceholder={searchPlaceholder}
+        sections={sections}
+        onQueryChange={setQuery}
+        renderTrigger={renderTrigger}
+        renderRow={renderRow}
+        renderEmpty={renderEmpty}
+        onActivate={handleActivate}
+        autofocusSearch="except-phone"
+        sheetSize="tall"
+      />
+    </View>
   )
 }
 
