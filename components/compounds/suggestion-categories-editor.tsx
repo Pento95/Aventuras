@@ -513,7 +513,7 @@ function SuggestionCategoriesEditor({
   )
 
   const addButton = (
-    <Button variant="ghost" onPress={handleAdd} disabled={disabled}>
+    <Button variant="ghost" onPress={handleAdd} disabled={disabled} aria-label="Add category">
       <Text>+ Add category</Text>
     </Button>
   )
