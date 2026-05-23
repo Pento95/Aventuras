@@ -186,10 +186,16 @@ function useSearchableList<T>(props: SearchableOverlayListProps<T>) {
   }, [searchPlacement, valueLabel, onQueryChange])
 
   const resetOnClose = useCallback(() => {
-    setQueryState('')
-    onQueryChange('')
+    // Mirrors resetOnOpen: as-trigger combobox closes back to the committed value
+    // (otherwise the consumer that wired onQueryChange→onValueChange would receive a
+    // spurious '' that wipes the freshly-picked value — the mobile-only Autocomplete bug).
+    // in-overlay (Picker / ActionsMenu) keeps the empty-on-close behavior since their
+    // onQueryChange is a filter setter, separate from the committed value.
+    const seed = searchPlacement === 'as-trigger' ? (valueLabel ?? '') : ''
+    setQueryState(seed)
+    onQueryChange(seed)
     setHighlightedId(null)
-  }, [onQueryChange])
+  }, [searchPlacement, valueLabel, onQueryChange])
 
   return {
     query,
