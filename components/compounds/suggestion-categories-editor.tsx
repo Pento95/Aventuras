@@ -27,7 +27,13 @@ import {
 } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
 import { runOnJS } from 'react-native-worklets'
 
 import {
@@ -384,17 +390,27 @@ type PhoneDragShared = {
   dragY: ReturnType<typeof useSharedValue<number>>
 }
 
-// Release pattern: no animations on the transition. The matched
-// layout+transform cancellation approach kept showing motion because the
-// React commit (layout change) and the worklet's transform clear ran on
-// different ticks — a frame gap where layout had moved but transform
-// hadn't created visible drift regardless of easing match. Instead we
-// keep transforms at their drag-state values UNTIL React commits the
-// reorder, then clear them via useLayoutEffect inside the same commit
-// cycle. Before paint, both the new layout and the cleared transforms
-// are in place, so the painted frame goes directly from drag-state
-// visual (correct via transforms on old layout) to post-reorder visual
-// (correct via natural new layout) with no intermediate state.
+// Sibling spring config — snappy enough that mid-drag shifts feel responsive
+// but not so stiff they feel mechanical. By release time, springs are usually
+// settled at their target shift; the bridge clears them in either case.
+const SIBLING_SPRING = { damping: 22, stiffness: 240, mass: 0.7 } as const
+
+// Release "settle" — the active row's dragY animates from raw finger position
+// to the exact target slot offset over RELEASE_SETTLE_MS, giving the user a
+// smooth landing into the slot before the invisible bridge takes over. The
+// runOnJS-back-to-JS only fires on completion, so the bridge waits for the
+// settle. Quad easing-out matches the muscle-memory of a finger releasing.
+const RELEASE_SETTLE_MS = 100
+const RELEASE_SETTLE_EASING = Easing.out(Easing.cubic)
+
+// Release pattern: matched layout+transform cancellation never reliably
+// hid motion because React's commit and the worklet's transform clear ran
+// on different ticks — even with perfect easing match, the inter-tick gap
+// painted a frame with new layout + old transform. The current architecture
+// keeps transforms at their drag-state values UNTIL React commits the
+// reorder, then clears them in a useLayoutEffect that runs synchronously
+// after commit and before paint. The painted frame has both new layout AND
+// zero transforms, so there's no intermediate visual to flicker through.
 
 function PhoneAccordionRow({
   rowState,
@@ -436,14 +452,12 @@ function PhoneAccordionRow({
     })
     .onUpdate((e) => {
       if (drag.activeId.value === id) {
-        // Snap-to-grid drag, INSTANT (no withTiming). Any in-flight tween at
-        // release time would leave dragY at an intermediate value — the
-        // matched layout+transform release pair only cancels visually when
-        // dragY is exactly (V - A) * ROW_H. The smooth slide we'd get from
-        // withTiming here is the source of the "row moves on release" the
-        // user kept seeing: release-mid-tween left dragY mid-stride and the
-        // residual animated to zero post-release. Hard jumps look slightly
-        // less fluid mid-drag but make release visually motionless.
+        // Free-follow: active row tracks the finger directly. virtualIndex
+        // still updates each frame (driving sibling shifts) but dragY is the
+        // raw translation, so the row feels physically attached. Any
+        // residual offset on release is settled by the .onEnd handler before
+        // the bridge fires.
+        drag.dragY.value = e.translationY
         const next = Math.max(
           0,
           Math.min(
@@ -451,15 +465,27 @@ function PhoneAccordionRow({
             drag.activeStartIndex.value + Math.round(e.translationY / PHONE_ROW_HEIGHT_PX),
           ),
         )
-        if (next !== drag.virtualIndex.value) {
-          drag.virtualIndex.value = next
-          drag.dragY.value = (next - drag.activeStartIndex.value) * PHONE_ROW_HEIGHT_PX
-        }
+        if (next !== drag.virtualIndex.value) drag.virtualIndex.value = next
       }
     })
     .onEnd(() => {
       if (drag.activeId.value === id) {
-        runOnJS(onRelease)(id, drag.virtualIndex.value)
+        // Settle phase: animate dragY from the finger-drop value to the
+        // exact target offset over RELEASE_SETTLE_MS, then trigger the
+        // bridge. The animation is purely cosmetic — by completion, dragY
+        // is at exactly (V - A) * ROW_H, so the bridge's value clear maps
+        // cleanly to the post-reorder natural position. Without this, the
+        // bridge would clear dragY mid-residual and the row would visually
+        // jump from finger position to V's center in one frame.
+        const exact = (drag.virtualIndex.value - drag.activeStartIndex.value) * PHONE_ROW_HEIGHT_PX
+        drag.dragY.value = withTiming(
+          exact,
+          { duration: RELEASE_SETTLE_MS, easing: RELEASE_SETTLE_EASING },
+          (finished) => {
+            'worklet'
+            if (finished) runOnJS(onRelease)(id, drag.virtualIndex.value)
+          },
+        )
       }
     })
 
@@ -496,11 +522,14 @@ function PhoneAccordionRow({
     let shift = 0
     if (V > A && index > A && index <= V) shift = -PHONE_ROW_HEIGHT_PX
     else if (V < A && index < A && index >= V) shift = PHONE_ROW_HEIGHT_PX
-    // Instant shift for the same reason dragY is instant in onUpdate: any
-    // in-flight spring at release would leave the sibling's transform at a
-    // non-exact value, breaking the matched cancellation.
+    // Spring-smoothed shift: siblings glide into and out of "making space"
+    // for the active row. Safe to spring (rather than snap instant) because
+    // the bridge clears all shared values atomically with the layout commit
+    // — even if a sibling's spring is mid-flight at release, the next paint
+    // has translateY 0 against the new layout, and the visual handoff has
+    // no intermediate frame to flicker through.
     return {
-      transform: [{ translateY: shift }],
+      transform: [{ translateY: withSpring(shift, SIBLING_SPRING) }],
     }
   })
 
