@@ -19,7 +19,7 @@ import { GripVertical, Trash2 } from 'lucide-react-native'
 import { memo, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { runOnJS } from 'react-native-worklets'
 
 import {
@@ -368,11 +368,20 @@ const PHONE_ROW_HEIGHT_PX = 56
 
 type PhoneDragShared = {
   activeId: ReturnType<typeof useSharedValue<string | null>>
+  activeStartIndex: ReturnType<typeof useSharedValue<number>>
+  // Where the dragged row would settle right now if released. Updates on
+  // every pan frame; siblings shift based on the gap between this and
+  // activeStartIndex (see PhoneAccordionRow's animated style below).
+  virtualIndex: ReturnType<typeof useSharedValue<number>>
   dragY: ReturnType<typeof useSharedValue<number>>
 }
 
+const SIBLING_SPRING = { damping: 22, stiffness: 240, mass: 0.7 } as const
+
 function PhoneAccordionRow({
   rowState,
+  index,
+  totalRows,
   handlers,
   swatches,
   fallbackColor,
@@ -383,14 +392,16 @@ function PhoneAccordionRow({
   onRelease,
 }: {
   rowState: RowState
+  index: number
+  totalRows: number
   handlers: RowHandlers
   swatches: ColorValue[]
   fallbackColor: ColorValue
   fallbackColorLabel: string
   disabled?: boolean
   drag: PhoneDragShared
-  onPickUp: (id: string) => void
-  onRelease: (id: string, totalDragY: number) => void
+  onPickUp: (id: string, startIndex: number) => void
+  onRelease: (id: string, finalIndex: number) => void
 }) {
   const id = rowState.category.id
 
@@ -403,32 +414,53 @@ function PhoneAccordionRow({
     .enabled(!disabled)
     .activateAfterLongPress(400)
     .onStart(() => {
-      runOnJS(onPickUp)(id)
+      runOnJS(onPickUp)(id, index)
     })
     .onUpdate((e) => {
       if (drag.activeId.value === id) {
         drag.dragY.value = e.translationY
+        // Recompute virtual index every frame. Clamping to the list bounds
+        // means dragging off either edge parks at the end without runaway.
+        const next = drag.activeStartIndex.value + Math.round(e.translationY / PHONE_ROW_HEIGHT_PX)
+        drag.virtualIndex.value = Math.max(0, Math.min(totalRows - 1, next))
       }
     })
-    .onEnd((e) => {
+    .onEnd(() => {
       if (drag.activeId.value === id) {
-        runOnJS(onRelease)(id, e.translationY)
+        runOnJS(onRelease)(id, drag.virtualIndex.value)
       }
     })
 
+  // Three branches: no drag in progress (everyone at rest), I'm the active
+  // row (translateY directly from gesture), or I'm a sibling that needs to
+  // make space for the active row (translateY ±PHONE_ROW_HEIGHT_PX, spring-
+  // animated). The "make space" rule: if active dragged DOWN past me, I
+  // shift UP one slot; if dragged UP past me, I shift DOWN one slot.
   const animatedStyle = useAnimatedStyle(() => {
-    const isActive = drag.activeId.value === id
+    if (drag.activeId.value == null) {
+      return { transform: [{ translateY: 0 }] }
+    }
+    if (drag.activeId.value === id) {
+      return {
+        transform: [{ translateY: drag.dragY.value }],
+        // Visual lift cues while active. zIndex pulls the row above siblings
+        // on web; native uses elevation for the same effect on Android.
+        zIndex: 50,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        opacity: 0.95,
+      }
+    }
+    const A = drag.activeStartIndex.value
+    const V = drag.virtualIndex.value
+    let shift = 0
+    if (V > A && index > A && index <= V) shift = -PHONE_ROW_HEIGHT_PX
+    else if (V < A && index < A && index >= V) shift = PHONE_ROW_HEIGHT_PX
     return {
-      transform: [{ translateY: isActive ? drag.dragY.value : 0 }],
-      // Visual lift cues while active. zIndex pulls the row above siblings on
-      // web; native uses elevation for the same effect on Android.
-      zIndex: isActive ? 50 : 0,
-      elevation: isActive ? 8 : 0,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isActive ? 0.2 : 0,
-      shadowRadius: 8,
-      opacity: isActive ? 0.95 : 1,
+      transform: [{ translateY: withSpring(shift, SIBLING_SPRING) }],
     }
   })
 
@@ -645,56 +677,64 @@ function PhoneList({
   categories,
 }: ListProps) {
   // Custom drag impl: rows render as plain Animated.Views inside the
-  // Accordion (no FlatList, no virtualization). One row at a time is "active"
-  // and follows the finger via reanimated translateY; on release we compute
-  // the target index from the total drag distance assuming a uniform row
-  // height (PHONE_ROW_HEIGHT_PX) and reorder via the consumer's onChange.
-  // Trade-off: other rows DON'T live-shift around the active row mid-drag,
-  // so the UX is "pick-up-and-drop" rather than "watch-them-rearrange."
-  // Worth it: zero virtualization means consumers can nest the editor inside
-  // any ScrollView without warnings.
+  // Accordion (no FlatList, no virtualization). Live-shuffle UX: as the
+  // active row's virtual index changes during drag, siblings spring up/down
+  // by one slot to make space. The array itself stays stable during the
+  // drag and reorders once on release — that way React renders aren't
+  // racing the gesture, and the visual end-state (siblings already shifted,
+  // active row already at its virtual index) lines up cleanly with the new
+  // array order with no flash.
   const activeId = useSharedValue<string | null>(null)
+  const activeStartIndex = useSharedValue(-1)
+  const virtualIndex = useSharedValue(-1)
   const dragY = useSharedValue(0)
 
   const finalizeReorder = useCallback(
-    (fromId: string, totalDragY: number) => {
+    (fromId: string, toIdx: number) => {
       const fromIdx = categories.findIndex((c) => c.id === fromId)
-      if (fromIdx < 0) {
+      if (fromIdx < 0 || toIdx < 0) {
         activeId.value = null
         dragY.value = 0
         return
       }
-      const delta = Math.round(totalDragY / PHONE_ROW_HEIGHT_PX)
-      const toIdx = Math.max(0, Math.min(categories.length - 1, fromIdx + delta))
-      // Animate the drag offset back to 0 before clearing active state so the
-      // released row doesn't visually snap; withTiming on a 120ms ramp keeps
-      // the transition crisp without feeling sluggish.
-      dragY.value = withTiming(0, { duration: 120 })
+      // Clear shared values FIRST so sibling rows snap to translateY 0 in the
+      // same frame as the array reorder — they were already visually at their
+      // new positions via transform, and the reordered array puts them there
+      // naturally at translateY 0. Active row similarly: was visually at
+      // virtual position via dragY, now at virtual position naturally.
       activeId.value = null
+      dragY.value = 0
       if (toIdx !== fromIdx) onReorder(arrayMove(categories, fromIdx, toIdx))
     },
     [categories, onReorder, activeId, dragY],
   )
 
   const handlePickUp = useCallback(
-    (id: string) => {
+    (id: string, startIndex: number) => {
       activeId.value = id
-      // withSpring on dragY would feel laggy at pickup — finger is already in
-      // contact, so we initialize to 0 explicitly and let Pan's onUpdate take
-      // over immediately.
+      activeStartIndex.value = startIndex
+      virtualIndex.value = startIndex
+      // Initialize to 0 explicitly — finger is already in contact, Pan's
+      // onUpdate takes over immediately and any prior animation residue
+      // would otherwise show on first frame.
       dragY.value = 0
     },
-    [activeId, dragY],
+    [activeId, activeStartIndex, virtualIndex, dragY],
   )
 
-  const drag = useMemo(() => ({ activeId, dragY }), [activeId, dragY])
+  const drag = useMemo(
+    () => ({ activeId, activeStartIndex, virtualIndex, dragY }),
+    [activeId, activeStartIndex, virtualIndex, dragY],
+  )
 
   return (
     <Accordion type="single" collapsible>
-      {rowStates.map((rowState) => (
+      {rowStates.map((rowState, index) => (
         <PhoneAccordionRow
           key={rowState.category.id}
           rowState={rowState}
+          index={index}
+          totalRows={rowStates.length}
           handlers={handlers}
           swatches={swatches}
           fallbackColor={fallbackColor}
