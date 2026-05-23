@@ -434,11 +434,28 @@ function PhoneAccordionRow({
     })
     .onUpdate((e) => {
       if (drag.activeId.value === id) {
-        drag.dragY.value = e.translationY
-        // Recompute virtual index every frame. Clamping to the list bounds
-        // means dragging off either edge parks at the end without runaway.
-        const next = drag.activeStartIndex.value + Math.round(e.translationY / PHONE_ROW_HEIGHT_PX)
-        drag.virtualIndex.value = Math.max(0, Math.min(totalRows - 1, next))
+        // Snap-to-grid drag: the active row tracks the nearest target slot
+        // rather than the raw finger position. The finger is the intent
+        // indicator; the row indicates the discrete drop target. Crossing a
+        // row midpoint snaps to the next slot with a short withTiming so
+        // jumps don't feel jarring. This is what makes release motion zero —
+        // dragY is always exactly (V - A) * ROW_H at any moment, so the
+        // post-release layout+transform pair has nothing to cancel.
+        const next = Math.max(
+          0,
+          Math.min(
+            totalRows - 1,
+            drag.activeStartIndex.value + Math.round(e.translationY / PHONE_ROW_HEIGHT_PX),
+          ),
+        )
+        if (next !== drag.virtualIndex.value) {
+          drag.virtualIndex.value = next
+          const snapped = (next - drag.activeStartIndex.value) * PHONE_ROW_HEIGHT_PX
+          drag.dragY.value = withTiming(snapped, {
+            duration: 120,
+            easing: Easing.out(Easing.quad),
+          })
+        }
       }
     })
     .onEnd(() => {
@@ -721,17 +738,6 @@ function PhoneList({
   const virtualIndex = useSharedValue(-1)
   const dragY = useSharedValue(0)
 
-  // Step 2 of release: array reorder + activeId clear, kicking off the
-  // matched layout+transform release transition. Runs from a UI-thread
-  // animation callback via runOnJS once the pre-reorder snap finishes.
-  const commitReorder = useCallback(
-    (fromIdx: number, toIdx: number) => {
-      if (toIdx !== fromIdx) onReorder(arrayMove(categories, fromIdx, toIdx))
-      activeId.value = null
-    },
-    [categories, onReorder, activeId],
-  )
-
   const finalizeReorder = useCallback(
     (fromId: string, toIdx: number) => {
       const fromIdx = categories.findIndex((c) => c.id === fromId)
@@ -740,26 +746,15 @@ function PhoneList({
         dragY.value = 0
         return
       }
-      // Pre-reorder snap: animate dragY from the finger-drop value to the
-      // exact target-V offset over 80ms. Without this, an off-center or
-      // past-the-edge drop leaves a residual translateY that the post-release
-      // layout+timing pair then animates back to 0, visually sliding the row
-      // across other rows' space. Setting the start frame's dragY = the
-      // exact target ((V - A) * ROW_H) means the release transition has zero
-      // distance to cancel — the row visually freezes in place when the
-      // reorder commits.
-      const snapTarget = (toIdx - fromIdx) * PHONE_ROW_HEIGHT_PX
-      dragY.value = withTiming(
-        snapTarget,
-        { duration: 80, easing: Easing.out(Easing.quad) },
-        (finished) => {
-          'worklet'
-          if (!finished) return
-          runOnJS(commitReorder)(fromIdx, toIdx)
-        },
-      )
+      // dragY is guaranteed to be exactly (V - A) * ROW_H by the snap-to-grid
+      // logic in the gesture's onUpdate, so committing the reorder + clearing
+      // activeId in the same frame lets the matched layout+transform release
+      // pair hold visual position constant for the full RELEASE_DURATION_MS
+      // (see ROW_LAYOUT_TRANSITION + the worklet's null branch).
+      if (toIdx !== fromIdx) onReorder(arrayMove(categories, fromIdx, toIdx))
+      activeId.value = null
     },
-    [categories, commitReorder, activeId, dragY],
+    [categories, onReorder, activeId, dragY],
   )
 
   const handlePickUp = useCallback(
