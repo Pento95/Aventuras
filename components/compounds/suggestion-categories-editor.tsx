@@ -19,7 +19,14 @@ import { GripVertical, Trash2 } from 'lucide-react-native'
 import { memo, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
 import { runOnJS } from 'react-native-worklets'
 
 import {
@@ -378,6 +385,15 @@ type PhoneDragShared = {
 
 const SIBLING_SPRING = { damping: 22, stiffness: 240, mass: 0.7 } as const
 
+// Release transition: linear easing + matched durations on the row's layout
+// animation AND the worklet's translateY → 0 ramp let the two cancel out so
+// the dragged row visually holds still while the DOM reorder lands.
+// Linear (rather than ease-in-out) because any easing mismatch between the
+// layout interpolator and withTiming causes a visible wobble.
+const RELEASE_DURATION_MS = 200
+const RELEASE_EASING = Easing.linear
+const ROW_LAYOUT_TRANSITION = LinearTransition.duration(RELEASE_DURATION_MS).easing(RELEASE_EASING)
+
 function PhoneAccordionRow({
   rowState,
   index,
@@ -431,14 +447,30 @@ function PhoneAccordionRow({
       }
     })
 
-  // Three branches: no drag in progress (everyone at rest), I'm the active
-  // row (translateY directly from gesture), or I'm a sibling that needs to
-  // make space for the active row (translateY ±PHONE_ROW_HEIGHT_PX, spring-
-  // animated). The "make space" rule: if active dragged DOWN past me, I
-  // shift UP one slot; if dragged UP past me, I shift DOWN one slot.
+  // Three branches: no drag in progress (everyone animates translateY back to
+  // 0 in sync with the row layout transition — see RELEASE_DURATION_MS), I'm
+  // the active row (translateY directly from gesture), or I'm a sibling that
+  // needs to make space for the active row (translateY ±PHONE_ROW_HEIGHT_PX,
+  // spring-animated). The "make space" rule: if active dragged DOWN past me,
+  // I shift UP one slot; if dragged UP past me, I shift DOWN one slot.
+  //
+  // The activeId == null branch is the release-snap path: layout animation
+  // moves the row from its OLD DOM position to its NEW DOM position over
+  // RELEASE_DURATION_MS with linear easing, while withTiming animates the
+  // residual translateY from its prior shifted value down to 0 over the same
+  // duration and easing. The sum (layoutY + translateY) stays constant, so
+  // every row visually holds at its release-time position throughout the
+  // transition — no flash between the React re-render and the worklet
+  // re-evaluation.
   const animatedStyle = useAnimatedStyle(() => {
     if (drag.activeId.value == null) {
-      return { transform: [{ translateY: 0 }] }
+      return {
+        transform: [
+          {
+            translateY: withTiming(0, { duration: RELEASE_DURATION_MS, easing: RELEASE_EASING }),
+          },
+        ],
+      }
     }
     if (drag.activeId.value === id) {
       return {
@@ -465,7 +497,7 @@ function PhoneAccordionRow({
   })
 
   return (
-    <Animated.View style={animatedStyle}>
+    <Animated.View style={animatedStyle} layout={ROW_LAYOUT_TRANSITION}>
       <AccordionItem value={id}>
         <View className="flex-row items-center gap-1">
           {/* GestureDetector wraps the drag handle so only the handle picks
