@@ -36,6 +36,7 @@ import { Switch } from '@/components/ui/switch'
 import { Text } from '@/components/ui/text'
 import { Textarea } from '@/components/ui/textarea'
 import { useTier } from '@/hooks/use-tier'
+import { useDensity } from '@/lib/density/use-density'
 import { cn } from '@/lib/utils'
 
 type SuggestionCategory = {
@@ -72,8 +73,17 @@ type SuggestionCategoriesEditorProps = {
 const DEFAULT_FALLBACK_LABEL = 'Default'
 const PROMPT_HINT_MIN_HEIGHT = 80
 const EXPAND_DURATION_MS = 200
-// Initial guess for a collapsed phone row; library swaps in measured heights once rendered.
-const ESTIMATED_COLLAPSED_ROW_HEIGHT = 56
+// Collapsed row height per density, used to seed the sortable's per-item top. The lib initializes
+// each item's `top` to `position * estimatedItemHeight`, then springs to the measured cumulative-Y
+// when onLayout fires; if the estimate is off, every non-first row visibly slides into place over
+// the spring's ~500ms settle. In compact the 12+20+12 drag handle dominates the row; in regular
+// and comfortable the `py-row-y-lg` Pressable dominates — RN's text-sm renders at ~24px tall with
+// default leading, so Pressable height = 2*py-lg + 24, then +1 for border-b.
+const COLLAPSED_ROW_HEIGHT_BY_DENSITY = {
+  compact: 45,
+  regular: 50,
+  comfortable: 59,
+} as const
 
 function findDuplicateLabelIds(categories: SuggestionCategory[]): ReadonlySet<string> {
   const seen = new Map<string, string[]>()
@@ -591,49 +601,11 @@ function PhoneList(props: PhoneListProps) {
         .join('|'),
     [props.categories],
   )
-  return props.disabled ? (
-    <PhoneListStatic {...props} />
-  ) : (
-    <PhoneListSortable key={idSetKey} {...props} />
-  )
-}
-
-function PhoneListStatic({
-  rowStates,
-  handlers,
-  swatches,
-  fallbackColor,
-  fallbackColorLabel,
-  disabled,
-}: PhoneListProps) {
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(EMPTY_EXPANDED_SET)
-  const toggleExpanded = useToggleExpanded(setExpandedIds)
-  return (
-    <View className="overflow-hidden rounded-md border border-border bg-bg-base">
-      {rowStates.map((rowState) => (
-        <PhoneRowShell
-          key={rowState.category.id}
-          rowState={rowState}
-          handlers={handlers}
-          swatches={swatches}
-          fallbackColor={fallbackColor}
-          fallbackColorLabel={fallbackColorLabel}
-          disabled={disabled}
-          expanded={expandedIds.has(rowState.category.id)}
-          onToggleExpanded={() => toggleExpanded(rowState.category.id)}
-          dragHandle={
-            <View
-              accessibilityRole="image"
-              aria-label="Drag handle (disabled)"
-              style={dragHandleStaticStyle}
-            >
-              <Icon as={GripVertical} size="md" className="text-fg-muted" />
-            </View>
-          }
-        />
-      ))}
-    </View>
-  )
+  // Always render the sortable path even when disabled — branching to a different layout
+  // (e.g. natural flex) causes a measurable height jump on toggle, because the two paths
+  // measure and stack their rows differently. Disable drag via pointerEvents on the handle
+  // and via the disabled prop the row controls already honor.
+  return <PhoneListSortable key={idSetKey} {...props} />
 }
 
 const EMPTY_EXPANDED_SET: ReadonlySet<string> = new Set()
@@ -666,13 +638,15 @@ function PhoneListSortable({
   fallbackColorLabel,
   onReorder,
   categories,
+  disabled,
 }: PhoneListProps) {
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(EMPTY_EXPANDED_SET)
   const toggleExpanded = useToggleExpanded(setExpandedIds)
+  const density = useDensity()
   const sortableList = useSortableList<SuggestionCategory>({
     data: categories,
     enableDynamicHeights: true,
-    estimatedItemHeight: ESTIMATED_COLLAPSED_ROW_HEIGHT,
+    estimatedItemHeight: COLLAPSED_ROW_HEIGHT_BY_DENSITY[density.resolved],
     itemKeyExtractor: (item) => item.id,
   })
 
@@ -736,6 +710,7 @@ function PhoneListSortable({
             onDragStart={handleDragStart}
             expanded={expandedIds.has(item.id)}
             onToggleExpanded={toggleExpanded}
+            disabled={disabled}
           />
         )
       })}
@@ -762,7 +737,10 @@ type SortablePhoneRowProps = {
   onDragStart: () => void
   expanded: boolean
   onToggleExpanded: (id: string) => void
+  disabled?: boolean
 }
+
+const dragHandleDisabledStyle = { padding: 12, pointerEvents: 'none' } as const
 
 // memo here is load-bearing for perf: useSortableList runs setDynamicContentHeight on every
 // layout tick (via the lib's scheduleHeightUpdate). Without memoization, PhoneListSortable
@@ -782,6 +760,7 @@ const SortablePhoneRow = memo(function SortablePhoneRow({
   onDragStart,
   expanded,
   onToggleExpanded,
+  disabled,
 }: SortablePhoneRowProps) {
   const handleToggle = useCallback(() => onToggleExpanded(item.id), [item.id, onToggleExpanded])
   return (
@@ -798,14 +777,18 @@ const SortablePhoneRow = memo(function SortablePhoneRow({
         swatches={swatches}
         fallbackColor={fallbackColor}
         fallbackColorLabel={fallbackColorLabel}
+        disabled={disabled}
         expanded={expanded}
         onToggleExpanded={handleToggle}
         dragHandle={
-          <SortableItem.Handle>
+          // pointerEvents on the Handle's inner View blocks the GestureDetector's long-press
+          // from registering. The lib has no `disabled` prop on SortableItem, so this is the
+          // way to suppress drag while keeping the same row layout (so the disable toggle
+          // doesn't visually re-flow the list).
+          <SortableItem.Handle style={disabled ? dragHandleDisabledStyle : dragHandleStaticStyle}>
             <View
-              accessibilityRole="button"
-              aria-label="Long-press to drag and reorder"
-              style={dragHandleStaticStyle}
+              accessibilityRole={disabled ? 'image' : 'button'}
+              aria-label={disabled ? 'Drag handle (disabled)' : 'Long-press to drag and reorder'}
             >
               <Icon as={GripVertical} size="md" className="text-fg-muted" />
             </View>
@@ -827,6 +810,7 @@ function sortablePhoneRowPropsEqual(prev: SortablePhoneRowProps, next: SortableP
   if (prev.onDragStart !== next.onDragStart) return false
   if (prev.expanded !== next.expanded) return false
   if (prev.onToggleExpanded !== next.onToggleExpanded) return false
+  if (prev.disabled !== next.disabled) return false
   const ps = prev.sortableProps
   const ns = next.sortableProps
   // sortableProps is a fresh object each render (lib's getItemProps returns new), but its
