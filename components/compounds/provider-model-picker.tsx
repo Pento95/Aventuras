@@ -1,4 +1,12 @@
-import { Brain, ChevronDown, ChevronUp, Star, TriangleAlert, Wrench } from 'lucide-react-native'
+import {
+  Brain,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Star,
+  TriangleAlert,
+  Wrench,
+} from 'lucide-react-native'
 import { useCallback, useMemo, useState, type Ref } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 
@@ -355,6 +363,11 @@ function ProviderInlinePicker({ providers, value, onChange }: ProviderInlinePick
           <ScrollView keyboardShouldPersistTaps="handled">
             {providers.map((p) => {
               const isSelected = p.id === value
+              // Row shape matches Select's default-content pattern: text on the
+              // left, right-aligned Check icon at right-3 inside a reserved
+              // size-5 box, pr-10 reserves the gutter so long names don't
+              // overlap the icon. Single source of "this is selected" so we
+              // don't duplicate the cue with a row tint.
               return (
                 <Pressable
                   key={p.id}
@@ -364,17 +377,16 @@ function ProviderInlinePicker({ providers, value, onChange }: ProviderInlinePick
                     onChange(p.id)
                     setOpen(false)
                   }}
-                  className={cn(
-                    'w-full flex-row items-center gap-2 px-row-x-md py-row-y-md active:bg-tint-press',
-                    isSelected && 'bg-bg-sunken',
-                  )}
+                  className="relative w-full flex-row items-center py-row-y-md pl-row-x-md pr-10 active:bg-tint-press"
                 >
-                  <Text size="sm" className="w-4 text-fg-primary">
-                    {isSelected ? '✓' : ''}
-                  </Text>
                   <Text size="sm" className="flex-1 text-fg-primary" numberOfLines={1}>
                     {p.name}
                   </Text>
+                  {isSelected ? (
+                    <View className="absolute right-3 flex size-5 items-center justify-center">
+                      <Icon as={Check} size="md" className="shrink-0 text-fg-primary" />
+                    </View>
+                  ) : null}
                 </Pressable>
               )
             })}

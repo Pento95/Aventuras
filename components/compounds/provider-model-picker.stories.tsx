@@ -182,6 +182,27 @@ export const BrokenFavorite: Story = {
   ),
 }
 
+// Stresses the inline composer's `Under:` panel scroll cap. With 10+
+// providers the panel hits its 180px max-height and the inner ScrollView
+// becomes the scroll surface — verify by opening the picker, tapping
+// `+ Add custom model…`, then tapping `Under:` and confirming the panel
+// doesn't push Cancel/Add off-screen.
+const MANY_PROVIDERS: ProviderSource[] = Array.from({ length: 12 }, (_, i) => ({
+  id: `provider-${i + 1}`,
+  name: `Provider ${i + 1} ${['Anthropic', 'OpenAI', 'OpenRouter', 'Mistral', 'Cohere', 'Google'][i % 6]}`,
+  models: [{ id: `model-${i + 1}-default` }, { id: `model-${i + 1}-mini` }],
+}))
+
+export const ManyProvidersComposer: Story = {
+  render: () => (
+    <DemoPicker
+      providers={MANY_PROVIDERS}
+      initialValue={{ providerId: 'provider-1', modelId: 'model-1-default' }}
+      initialFavorites={[]}
+    />
+  ),
+}
+
 export const LongModelNames: Story = {
   render: () => (
     <DemoPicker
