@@ -25,7 +25,7 @@ when they ship.
   scaffolding.
 - **needs-design** — surface uses it or wireframe shows it, but
   there's no written contract yet. Run a design pass via
-  [`aventuras-design`](../../.claude/skills/aventuras-design) before
+  [`aventuras-design`](../../.agents/skills/aventuras-design) before
   scaffolding.
 
 ## Primitives
