@@ -646,7 +646,8 @@ function PhoneList({
   // Auto-expand only when exactly one new id appears — the "user clicked Add" case. Bulk
   // changes (Reset to defaults, load saved settings) introduce many ids at once and would
   // otherwise expand them all, overflowing the lib's cumulative-Y layout before measurements
-  // land.
+  // land. Also prune ghost ids: a row removed from categories must leave expandedIds, or a
+  // same-id Reset re-mounts the row already "expanded" with no body fitting the container.
   const prevIdsRef = useRef<Set<string>>(new Set(categories.map((c) => c.id)))
   useEffect(() => {
     const currentIds = new Set(categories.map((c) => c.id))
@@ -655,11 +656,20 @@ function PhoneList({
       if (!prevIdsRef.current.has(id)) newIds.push(id)
     }
     prevIdsRef.current = currentIds
-    if (newIds.length !== 1) return
     setExpandedIds((prev) => {
       const next = new Set(prev)
-      next.add(newIds[0]!)
-      return next
+      let changed = false
+      for (const id of prev) {
+        if (!currentIds.has(id)) {
+          next.delete(id)
+          changed = true
+        }
+      }
+      if (newIds.length === 1 && !next.has(newIds[0]!)) {
+        next.add(newIds[0]!)
+        changed = true
+      }
+      return changed ? next : prev
     })
   }, [categories])
 
