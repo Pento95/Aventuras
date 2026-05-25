@@ -12,9 +12,6 @@ probe ([`memory/probe.md`](./memory/probe.md)) is the one
 persistent surface in this family and pre-dates this doc; its
 contract is referenced rather than restated here.
 
-Design record:
-[`explorations/2026-05-17-observability-substrate.md`](./explorations/2026-05-17-observability-substrate.md).
-
 ## Scope
 
 **In:** observability contracts for inspecting AI-pipeline behavior

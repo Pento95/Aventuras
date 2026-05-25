@@ -950,10 +950,6 @@ Neither scope reaches NEW-side-only value strings (a value just
 added and not yet replaced lives only on the current row, not
 in any `undo_payload`); accepted as a v1 limitation.
 
-Full design rationale, trade-off discussion, and adversarial
-review live in
-[`explorations/2026-05-17-delta-diff-cache.md`](./explorations/2026-05-17-delta-diff-cache.md).
-
 ---
 
 ## What this doc does not yet cover
@@ -977,10 +973,8 @@ Flag for future sessions:
 - **Boot-time orchestration** — the interaction between Drizzle's
   `migrate()` (per
   [Slice 1.2](./implementation/milestones/01-spine/slices/02-drizzle-schema.md)),
-  store hydration, and crash-recovery
-  ([crash-recovery-startup exploration](./explorations/2026-05-17-crash-recovery-startup.md)
-  and
-  [`generation-pipeline.md → Crash recovery`](./generation-pipeline.md#crash-recovery-via-pipeline_runs-marker-table)).
+  store hydration, and
+  [crash recovery](./generation-pipeline.md#crash-recovery-via-pipeline_runs-marker-table).
   The substrate is in place — schema migrations run idempotently
   at boot, marker-table replay is spec'd end-to-end — what's
   missing is the canonical ordering doc that names the precise

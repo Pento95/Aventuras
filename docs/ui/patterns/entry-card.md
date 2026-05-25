@@ -220,9 +220,6 @@ holds, cleared on next render when the user fixes it.
 [`principles.md → Edit restrictions during in-flight generation`](../principles.md#edit-restrictions-during-in-flight-generation))
 — same gating as content edit, regen, and delete. No new mechanism.
 
-Full design rationale and the downstream-consumer tolerance
-contract: [`explorations/2026-05-17-manual-worldtime-correction.md`](../../explorations/2026-05-17-manual-worldtime-correction.md).
-
 ## Action cluster
 
 Per-kind action sets:

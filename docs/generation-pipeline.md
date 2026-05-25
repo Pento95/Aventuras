@@ -1047,9 +1047,6 @@ No max-retry counter and no admin "drop orphan" affordance for v1;
 stuck orphans remain visible in Logs across boots. The real fix
 lives with the multi-version apply-dispatcher work.
 
-The design exploration for this consumer-side wiring is
-[`explorations/2026-05-17-crash-recovery-startup.md`](./explorations/2026-05-17-crash-recovery-startup.md).
-
 ### `chainsTo` on predecessor
 
 ```ts

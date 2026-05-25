@@ -16,9 +16,6 @@ built; this doc names the structural pieces (top-bar, tab strip,
 story-anchor selector, cross-tab nav, empty states, mobile
 expression).
 
-Design record:
-[`docs/explorations/2026-05-17-observability-substrate.md`](../../../explorations/2026-05-17-observability-substrate.md).
-
 ## Top-bar
 
 App-level chrome `[←] [Diagnostics] [⚲]`. No status pill, no

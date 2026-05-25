@@ -357,9 +357,8 @@ active calendar; Save writes one `op=update` delta against
 `entries.metadata.worldTime`. Host contract (props, render rules,
 indicator behavior, cross-tier overlay shape):
 [`entry-card.md → World-time footer`](../../patterns/entry-card.md#world-time-footer).
-Design rationale, downstream-consumer tolerance contract, and the
-no-cascade decision:
-[`explorations/2026-05-17-manual-worldtime-correction.md`](../../../explorations/2026-05-17-manual-worldtime-correction.md).
+Downstream consumers (classifier, monotonicity check) tolerate
+manual edits; no cascade is triggered.
 
 The host (`reader-composer`) is responsible for computing the
 monotonicity-break flag per entry (walk-back over the entries

@@ -1000,10 +1000,6 @@ changes; user edits "stick" only until classifier reads contradicting
 prose. Per-field provenance metadata (deferred to v1.5) is the proper
 fix.
 
-The full design rationale, alternatives considered, and adversarial
-findings are recorded in
-[`explorations/2026-04-29-entities-state-shape.md`](./explorations/2026-04-29-entities-state-shape.md).
-
 ### Story identity fields
 
 **Decided:** `stories` gains identity metadata as columns (not inside
@@ -2100,10 +2096,6 @@ encoding rules — column rename, sub-field type change, encoding rule
 revision — can dispatch per-delta without retrofitting a version
 into existing rows. Cost is ~4 bytes per delta; the ~200 KB per large
 story at the storage ceiling is negligible.
-
-Full encoding contract, rejected alternatives, and apply-time
-semantics in
-[`explorations/2026-05-17-deltas-substrate.md`](./explorations/2026-05-17-deltas-substrate.md).
 
 **Delta scope: narrative state only.** Deltas cover the core narrative
 tables (`story_entries` row-level changes, `entities` narrative fields,
