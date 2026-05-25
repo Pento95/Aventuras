@@ -12,6 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Text } from '@/components/ui/text'
 import { useTier } from '@/hooks/use-tier'
+import type { DensityValue } from '@/lib/density/types'
+import { useDensity } from '@/lib/density/use-density'
 import { cn } from '@/lib/utils'
 
 type ColorValue = string
@@ -74,7 +76,19 @@ function isLightColor(hex: string): boolean {
 
 // Slightly transparent so the Check reads as an overlay rather than a hard
 // shape — keeps the swatch color legible while still clearly marking selection.
-const CHECK_OVERLAY_STYLE = { opacity: 0.85 } as const
+const CHECK_OVERLAY_OPACITY = 0.85
+
+const SWATCH_SIZE_CLASSES: Record<DensityValue, string> = {
+  compact: 'h-6 w-6',
+  regular: 'h-7 w-7',
+  comfortable: 'h-8 w-8',
+}
+
+const CHECK_ICON_PX: Record<DensityValue, number> = {
+  compact: 12,
+  regular: 14,
+  comfortable: 16,
+}
 
 const STATIC_STYLES = StyleSheet.create({
   pickerWrapper: { width: '100%' },
@@ -102,6 +116,7 @@ function SwatchButton({
   disabled,
   ...slotProps
 }: SwatchButtonProps) {
+  const { resolved: density } = useDensity()
   const ringClass = selected ? 'border-border-strong' : 'border-border'
   const dashed = kind === 'none' ? 'border-dashed' : ''
   const isEmpty = kind === 'custom-empty'
@@ -110,7 +125,15 @@ function SwatchButton({
   // 'none' fallback chip (selected when value === null). The 'custom-empty'
   // chip is the editor trigger, never a selection target, so it stays as '+'.
   const showCheck = selected && !isEmpty && color != null
-  const checkTint = color != null && isLightColor(color) ? '#000000' : '#ffffff'
+  // Color routed through `style`, not the `color` prop: Icon's cssInterop
+  // wires `nativeStyleToProp: { color }`, which extracts color from the
+  // resolved style and overrides any explicit `color` prop on native — the
+  // className-derived `text-fg-primary` would otherwise win and paint the
+  // check white on every swatch.
+  const checkStyle = {
+    color: color != null && isLightColor(color) ? '#000000' : '#ffffff',
+    opacity: CHECK_OVERLAY_OPACITY,
+  }
 
   return (
     <Pressable
@@ -120,16 +143,19 @@ function SwatchButton({
       onPress={onPress}
       disabled={disabled}
       style={isEmpty || !color ? undefined : fillStyle(color)}
-      className={cn('h-7 w-7 items-center justify-center rounded-full border-2', ringClass, dashed)}
+      className={cn(
+        'items-center justify-center rounded-full border-2',
+        SWATCH_SIZE_CLASSES[density],
+        ringClass,
+        dashed,
+      )}
       // Slot props spread last so PopoverTrigger.asChild can inject its ref + click
       // handler onto the underlying Pressable — without this, Floating UI can't anchor
       // the popover (renders unanchored at the viewport edge with collapsed height).
       {...slotProps}
     >
       {isEmpty ? <Text size="sm">+</Text> : null}
-      {showCheck ? (
-        <Icon as={Check} size="sm" color={checkTint} style={CHECK_OVERLAY_STYLE} />
-      ) : null}
+      {showCheck ? <Icon as={Check} size={CHECK_ICON_PX[density]} style={checkStyle} /> : null}
     </Pressable>
   )
 }

@@ -188,7 +188,11 @@ const RowContent = memo(function RowContent({
     </View>
   )
   const colorField = (
-    <View className={stacked ? 'flex-col gap-1' : undefined}>
+    // Inline layout pins the swatch row to the Input's vertical center via
+    // `min-h-control-md` + `justify-center`. Without this, `items-start` on the
+    // parent row leaves the (shorter) swatches floating at the top of the
+    // (taller) Input, and `items-center` drifts mid-(input + error message).
+    <View className={stacked ? 'flex-col gap-1' : 'min-h-control-md justify-center'}>
       {stacked ? (
         <Text size="xs" variant="muted">
           Color
@@ -226,7 +230,7 @@ const RowContent = memo(function RowContent({
           aria-label={category.enabled ? 'Disable category' : 'Enable category'}
         />
       </View>
-      <View className="flex-1 flex-col gap-2">
+      <View className={cn('flex-1 flex-col', stacked ? 'gap-3' : 'gap-2')}>
         {stacked ? (
           <>
             {labelField}
