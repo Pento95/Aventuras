@@ -13,20 +13,35 @@ for the placement rule.
 
 ## UX
 
-### Importer compound — design pass
+### Sheet vs Modal — general-use review
 
-[`component-inventory.md → Compounds — needs design`](./ui/component-inventory.md#compounds--needs-design)
-lists the Importer compound as deferred until more import
-groundwork lands. v1 has three concrete consumers ([roadmap
-M4 entity import](./implementation/roadmap.md#m4--world--plot-read-surfaces),
-[M8.3 vault calendars import](./implementation/roadmap.md#m8--translation--vault-parent-shell),
-[M9.4 story `.avts` import](./implementation/roadmap.md#m9--storybook--per-surface-visual-polish--ship-gate))
-so the wrapper shape needs designing before the first consumer
-slice can scaffold against it. Action surfaces per host differ
-enough that the design pass is non-trivial — the picker wraps
-`ImporterMenu` + file dialog (web `<input>` / native
-`expo-document-picker`) + paste flow + zod-validated parse +
-error display. Lands before M4 starts.
+Two related questions about the project's overlay strategy that
+need an explicit decision before more dialog / sheet surfaces
+land:
+
+1. **Sheet vs Dialog/Modal for general use.** Should the project
+   keep the current dual `Sheet` + `Dialog` primitives, or
+   consolidate around `Dialog`/`Modal` and retire `Sheet`? The
+   `ImportDialog` design pass picked `Dialog` outright (per
+   [import-dialog.md](./ui/patterns/import-dialog.md)); other
+   shipped dialog compounds use `@rn-primitives/dialog` too. If
+   `Sheet` lacks load-bearing consumers v1 doesn't already have,
+   consolidating would simplify the overlay story.
+
+2. **Native form-sheet `Modal` vs `@rn-primitives/dialog`.** The
+   [`ui-native-modals.md` rule](../.agents/skills/vercel-react-native-skills/rules/ui-native-modals.md)
+   recommends native `Modal` with `presentationStyle="formSheet"`
+   on native (built-in gestures, accessibility, better
+   performance). Current dialog compounds use
+   `@rn-primitives/dialog`, which is overlay-based. Worth a
+   focused review of whether to migrate native dialogs to the
+   native form-sheet `Modal`, given the cross-platform behavior
+   delta.
+
+Both axes affect every existing dialog compound
+(`CollisionResolveDialog`, `EmbedderDownloadDialog`,
+`ImportDialog`), so the decision should land before the v1 ship
+gate.
 
 ### Diagnostics hub — per-tab body design passes
 

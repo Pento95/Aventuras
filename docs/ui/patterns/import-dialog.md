@@ -1,0 +1,545 @@
+# Import dialog pattern
+
+Pure-View Dialog that runs every `.avts` JSON import in the
+app — file pick or clipboard read → envelope meta-check → zod
+payload validation → emit. Single canonical compound consumed by
+World/Plot per-row imports, Vault calendars import, and Story
+List story import. Domain-agnostic; the host supplies the format,
+schema, payload key, and the `onValidated` handoff.
+
+Used by:
+
+- [World per-row import](../screens/world/world.md#per-row-import)
+  — entity (`aventuras-entity`) and lore (`aventuras-lore`)
+  per-kind imports.
+- [Plot per-row import](../screens/plot/plot.md#manual-creation--per-row-import)
+  — thread (`aventuras-thread`) and happening
+  (`aventuras-happening`) imports.
+- [Vault calendars · From JSON file](../screens/vault/calendars/calendars.md#from-json-file)
+  — `aventuras-calendar`.
+- [Story List · Story import](../screens/story-list/story-list.md#story-import)
+  — `aventuras-story`.
+
+The envelope contract — `format`, `formatVersion`, payload sub-key,
+per-UI gated rejection — is canonical at
+[`data-model.md → Aventuras file format`](../../data-model.md#aventuras-file-format-avts).
+This pattern doc owns the **dialog UI shape and validation
+pipeline**; the data-model doc owns the envelope spec.
+
+## Why one component, not per-host variants
+
+The contract at every callsite is identical: a host opens the
+dialog with a `format`, a `supportedMajor`, a `payloadKey`, a
+zod `schema`, and an `onValidated` handler. The dialog runs the
+same three-stage pipeline (read → meta-check → payload-validate)
+and either fires `onValidated(payload)` or surfaces the failure
+with copy keyed off the failure mode. Every host's success path
+is different (Vault assigns a fresh UUID; story-list routes to
+the reader; per-row creates a row and selects it) but those are
+host-side effects, not Dialog UI variants — pure-View Dialog +
+host-supplied effect handler keeps the compound's contract
+tight.
+
+The trigger affordance varies per host (`+ New X ▾` menu via
+`ImporterMenu` for world / plot / vault-calendars; flat
+`[Import story…]` Button for story-list), so the trigger lives
+with the host. This mirrors the `CollisionResolveDialog` and
+`EmbedderDownloadDialog` precedent.
+
+## Props
+
+```ts
+type ImportDialogProps<TPayload> = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+
+  // Envelope contract — per data-model.md → Aventuras file format
+  format: `aventuras-${string}` // expected `format` field, exact-match
+  supportedMajor: number // accepts files where `formatVersion.major === supportedMajor`
+  payloadKey: string // envelope sub-key, e.g. 'calendar', 'story', 'entity'
+  schema: ZodSchema<TPayload> // validates the payload sub-object
+
+  // Copy
+  title: string // dialog title, e.g. 'Import calendar', 'Import story'
+
+  // Outcome
+  onValidated: (payload: TPayload) => void // fires on success; Dialog closes itself after
+}
+```
+
+Generic over `TPayload`. The host typically narrows
+`TPayload` via the zod schema and threads the inferred type
+through to its action layer.
+
+## States
+
+Five states drive the dialog body. Header (title + ×) and footer
+(`Cancel`) persist across all states; the body content swaps.
+
+```
+idle          → two input buttons, no error
+reading       → spinner on active source, both buttons disabled
+meta-error    → wrong-format / wrong-major banner, both buttons re-enabled
+payload-error → "Invalid format — N issues. [Show details]" + collapsed details
+(success)     → onValidated fires; Dialog self-closes via onOpenChange(false)
+```
+
+Transitions are linear: `idle → reading → (meta-error |
+payload-error | close)`. Any error state → user clicks either
+input button again → back to `reading`. Closing during `reading`
+discards the in-flight read (settle handlers compare a
+`requestId` ref before any state mutation).
+
+## Dialog body — idle
+
+```
+┌── Import calendar ─────────────────────────┐
+│                                             │
+│   ┌──────────────────────────────────────┐  │
+│   │  📁  Choose .avts file…              │  │
+│   └──────────────────────────────────────┘  │
+│                                             │
+│   ┌──────────────────────────────────────┐  │
+│   │  📋  Import from clipboard           │  │
+│   └──────────────────────────────────────┘  │
+│                                             │
+│   .avts and .json files supported.          │
+│                                             │
+│                              [ Cancel ]     │
+└─────────────────────────────────────────────┘
+```
+
+The hint line at the bottom is fixed copy; the extension policy
+(`.avts` canonical, `.json` accepted) is canonical at
+[`data-model.md → Extension policy`](../../data-model.md#aventuras-file-format-avts).
+
+### Picker mechanics
+
+- **Web file picker.** A visually-hidden `<input type="file"
+accept=".avts,.json">` lives inside the dialog body, clicked
+  programmatically from the `📁` Button. The input's
+  `value` is reset to `''` before each click so the same file
+  can be re-picked after an error.
+- **Native file picker.**
+  `expo-document-picker.getDocumentAsync({ type:
+['application/json', 'application/octet-stream'] })`. Android
+  doesn't reliably MIME-type `.avts`; the dual MIME accept-list
+  plus extension dispatch covers it. URI returned →
+  `expo-file-system.readAsStringAsync(uri)`.
+- **Web clipboard.** `navigator.clipboard.readText()`. Available
+  on HTTPS / localhost / Electron contexts. Feature-detect on
+  mount; if absent, the `📋` Button renders disabled with
+  `disabledReason="Clipboard access not available."` (kept
+  rendered for stable layout).
+- **Native clipboard.** `expo-clipboard.getStringAsync()`.
+
+### Disabled-state gating
+
+Both buttons during `reading` are gated via inline
+`pointerEvents: 'none'` style — className-only gating doesn't
+fully block clicks on web (see
+[`icon-actions.md → Disabled vs hidden`](./icon-actions.md#disabled-vs-hidden)
+for the rationale on disabled affordances generally; the
+underlying inline-style mechanic is the same).
+Disabled visual treatment is `opacity-50` plus muted text.
+
+## Validation pipeline
+
+Three stages, each owning one failure mode. The categorical
+split — meta-error vs payload-error — is the user-facing
+contract; the pattern doc is the source of truth.
+
+### Stage 1 — Read
+
+Async load → string. Failures here are transient meta-errors
+with a banner shape (no `[Show details]`), because there's no
+parsed JSON to dig into:
+
+- File read I/O failure → `⚠ Could not read file.`
+- Clipboard read failure / permission denied
+  → `⚠ Clipboard access denied.`
+- Empty clipboard → `⚠ Clipboard is empty.`
+
+If Stage 1 returns a string, the spinner clears and Stage 2 runs
+synchronously.
+
+### Stage 2 — Parse + meta-check
+
+`JSON.parse` the string, then walk the envelope header. All
+failures here are meta-errors. Each branch maps to a categorical
+copy line:
+
+- `JSON.parse` throws or result is not a plain object
+  → `⚠ This file isn’t valid JSON.`
+- `parsed.format` missing or not a string starting with
+  `aventuras-` → `⚠ This isn’t an Aventuras file.`
+- `parsed.format !== props.format` (exact match,
+  case-sensitive) → `⚠ This is a different kind of Aventuras
+file (got <parsed.format>, expected <props.format>).`
+- `parsed.formatVersion` missing or shape-invalid (must match
+  `/^(\d+)\.(\d+)$/`; `"1"`, `"1.0.0"`, `"v1.0"` all fail)
+  → `⚠ This file is missing version information.`
+- Parsed `major < props.supportedMajor`
+  → `⚠ This file is from an older version of Aventuras.`
+- Parsed `major > props.supportedMajor`
+  → `⚠ This file is from a newer version. Update Aventuras to
+import.`
+- `parsed[props.payloadKey]` missing
+  → `⚠ This file is missing its <payloadKey> data.`
+
+Stage 2 does **not** use zod. Hand-rolled envelope inspection
+keeps the meta-error surface categorical; mixing zod here would
+push meta-failures into payload-error's field-list shape,
+collapsing the distinction.
+
+### Stage 3 — Payload zod validate
+
+`props.schema.safeParse(parsed[props.payloadKey])`.
+
+- `.success === true` → fire `props.onValidated(result.data)`,
+  then `onOpenChange(false)` (Dialog self-closes).
+- `.success === false` → payload-error state; flatten
+  `result.error.issues` into rendered lines.
+
+**Forward compatibility.** Zod's default `.strip` behavior
+discards unknown keys; a `formatVersion: "1.1"` payload with new
+fields validates against the v1.0 schema and the host receives a
+payload with the new fields stripped. See
+[`parked.md → Forward-compat field-loss UX advisory`](../../parked.md)
+for the open question on whether to surface this to the user.
+
+### Issue flattening
+
+```
+['calendar', 'units', 0, 'name']  →  'calendar.units[0].name'
+['calendar', 'eras']              →  'calendar.eras'
+```
+
+String keys joined by `.`, numeric indices wrapped in `[]`.
+Helper lives inside `import-dialog.tsx`; not a published
+primitive.
+
+Path-truncation rule: each rendered line trims path to ≤ 40 chars
+with middle-elision (`calendar.…s[0].name`) and message to ≤ 80
+chars with tail-elision.
+
+## Error UI
+
+### Meta-error banner
+
+```
+┌── Import calendar ─────────────────────────────────┐
+│                                                     │
+│   ┌── ⚠ This file is from a newer version. ────┐    │
+│   │     Update Aventuras to import.              │    │
+│   └──────────────────────────────────────────────┘    │
+│                                                     │
+│   [ 📁  Choose .avts file…             ]            │
+│   [ 📋  Import from clipboard          ]            │
+│                                                     │
+│                              [ Cancel ]             │
+└─────────────────────────────────────────────────────┘
+```
+
+Warn-tinted banner (per the toast / banner `warn` token).
+Re-enabled buttons below. Clicking either re-runs the pipeline.
+
+### Payload-error collapsed
+
+```
+┌── Import calendar ─────────────────────────────────┐
+│                                                     │
+│   ⚠ Invalid format — 3 issues. [Show details ▾]    │
+│                                                     │
+│   [ 📁  Choose .avts file…             ]            │
+│   [ 📋  Import from clipboard          ]            │
+│                                                     │
+│                              [ Cancel ]             │
+└─────────────────────────────────────────────────────┘
+```
+
+Pluralization: `1 issue.` / `N issues.`
+
+### Payload-error expanded
+
+```
+┌── Import calendar ─────────────────────────────────┐
+│                                                     │
+│   ⚠ Invalid format — 3 issues. [Hide details ▴]    │
+│   ┌────────────────────────────────────────────┐    │
+│   │  • calendar.units[0].name — required        │    │
+│   │  • calendar.units[2].length — number > 0    │    │
+│   │  • calendar.eras — must be an array         │    │
+│   └────────────────────────────────────────────┘    │
+│                                                     │
+│   [ 📁  Choose .avts file…             ]            │
+│   [ 📋  Import from clipboard          ]            │
+│                                                     │
+│                              [ Cancel ]             │
+└─────────────────────────────────────────────────────┘
+```
+
+**Scroll behavior — tier-dependent:**
+
+- **Desktop / tablet:** details list is `max-height: 200px` with
+  internal vertical scroll. Dialog body height stays compact.
+- **Phone:** details list expands inline with no max-height;
+  the whole Dialog body becomes scrollable (single scroll
+  surface — no nested scrolls).
+
+The details list is read-only — no per-issue affordances. Users
+fix and re-pick / re-paste.
+
+## Per-host integration
+
+### World per-row entity import
+
+```tsx
+const [importOpen, setImportOpen] = useState(false)
+const activeKind = useActiveEntityKind() // from EntityListPane
+
+// Kind-narrowed schema — required to prevent cross-kind misemits.
+const schema = useMemo(
+  () =>
+    EntityImportSchema.refine((e) => e.kind === activeKind, {
+      message: `Expected a ${activeKind}.`,
+      path: ['kind'],
+    }),
+  [activeKind]
+)
+
+<ImporterMenu
+  label={kindLabel} // 'New character' / 'New location' / …
+  options={[
+    {
+      key: 'blank',
+      label: 'Blank',
+      onPress: () => openCreateForm({ kind: activeKind, prefill: null }),
+    },
+    {
+      key: 'from-json',
+      label: 'From JSON file…',
+      onPress: () => setImportOpen(true),
+    },
+    {
+      key: 'from-vault',
+      label: 'From Vault…',
+      disabled: true,
+      disabledReason: 'Vault lands in M8.',
+    },
+  ]}
+/>
+
+<ImportDialog
+  open={importOpen}
+  onOpenChange={setImportOpen}
+  format="aventuras-entity"
+  supportedMajor={1}
+  payloadKey="entity"
+  schema={schema}
+  title={`Import ${kindLabel.toLowerCase()}`}
+  onValidated={(entity) => {
+    importEntityAction(branchId, entity).then((newId) => selectRow(newId))
+  }}
+/>
+```
+
+Lore is the parallel case with `format="aventuras-lore"`,
+`payloadKey="lore"`, `schema={LoreImportSchema}`, and its own
+state pair.
+
+**Kind-narrowing is mandatory** for `aventuras-entity` consumers.
+Without the `.refine` on `kind`, a `kind: 'location'` JSON
+imported via the Characters selector would validate against the
+base entity schema and emit a wrong-kind payload to the
+character creation handler. The narrowed schema surfaces the
+mismatch as `⚠ Invalid — 1 issue: kind — Expected a character.`
+(payload-error level), giving the user a clear redirect.
+
+### Plot per-row import
+
+Identical shape to world per-row. Each kind:
+
+- `format='aventuras-thread'`, `payloadKey='thread'`,
+  `schema=ThreadImportSchema`
+- `format='aventuras-happening'`, `payloadKey='happening'`,
+  `schema=HappeningImportSchema`
+
+### Vault calendars
+
+```tsx
+<ImporterMenu
+  label="+ Add calendar"
+  options={[
+    { key: 'clone-builtin', label: 'Clone built-in…', onPress: openCloneBuiltinModal },
+    { key: 'from-json', label: 'From JSON file…', onPress: () => setImportOpen(true) },
+    {
+      key: 'from-scratch',
+      label: 'From scratch',
+      disabled: true,
+      disabledReason: 'Lands when L3 design pass ships.',
+    },
+  ]}
+/>
+
+<ImportDialog
+  open={importOpen}
+  onOpenChange={setImportOpen}
+  format="aventuras-calendar"
+  supportedMajor={1}
+  payloadKey="calendar"
+  schema={CalendarSystemSchema}
+  title="Import calendar"
+  onValidated={(calendar) => {
+    importCalendarAction(calendar).then((newId) => router.push(`/vault/calendars/${newId}`))
+  }}
+/>
+```
+
+Vault-specific bits (fresh UUID on import, name-collisions
+allowed, success route to L2 detail) live in the action layer
+and the route — the Dialog only validates shape.
+
+### Story list
+
+Flat-button trigger. No menu.
+
+```tsx
+<Button variant="secondary" onPress={() => setImportOpen(true)}>
+  <Text>Import story…</Text>
+</Button>
+
+<ImportDialog
+  open={importOpen}
+  onOpenChange={setImportOpen}
+  format="aventuras-story"
+  supportedMajor={1}
+  payloadKey="story"
+  schema={StoryImportSchema}
+  title="Import story"
+  onValidated={(story) => {
+    importStoryAction(story).then((storyId) => router.push(`/story/${storyId}`))
+  }}
+/>
+```
+
+Legacy `.avt` migration import is a separate parallel path with
+its own dialog and design pass — see
+[`parked.md → Legacy .avt migration import`](../../parked.md#legacy-avt-migration-import).
+`ImportDialog` is strictly `.avts`.
+
+### Host gating during in-flight generation
+
+Per
+[`principles.md → Edit restrictions during in-flight generation`](../principles.md#edit-restrictions-during-in-flight-generation),
+edits to active-story content are gated during generation.
+Per-row imports into the active story should be gated by the
+host (host doesn't mount the trigger, or mounts it disabled).
+Vault calendars (global) and story-list story-import (new story)
+are unaffected.
+
+## Storybook
+
+One stories file at
+`components/compounds/import-dialog.stories.tsx`. Story matrix:
+
+| Story                      | State         | Notes                                                                                   |
+| -------------------------- | ------------- | --------------------------------------------------------------------------------------- |
+| `IdleCalendar`             | idle          | `aventuras-calendar` + `CalendarSystemSchema`; default open. Anchors visual reference.  |
+| `IdleStory`                | idle          | `aventuras-story` + `StoryImportSchema`; demonstrates title-copy variation.             |
+| `IdleCalendar_Phone`       | idle          | Phone viewport; verifies button text doesn't truncate.                                  |
+| `Reading`                  | reading       | Forced via test seam; spinner on file button, both disabled.                            |
+| `MetaError_NotAventuras`   | meta-error    | Forced via mock clipboard: `{"hello":"world"}`. Banner: `This isn’t an Aventuras file.` |
+| `MetaError_WrongKind`      | meta-error    | Mock clipboard: an `aventuras-story` envelope into a `aventuras-calendar` dialog.       |
+| `MetaError_NewerVersion`   | meta-error    | Mock clipboard: `formatVersion: "2.0"` vs `supportedMajor: 1`.                          |
+| `MetaError_ClipboardEmpty` | meta-error    | Mock clipboard returns `""`.                                                            |
+| `PayloadError_Collapsed`   | payload-error | Forced; multi-issue zod failure; details hidden.                                        |
+| `PayloadError_Expanded`    | payload-error | Same as above; details open; demonstrates path-truncation + bounded scroll.             |
+| `Closed`                   | n/a           | Story with a Button that toggles `open`; demonstrates host wiring at a glance.          |
+
+### Forced-state test seam
+
+Transient states (`reading`, the various error variants) are
+forced via an internal `useImportPipeline(props, _initialState?)`
+hook with an optional `_initialState` argument that defaults to
+`'idle'`. The hook is **internal-only** (not exported from the
+compound's public API); Storybook imports it through a parallel
+internals path under
+`components/compounds/import-dialog/internals`. Keeps the
+public API surface clean while giving stories deterministic
+state coverage.
+
+## Accessibility
+
+- **Dialog semantics.** Inherited from
+  [`Dialog` primitive](../../../components/ui/dialog.tsx) via
+  `@rn-primitives/dialog`. Title wires through
+  `DialogPrimitive.Title`.
+- **Focus management.** On open, focus moves to `📁 Choose .avts
+file…`. The Dialog primitive returns focus to the trigger on
+  close. During state transitions, action-button focus is
+  retained; error regions announce via `role="alert"` (web) /
+  `accessibilityLiveRegion="assertive"` (RN) rather than
+  stealing focus.
+- **Hidden file input (web).** `aria-hidden="true"` plus
+  visually hidden styling; the visible Button owns the
+  accessible label.
+- **Spinner / reading state.** Active button receives
+  `aria-busy="true"` (web) and
+  `accessibilityState={{ busy: true }}` (RN). Disabled state
+  via inline `pointerEvents: 'none'` plus `opacity-50`.
+- **Disclosure (Show details).** `accessibilityRole="button"`
+  on the toggle; `aria-expanded` /
+  `accessibilityState={{ expanded }}` reflects state. Focus
+  stays on toggle on expand (does not jump into the list).
+- **Error copy.** All categorical copies lead with `⚠ ` for
+  visual emphasis; accessible names strip the glyph (announces
+  as `"This is a different kind of Aventuras file…"`, not
+  `"warning sign…"`).
+
+## Implementation prerequisites
+
+Native deps not currently in `package.json`:
+
+- `expo-document-picker` — file picker on iOS / Android.
+- `expo-file-system` — `readAsStringAsync` to load the picked
+  file.
+
+`expo-clipboard` is already present.
+
+Both new modules carry native code; per the project's native-dep
+convention, `pnpm add` alone is insufficient — the consuming
+slice (M4 first) needs a dev-client rebuild before the import
+runs at runtime. Slice prep should:
+
+1. `pnpm add expo-document-picker expo-file-system`.
+2. Trigger a dev-client rebuild (`eas build --profile
+development` or local prebuild + native build, depending on
+   the slice's setup).
+3. Reinstall the dev client on test devices before running.
+
+Web has no native-build step — `<input type="file">` and
+`navigator.clipboard.readText()` are standard browser APIs and
+work in Electron's renderer context as-is.
+
+## Open questions
+
+None blocking v1. Related followups:
+
+- [`followups.md → Sheet vs Modal — general-use review`](../../followups.md)
+  — does the project drop `Sheet` in favor of `Dialog/Modal` for
+  general use, and do native dialogs migrate to native
+  form-sheet `Modal` per
+  [`ui-native-modals.md`](../../../.agents/skills/vercel-react-native-skills/rules/ui-native-modals.md)?
+  Affects future iterations of this Dialog along with every
+  other dialog compound.
+- [`parked.md → Forward-compat field-loss UX advisory`](../../parked.md)
+  — surface dropped-unknown-field information when importing
+  newer-minor-version files? Currently silent.
+- [`parked.md → Pre-import payload preview`](../../parked.md)
+  — "About to import: Story 'Foo' (15 entries, 3 branches,
+  8 entities)" preview screen before commit. Real value for
+  large imports; not in v1.
+- [`parked.md → Drag-and-drop file import for ImportDialog`](../../parked.md)
+  — common web UX; carve out from v1 unless real demand
+  surfaces.

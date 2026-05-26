@@ -222,18 +222,28 @@ user.
 
 ## Story import
 
-`.avts` files are imported via an **Import story** affordance in the
-header next to `+ New story`. File picker opens; selected file's
-`formatVersion` is validated, then the story (including branches,
-entities, lore, threads, happenings, chapters, deltas, entry-asset
-references) is materialized into the library as a new row.
+`.avts` files are imported via an **Import story** affordance in
+the header next to `+ New story`. The flat `[Import story…]`
+Button opens the shared
+[`ImportDialog`](../../patterns/import-dialog.md) configured for
+stories:
 
-Legacy `.avt` files (old-app format) are accepted but route through
-a migration pass — see
+- `format='aventuras-story'`, `payloadKey='story'`,
+  `supportedMajor=1`, `schema=StoryImportSchema`, title
+  `Import story`.
+
+On `onValidated`, the host materializes the story (branches,
+entities, lore, threads, happenings, chapters, deltas, entry-asset
+references) into the library as a new row through the action
+layer, then routes to the reader.
+
+Legacy `.avt` files (old-app format) live on a separate migration
+path with its own dialog and design pass — see
 [`parked.md → Legacy .avt migration import`](../../../parked.md#legacy-avt-migration-import).
+`ImportDialog` itself is `.avts`-only.
 
 See [patterns → Import counterparts](../../patterns/data.md#import-counterparts--file-based--vault)
-for the cross-cutting pattern (versioning, zod validation, Vault
+for the cross-cutting contract (versioning, zod validation, Vault
 parallelism).
 
 ## Banner — AI configuration

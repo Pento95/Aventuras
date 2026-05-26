@@ -333,26 +333,17 @@ Click a row → creates the clone, closes modal, navigates to Layer
 
 ### From JSON file
 
-Click `+ Add calendar ▾ → From JSON file…` opens an import modal:
+Click `+ Add calendar ▾ → From JSON file…` opens the shared
+[`ImportDialog`](../../../patterns/import-dialog.md) configured
+for calendars:
 
-```
-┌── Import calendar ─────────────────────────────────┐
-│  [📁 Choose .avts file…]                            │
-│  — or —                                              │
-│  [paste JSON envelope here ...]                     │
-│  ⚠ <validation errors render here on failure>       │
-│                                                     │
-│                       [Cancel]   [Import]           │
-└─────────────────────────────────────────────────────┘
-```
-
-**Validation** per
-[Aventuras file format](../../../../data-model.md#aventuras-file-format-avts):
-
-- `format` field must equal `"aventuras-calendar"`.
-- `formatVersion` checked against import-supported versions.
-- `calendar` object validates against `CalendarSystem` zod schema —
-  failures surface field-level errors inline.
+- `format='aventuras-calendar'`, `payloadKey='calendar'`,
+  `supportedMajor=1`, `schema=CalendarSystemSchema`, title
+  `Import calendar`.
+- The dialog drives the file-pick / clipboard-read /
+  meta-check / payload-validate pipeline, hybrid error display,
+  and self-closes on validated emit. See the pattern doc for the
+  full UI and validation contract.
 
 **ID handling** — the JSON's `id` is informational; on import, a
 fresh UUID is always generated for the `vault_calendars` row.
@@ -363,12 +354,15 @@ portable content).
 **Name collisions** — allowed. Two "Earth (Gregorian)" customs
 differentiate by UUID; user can rename either.
 
-**Success** — closes modal, navigates to Layer 2 detail of the
-imported calendar (no auto-focus — the name's already what the
-importer chose).
+**Success** — `onValidated` fires with the parsed
+`CalendarSystem`; the host writes the new `vault_calendars` row
+through the action layer, then navigates to Layer 2 detail of
+the imported calendar (no auto-focus — the name's already what
+the importer chose).
 
-**Failure** — modal stays open, errors render inline. `[Import]`
-disabled until input is provided.
+**Failure** — dialog stays open with the meta or payload error
+surface; the user can re-pick a different file or fix and re-paste
+without leaving the flow.
 
 ### From scratch (deferred · L3)
 

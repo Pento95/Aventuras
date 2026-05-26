@@ -63,25 +63,25 @@ target the same "add to story" actions; they're parallel, not
 exclusive.
 
 **Aventuras file format:** `.avts` is the canonical extension across
-all import/export content (stories, calendars, future packs /
-scenarios / templates) — same envelope, kind-tagged via the
-`format` field. Full convention spec lives at
+all import/export content (stories, calendars, entities, lore,
+threads, happenings, future packs / scenarios / templates) — same
+envelope, kind-tagged via the `format` field. Full convention spec
+(envelope shape, version handling, per-UI gated rejection) lives at
 [`data-model.md → Aventuras file format`](../../data-model.md#aventuras-file-format-avts).
-This pattern doc covers the UX side (file picker affordance, paste
-support, validation behavior); the envelope shape and version
-handling are canonical there.
 
 **Legacy `.avt` import** (from the old app) is supported for
 migration. The import flow needs its own design pass — see
-[`followups.md`](../../parked.md#legacy-avt-migration-import).
+[`parked.md → Legacy .avt migration import`](../../parked.md#legacy-avt-migration-import).
 
 **Per-row import (entity / thread / happening / lore).** Each list
-pane's `+ New X` affordance becomes a small menu offering:
+pane's `+ New X ▾` affordance is a menu offering:
 
 - `Blank` — opens the form in create mode, empty.
-- `From JSON file…` — file picker, paste-supported. Validates against
-  the kind's zod schema before creating; mismatch fails with a
-  friendly error rather than a partial save.
+- `From JSON file…` — opens the
+  [`ImportDialog`](./import-dialog.md) configured for the row's
+  kind. File pick or clipboard read, envelope meta-check, zod
+  payload validation. Mismatch fails with a friendly error rather
+  than a partial save.
 - `From Vault…` — disabled placeholder until the Vault parent shell
   lands (per the
   [Vault parent shell followup](../../parked.md#vault-parent-shell)).
@@ -92,8 +92,11 @@ pane's `+ New X` affordance becomes a small menu offering:
 
 **Validation contract:** all imports (story-level or row-level) pass
 through the same zod schema that protects writes. JSON that doesn't
-parse cleanly fails with field-level errors; no "merge what works,
-ignore what doesn't" path.
+parse cleanly fails — categorical meta-error for envelope-shape
+problems, field-level summary + expandable details for payload-shape
+problems. No "merge what works, ignore what doesn't" path. The
+canonical pipeline + error UI lives in
+[`import-dialog.md`](./import-dialog.md).
 
 **Full backup restore** lives in App Settings · Data tab; pending
 its wireframe.

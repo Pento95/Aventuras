@@ -240,10 +240,19 @@ happening).
 
 Each follows the standard
 [import-counterparts pattern](../../patterns/data.md#import-counterparts--file-based--vault)
-(Blank / From JSON file… / From Vault…). Zod schema constraints
-gate both manual entry and JSON imports — no happening with both
-`occurred_at_entry` and `temporal` set, no thread without status,
-etc. — surfaced as inline validation rather than partial-save.
+(Blank / From JSON file… / From Vault…). `From JSON file…` opens
+the shared [`ImportDialog`](../../patterns/import-dialog.md)
+configured for the active kind:
+
+- For threads: `format='aventuras-thread'`,
+  `payloadKey='thread'`, `schema=ThreadImportSchema`.
+- For happenings: `format='aventuras-happening'`,
+  `payloadKey='happening'`, `schema=HappeningImportSchema`.
+
+Zod schema constraints gate both manual entry and JSON imports —
+no happening with both `occurred_at_entry` and `temporal` set, no
+thread without status, etc. — surfaced as inline validation
+rather than partial-save.
 
 ## Detail pane — raw JSON viewer
 

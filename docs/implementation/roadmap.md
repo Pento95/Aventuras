@@ -527,8 +527,9 @@ isn't a per-feature concern.
   (prevents disk leaks from rolled-back / branch-deleted asset
   rows).
 - M9.4 — Per-story export `.avts` envelope; per-story import
-  `.avts` (story list `+ Import story` affordance routes through
-  the Importer compound from M4); cross-version resilience.
+  `.avts` (story list `[Import story…]` affordance routes through
+  the `ImportDialog` compound landed at M4); cross-version
+  resilience.
 - M9.5 — Cross-platform parity smoke (Linux desktop + Android),
   performance budget audit, accessibility audit
   ([`accessibility skill`](./conventions.md) checks).
@@ -702,14 +703,16 @@ explicit.
     flow extending the rollback-confirm modal with cascade
     warning for rollback spanning closed chapters; consumed by
     chapter delete (M5.3) and rollback-to-entry-N from reader.
-- **Import / Importer compound**
-  ([`component-inventory.md → Compounds — needs design`](../ui/component-inventory.md#compounds--needs-design)).
-  Design pass is a [design followup](../followups.md). Once design
-  lands, the compound scaffolds at first consumer and threads
-  through the rest:
-  - **M4** — First consumer: World / Plot per-row entity import
-    (assumes design pass complete; if not, defer to later
-    milestone and surface limitations explicitly).
+- **Import / `ImportDialog` compound**
+  ([`patterns/import-dialog.md`](../ui/patterns/import-dialog.md)).
+  Design pass landed 2026-05-26
+  ([exploration record](../explorations/2026-05-26-import-dialog.md)).
+  Compound scaffolds at first consumer and threads through the
+  rest:
+  - **M4** — First consumer: World / Plot per-row entity import.
+    Implementation prerequisite: add `expo-document-picker` +
+    `expo-file-system` and trigger a dev-client rebuild before
+    the slice runs (web has no native-build step).
   - **M8.3** — Vault calendars import.
   - **M9.4** — Story `.avts` import on the story list.
 

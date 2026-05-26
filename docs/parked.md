@@ -53,11 +53,9 @@ duplication without changing compound shapes.
 owns JSON column contents (`entities.state`, `stories.settings`,
 `stories.definition`, `app_settings` JSON), runtime LLM-output
 validation, and import / export validation — not the direct-DB
-column enums above. Adjacent design surfaces (importer JSON
-validation hinted at in the
-[Importer needs-design row](./ui/component-inventory.md#compounds--needs-design)
-as "zod-validated parse", structured-output schemas) drive Zod's
-adoption when they ship.
+column enums above. Adjacent design surfaces (the
+[`ImportDialog` payload validation contract](./ui/patterns/import-dialog.md#stage-3--payload-zod-validate),
+structured-output schemas) drive Zod's adoption when they ship.
 
 #### Multi-version `undo_payload` apply-dispatcher
 
@@ -351,6 +349,44 @@ flows cover the common cases. Likely surface when designed: App
 Settings → Data tab (alongside Full backup / Restore / Export all
 stories), and possibly the global Actions menu. Pending its own
 design pass.
+
+#### Forward-compat field-loss UX advisory
+
+[`ImportDialog`](./ui/patterns/import-dialog.md) currently
+follows zod's default `.strip` behavior on the payload schema:
+when a `formatVersion: "1.1"` file imports into a v1.0 app, any
+unknown fields are silently dropped. The host receives a payload
+typed to the v1.0 schema with the new-minor fields gone.
+
+That matches the
+[data-model forward-compat rule](./data-model.md#aventuras-file-format-avts)
+(minor-newer fields validated against the schema and ignored if
+zod doesn't recognize them), but it's silent — the user has no
+signal that future-version content was lost on import. An
+advisory ("This file has newer features that may not be
+preserved.") with a payload-shape diff would give them that
+signal.
+
+Requires a "shape-diff" sub-pipeline (parsed vs schema-known
+keys) that's a meaningful design pass on its own. Out of scope
+for v1 because the app ships as `1.0` of every format — no
+forward-version content exists yet.
+
+#### Pre-import payload preview
+
+Before
+[`ImportDialog`](./ui/patterns/import-dialog.md) commits a
+validated payload via `onValidated`, no preview surfaces. A
+preview screen — "About to import: Story 'Foo' (15 entries, 3
+branches, 8 entities, 12 happenings). Continue?" — would let the
+user confirm scope before the action layer materializes rows.
+Especially valuable for large story imports, where mistaking
+which file is which is more costly.
+
+Not in v1: the per-host route-on-success (vault → L2 detail;
+story-list → reader; per-row → new row selected) already gives
+the user immediate inspection. Lands if real-device data shows
+users misimporting files often.
 
 #### FTS5 upgrade for search
 
@@ -763,6 +799,23 @@ precise") if cross-device data shows mid-range mobile users with
 high-dim provider models hitting unworkable retrieval latency.
 
 ### UX (parked)
+
+#### Drag-and-drop file import for ImportDialog
+
+[`ImportDialog`](./ui/patterns/import-dialog.md) ships v1 with
+two input affordances: file picker button and clipboard read.
+Drag-and-drop a file onto the dialog body (or onto the trigger
+itself before opening) — common UX in many file-import surfaces —
+isn't part of v1.
+
+Web-only by nature (native doesn't have a drag-from-OS model);
+adds a `<div onDragOver onDrop>` zone overlay or a full-Dialog
+drop target plus visual affordance copy ("Drop file here"). Plus
+extension-filter on drop, just like the picker's `accept`.
+
+Lands if real-device usage data shows users dragging onto the
+dialog and being surprised it doesn't work. Until then, the
+file-picker button covers the case.
 
 #### Outage-mode fallback for user-action-translation
 

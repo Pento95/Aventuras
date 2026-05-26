@@ -2547,10 +2547,23 @@ machine-side and to a human inspecting the JSON.
 
 **Kinds shipped in v1:**
 
-| `format`             | Content                                  | Defined by                                             |
-| -------------------- | ---------------------------------------- | ------------------------------------------------------ |
-| `aventuras-story`    | Single story (branches, entries, world…) | [Per-story export](#backup--export-format)             |
-| `aventuras-calendar` | Single CalendarSystem definition         | [calendar-systems/spec.md](./calendar-systems/spec.md) |
+| `format`              | Content                                                                                                                                             | Defined by                                             |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `aventuras-story`     | Single story (branches, entries, world…)                                                                                                            | [Per-story export](#backup--export-format)             |
+| `aventuras-calendar`  | Single CalendarSystem definition                                                                                                                    | [calendar-systems/spec.md](./calendar-systems/spec.md) |
+| `aventuras-entity`    | Single entity (character / location / item / faction). Payload carries a `kind` discriminator; schema is a discriminated union over the four kinds. | [Diagram → entities](#diagram)                         |
+| `aventuras-lore`      | Single lore entry. Separate format from `aventuras-entity` because lore is a distinct kind in the data model.                                       | [Diagram → lore](#diagram)                             |
+| `aventuras-thread`    | Single thread (plot strand).                                                                                                                        | [Diagram → threads](#diagram)                          |
+| `aventuras-happening` | Single happening (timestamped plot event).                                                                                                          | [Happenings](#happenings--character-knowledge)         |
+
+Per-row formats (`aventuras-entity` / `-lore` / `-thread` /
+`-happening`) drive World/Plot per-row import via
+[`ImportDialog`](./ui/patterns/import-dialog.md). `aventuras-entity`
+consumers in particular must pass a kind-narrowed zod schema to the
+dialog so a wrong-kind JSON in a per-kind slot surfaces as a
+payload-error rather than emitting a wrong-kind payload — see the
+[ImportDialog per-host integration](./ui/patterns/import-dialog.md#world-per-row-entity-import)
+for the pattern.
 
 Future kinds (`aventuras-pack`, `aventuras-scenario`, etc.) follow
 the same envelope as those features ship.

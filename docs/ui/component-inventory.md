@@ -106,13 +106,13 @@ for the rule.
 
 ### Compounds — build-ready
 
-_Empty — every build-ready compound has shipped._
+| Compound     | Folder                  | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ImportDialog | `components/compounds/` | Pure-View Dialog driving every `.avts` import: file pick / clipboard read, envelope meta-check, zod payload validation, hybrid meta-error vs payload-error display. Generic over `TPayload`; host wires the trigger (`ImporterMenu` for world / plot / vault-calendars; flat Button for story-list). Implementation prerequisite: add `expo-document-picker` + `expo-file-system` to the project and trigger a dev-client rebuild before the consuming slice runs. Spec: [import-dialog.md](./patterns/import-dialog.md). |
 
 ### Compounds — needs design
 
-| Compound | Surfaces                                            | Open question                                                                                                                                                                                                                                                                                                                    |
-| -------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Importer | World / Plot per-row, Vault calendars, Story import | Full picker wrapper around `ImporterMenu` — file dialog (web `<input>` / native `expo-document-picker`), paste flow, zod-validated parse, error display, future Vault picker. Action surfaces per host differ enough that the wrapper shape needs a design pass before scaffolding. Deferred until more import groundwork lands. |
+_Empty — every compound either ships or has a spec._
 
 ## Layout shells
 

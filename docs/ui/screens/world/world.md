@@ -380,16 +380,27 @@ drawer. No World-specific deviation.
 ## Per-row import
 
 The list-pane carries the EntityListPane affordance — minimalist
-`[+]` icon-action right-anchored on the kind-selector row. Per-kind tooltip resolves to `New character`, `New location`,
-`New item`, `New faction`, or `New lore` per the active category;
-lore is not an entity, so the generic "New entity" copy would
-mis-label the lore creation path.
+`[+]` icon-action right-anchored on the kind-selector row. Per-kind
+tooltip resolves to `New character`, `New location`, `New item`,
+`New faction`, or `New lore` per the active category; lore is not
+an entity, so the generic "New entity" copy would mis-label the
+lore creation path.
 
-The button follows the standard
-[import-counterparts pattern](../../patterns/data.md#import-counterparts--file-based--vault)
-(Blank / From JSON file… / From Vault…). JSON imports validate
-against the kind's zod schema; mismatch fails with a friendly
-error rather than a partial save.
+The button opens an `ImporterMenu` with the standard
+[import-counterparts options](../../patterns/data.md#import-counterparts--file-based--vault)
+(Blank / From JSON file… / From Vault…). `From JSON file…` opens
+the shared [`ImportDialog`](../../patterns/import-dialog.md)
+configured for the active kind:
+
+- For entity kinds (character / location / item / faction):
+  `format='aventuras-entity'`, `payloadKey='entity'`, and a
+  **kind-narrowed** zod schema
+  (e.g. `EntityImportSchema.refine(e => e.kind === activeKind, …)`)
+  so a wrong-kind JSON imported via the wrong slot surfaces as a
+  payload-error rather than emitting a wrong-kind payload. See
+  [ImportDialog → World per-row entity import](../../patterns/import-dialog.md#world-per-row-entity-import).
+- For lore: `format='aventuras-lore'`, `payloadKey='lore'`,
+  `schema=LoreImportSchema`.
 
 ## History tab
 

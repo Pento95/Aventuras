@@ -97,6 +97,11 @@ The split heuristic + when-to-add rules live in
   Plot history tabs and the future global delta-log surface.
 - [`data.md`](./data.md) — raw JSON viewer, import counterparts
   (file-based + Vault).
+- [`import-dialog.md`](./import-dialog.md) — pure-View Dialog that
+  drives every `.avts` import in the app: file pick / clipboard
+  read, envelope meta-check, zod payload validation, hybrid
+  meta-error vs payload-error display. Used by World/Plot per-row,
+  Vault calendars, and Story List story import.
 - [`embedder-download.md`](./embedder-download.md) — multi-state
   modal driving embedding-model installation (license fetch +
   presentation, download with progress, SHA256 verify, error
