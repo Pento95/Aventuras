@@ -1,6 +1,12 @@
+import * as PopoverPrimitive from '@rn-primitives/popover'
 import { ChevronDown } from 'lucide-react-native'
 import { useCallback, useId, useMemo, useState } from 'react'
-import { Platform, Pressable, View } from 'react-native'
+import { Platform, Pressable, View, type ViewStyle } from 'react-native'
+// rn-primitives Content stamps onStartShouldSetResponder, which competes with
+// RN's JS-side ScrollView pan claim. Gesture-handler's ScrollView uses native
+// gesture handling and bypasses the JS responder — same workaround as the
+// Select primitive.
+import { ScrollView } from 'react-native-gesture-handler'
 
 import { Checkbox } from '@/components/ui/checkbox'
 import { Icon } from '@/components/ui/icon'
@@ -151,8 +157,17 @@ export function MultiSelect({
           {triggerInner}
         </Pressable>
       </PopoverTrigger>
-      <PopoverContent accessibilityRole="dialog" className="w-64 p-0">
-        {overlay}
+      <PopoverContent
+        accessibilityRole="dialog"
+        className={cn(
+          'p-0',
+          // Web: match trigger width via radix's exposed CSS variable so the
+          // popover never looks narrower than its trigger. Native equivalent
+          // applied via inline style below.
+          Platform.select({ web: 'min-w-[var(--radix-popover-trigger-width)]' }),
+        )}
+      >
+        <NativeWidthSync>{overlay}</NativeWidthSync>
       </PopoverContent>
     </Popover>
   )
@@ -201,17 +216,31 @@ function Overlay({
           </Text>
         </Pressable>
       </View>
-      <View className={isPhone ? undefined : 'max-h-80'}>
-        {options.map((option) => (
-          <OptionRow
-            key={option.value}
-            option={option}
-            checked={selected.has(option.value)}
-            onPress={onToggle}
-            isPhone={isPhone}
-          />
-        ))}
-      </View>
+      {isPhone ? (
+        <View>
+          {options.map((option) => (
+            <OptionRow
+              key={option.value}
+              option={option}
+              checked={selected.has(option.value)}
+              onPress={onToggle}
+              isPhone={isPhone}
+            />
+          ))}
+        </View>
+      ) : (
+        <ScrollView className="max-h-80" nestedScrollEnabled>
+          {options.map((option) => (
+            <OptionRow
+              key={option.value}
+              option={option}
+              checked={selected.has(option.value)}
+              onPress={onToggle}
+              isPhone={isPhone}
+            />
+          ))}
+        </ScrollView>
+      )}
     </View>
   )
 }
@@ -221,6 +250,20 @@ type OptionRowProps = {
   checked: boolean
   onPress: (value: string) => void
   isPhone: boolean
+}
+
+// Native popover width has no CSS-var equivalent to web's
+// `--radix-popover-trigger-width`. Read the measured trigger from rn-primitives
+// root context and apply a minWidth style so the popover matches (or exceeds)
+// the trigger width.
+function NativeWidthSync({ children }: { children: React.ReactNode }) {
+  const { triggerPosition } = PopoverPrimitive.useRootContext()
+  const triggerWidth = triggerPosition?.width
+  const style = useMemo<ViewStyle | undefined>(() => {
+    if (Platform.OS === 'web' || triggerWidth == null) return undefined
+    return { minWidth: triggerWidth }
+  }, [triggerWidth])
+  return <View style={style}>{children}</View>
 }
 
 function OptionRow({ option, checked, onPress, isPhone }: OptionRowProps) {
