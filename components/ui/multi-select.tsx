@@ -5,7 +5,9 @@ import { Platform, Pressable, View } from 'react-native'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Icon } from '@/components/ui/icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Text } from '@/components/ui/text'
+import { useTier } from '@/hooks/use-tier'
 import { cn } from '@/lib/utils'
 
 import {
@@ -55,6 +57,8 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false)
   const labelId = useId()
+  const tier = useTier()
+  const usesSheet = Platform.OS !== 'web' && tier === 'phone'
 
   const normalized = useMemo(() => normalizeSelection(selected, options), [selected, options])
   const state = useMemo(() => computeSelectionState(normalized, options), [normalized, options])
@@ -75,7 +79,64 @@ export function MultiSelect({
     [normalized, options, onChange],
   )
 
+  const overlay = (
+    <Overlay
+      options={options}
+      selected={normalized}
+      state={state}
+      onSelectAll={handleSelectAll}
+      onClearAll={handleClearAll}
+      onToggle={handleToggle}
+      isPhone={usesSheet}
+    />
+  )
+
+  const triggerInner = (
+    <>
+      <Text nativeID={labelId} size="xs" className="text-fg-muted">
+        {prefix}:
+      </Text>
+      <Text size="xs" className="text-fg-primary">
+        {stateLabel}
+      </Text>
+      <Icon as={ChevronDown} size="sm" className="text-fg-muted" />
+    </>
+  )
+
+  const triggerClass = cn(
+    'h-control-xs flex-row items-center gap-2 rounded-md border border-border bg-bg-base px-3',
+    'active:bg-tint-hover',
+    Platform.select({
+      web: 'outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-focus-ring',
+    }),
+    disabled && 'opacity-50',
+    triggerClassName,
+  )
+
   const webTitle = Platform.OS === 'web' ? { title: disabled ? disabledReason : undefined } : null
+
+  if (usesSheet) {
+    return (
+      <>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${prefix}: ${stateLabel}`}
+          accessibilityState={{ expanded: open, disabled: !!disabled }}
+          disabled={disabled}
+          onPress={() => setOpen(true)}
+          {...webTitle}
+          className={triggerClass}
+        >
+          {triggerInner}
+        </Pressable>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent anchor="bottom" size="medium" title={prefix}>
+            {overlay}
+          </SheetContent>
+        </Sheet>
+      </>
+    )
+  }
 
   return (
     <Popover onOpenChange={setOpen} ariaLabelledBy={labelId}>
@@ -85,34 +146,13 @@ export function MultiSelect({
           accessibilityLabel={`${prefix}: ${stateLabel}`}
           accessibilityState={{ expanded: open, disabled: !!disabled }}
           {...webTitle}
-          className={cn(
-            'h-control-xs flex-row items-center gap-2 rounded-md border border-border bg-bg-base px-3',
-            'active:bg-tint-hover',
-            Platform.select({
-              web: 'outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-focus-ring',
-            }),
-            disabled && 'opacity-50',
-            triggerClassName,
-          )}
+          className={triggerClass}
         >
-          <Text nativeID={labelId} size="xs" className="text-fg-muted">
-            {prefix}:
-          </Text>
-          <Text size="xs" className="text-fg-primary">
-            {stateLabel}
-          </Text>
-          <Icon as={ChevronDown} size="sm" className="text-fg-muted" />
+          {triggerInner}
         </Pressable>
       </PopoverTrigger>
       <PopoverContent accessibilityRole="dialog" className="w-64 p-0">
-        <Overlay
-          options={options}
-          selected={normalized}
-          state={state}
-          onSelectAll={handleSelectAll}
-          onClearAll={handleClearAll}
-          onToggle={handleToggle}
-        />
+        {overlay}
       </PopoverContent>
     </Popover>
   )
@@ -125,9 +165,18 @@ type OverlayProps = {
   onSelectAll: () => void
   onClearAll: () => void
   onToggle: (value: string) => void
+  isPhone: boolean
 }
 
-function Overlay({ options, selected, state, onSelectAll, onClearAll, onToggle }: OverlayProps) {
+function Overlay({
+  options,
+  selected,
+  state,
+  onSelectAll,
+  onClearAll,
+  onToggle,
+  isPhone,
+}: OverlayProps) {
   return (
     <View>
       <View className="flex-row items-center gap-3 border-b border-border px-row-x-md py-row-y-sm">
@@ -152,13 +201,14 @@ function Overlay({ options, selected, state, onSelectAll, onClearAll, onToggle }
           </Text>
         </Pressable>
       </View>
-      <View className="max-h-80">
+      <View className={isPhone ? undefined : 'max-h-80'}>
         {options.map((option) => (
           <OptionRow
             key={option.value}
             option={option}
             checked={selected.has(option.value)}
             onPress={onToggle}
+            isPhone={isPhone}
           />
         ))}
       </View>
@@ -170,9 +220,10 @@ type OptionRowProps = {
   option: MultiSelectOption
   checked: boolean
   onPress: (value: string) => void
+  isPhone: boolean
 }
 
-function OptionRow({ option, checked, onPress }: OptionRowProps) {
+function OptionRow({ option, checked, onPress, isPhone }: OptionRowProps) {
   const handlePress = useCallback(() => onPress(option.value), [onPress, option.value])
 
   return (
@@ -183,6 +234,7 @@ function OptionRow({ option, checked, onPress }: OptionRowProps) {
       disabled={option.disabled}
       className={cn(
         'flex-row items-center gap-3 px-row-x-md py-row-y-md',
+        isPhone && 'min-h-control-lg',
         Platform.select({ web: 'hover:bg-bg-raised' }),
         'active:bg-bg-raised',
         option.disabled && 'opacity-50',
