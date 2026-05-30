@@ -1,3 +1,4 @@
+export { clearCurrentActionId, getCurrentActionId, setCurrentActionId } from './ambient-action-id'
 export {
   redactHeaderValue,
   redactHeaders,
@@ -7,7 +8,13 @@ export {
 } from './http-redaction'
 export { httpCallSink } from './http-call-sink'
 export { logger, loggerWithoutTurn } from './logger'
-export { useDiagnosticsStore } from './store'
+export {
+  getDiagnosticsSnapshot,
+  setDiagnosticsDebugEnabled,
+  setDiagnosticsEnabled,
+  useDiagnosticsStore,
+} from './store'
+export { turnCaptureSink } from './turn-capture-sink'
 export { useDiagnosticsHydration } from './use-diagnostics-hydration'
 export type { LogKind, LogSubsystem } from './kinds'
 export type { HttpCall, LogEntry, LogLevel, PhaseEvent, TurnCapture } from './types'

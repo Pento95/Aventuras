@@ -17,3 +17,7 @@ ordered to build it.
   implementation pitfalls and runtime gotchas discovered while
   building. Indexed by topic; read before touching the substrate
   an entry references.
+- **[triage.md](./triage.md)** — inbox queue for cross-cutting
+  deferrals surfaced during implementation that have no single
+  downstream slice to own them; routed to their real home in a
+  separate triage pass.

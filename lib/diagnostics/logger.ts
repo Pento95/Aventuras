@@ -1,12 +1,8 @@
+import { getCurrentActionId } from './ambient-action-id'
 import { EVENT_NAME_REGEX, eventNameOf, type LogKind } from './kinds'
 import { diagnosticsStore } from './store'
 import type { LogEntry, LogLevel } from './types'
 import { ulid } from './ulid'
-
-// Slice 1.5 wires the ambient orchestrator actionId; until then no turn binding.
-function getCurrentActionId(): string | undefined {
-  return undefined
-}
 
 // Run dev-only drift checks unless this is explicitly a production build. Node
 // (vitest) leaves __DEV__ undefined, so the check runs there too.

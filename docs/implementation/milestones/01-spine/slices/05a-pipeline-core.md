@@ -366,29 +366,106 @@ cross-branch concurrency is parked.
 
 ## Open questions
 
-- **`deltas.source` value for synthetic M1 deltas.** The column
-  enum (`ai_classifier`, `user_edit`, `lore_agent`,
-  `chapter_close`) has no value that cleanly fits a synthetic
-  framework test. Resolve at implementation: have the
-  `PipelineAction` carry `source` and let tests pass a
-  representative value, or pin a placeholder. Not load-bearing
-  for the framework.
-- **ID generation for `run_id` / `action_id` / delta `id`.**
-  `act_${uuid}` and `run_${uuid}` per
-  [`data-model.md → ID shape`](../../../../data-model.md#id-shape--kind-prefixed-uuids-throughout).
-  Cross-platform constraint: Hermes lacks `crypto.randomUUID`,
-  so pick a generator that works on Android + Electron + vitest
-  (promote the existing `lib/diagnostics/ulid` util into a
-  shared id helper, or add a uuid dep). Implementer-choice;
-  settle when the first ID is generated.
-- **Ambient `actionId` lint guardrail.** The observability spec
-  notes a lint rule banning sink calls that bypass the ambient
-  provider is a worthwhile guardrail (tracked as a spec
-  followup). With the slot diagnostics-resident and the
-  `WithoutTurn` naming already in place, it may be cheap to land
-  here; if not, leave as the spec's followup. Don't block the
-  slice on it.
+_All three resolved at implementation; the decisions are recorded
+under [Implementation notes](#implementation-notes) (`deltas.source`,
+ID generation, ambient lint guardrail)._
 
 ## Implementation notes
 
-_Populated at finish: notable deviations from the plan and resolved developer decisions._
+### Resolved developer decisions
+
+- **Both delta engines built, round-trip tested.** Forward diff
+  (`computeUndoPayload`) and reverse apply (`applyUndoPayload`)
+  ship together with a property test asserting they are exact
+  inverses across the null-sentinel matrix. The encoding is
+  de-risked now rather than incrementally — no further data-model
+  changes are expected to the rollback shape.
+- **Atomicity via a `lib/db` ops-array primitive, not drizzle.**
+  `runInTransaction(ops: SqlOp[])` (ops built via drizzle
+  `.toSQL()`) commits the whole write-set in one unit, with three
+  platform executors (desktop single-IPC, native
+  `withTransactionSync`, vitest node:sqlite). Drizzle's own
+  `db.transaction()` issues begin/commit as separate IPC
+  round-trips on the sqlite-proxy driver, which is unsafe when a
+  no-gate run interleaves on the shared connection; that route is
+  deliberately avoided.
+- **Zod is the source of truth for JSON-column shapes.** The
+  null-sentinel discrimination is a runtime decision, so a runtime
+  schema is required (TS types, including drizzle `.$type`, are
+  erased). `entryMetadataSchema` is authored once and feeds the
+  drizzle column via `z.infer` — no duplicated row type.
+- **Minimal run context, explicit `RunCtx`.** `getPerTurnContext()`
+  returns `{ actionId, abortSignal, intermediates }`; the
+  orchestrator entry is `runPipeline(kind, ctx)` with an injected
+  `RunCtx` carrying `{ storyId, branchId, db, runInTransaction }`.
+  The spec's zero-arg `runPipeline(kind)` assumes a loaded story
+  (1.6+); the synthetic harness injects context, and global db
+  wiring lands in 1.7.
+- **`deltas.source` uses an existing enum value.** `PipelineAction`
+  carries `source`; synthetic tests pass `ai_classifier`. The
+  data-model enum was not extended for a non-load-bearing test
+  value. (Distinct from the action-method gate field
+  `MutationSource`.)
+- **IDs via a shared `lib/ids.ts` helper.** `generateId(prefix)`
+  backed by a cross-platform UUIDv4 polyfill (Hermes lacks
+  `crypto.randomUUID`). Kind-prefixed: `run_…`, `act_…`,
+  `delta_…`.
+- **Ambient lint guardrail deferred.** The sink-bypass lint rule
+  stays the observability-spec followup; the `WithoutTurn` naming
+  plus the index-only module boundary already make a bypass
+  reviewable.
+
+### Notable deviations & constraints for future slices
+
+- **`undo_payload` is column-keyed.** op=update stores
+  `{ <column>: <pre-change partial> }` (null for create);
+  reverse-replay iterates the payload's top-level keys as target
+  columns. The plan's op=update test originally asserted the
+  unwrapped partial, which would have broken the reverse-replay
+  consumer; corrected to the wrapped shape. Any future
+  delta-logged table's op=update must honor this.
+- **Reverse-replay threads a per-row working copy in `log_position`
+  DESC.** Multiple op=update deltas to the same row, even touching
+  disjoint JSON sub-keys, must compose onto an evolving copy. The
+  naive per-delta whole-column SET computed from a single
+  pre-transaction read silently clobbers the earlier undo (a
+  restored value is lost, the run commits corrupt). Do not revert
+  to that shape; the disjoint-sub-key regression test guards it.
+- **`TARGET_TABLES` is a descriptor**, not a bare table map:
+  `{ table, idCol, branchCol? }` per target, so composite-keyed
+  tables (`story_entries` on `(branch_id, id)`) build a correct
+  WHERE on reverse-replay.
+- **Delta-engine load-bearing invariants.** Per the data-model
+  hard schema rules: record sub-fields must be non-nullable, and a
+  leaf never stacks optional over nullable. The engines assume
+  this and have no runtime guard yet. Any new delta-logged schema
+  must honor it; add a `classify()`-time assertion when the first
+  real entity-state schema lands.
+- **Cross-module tests reach the shared in-memory test db.** Tests
+  deep-import `@/lib/db/__tests__/test-db`; eslint
+  `boundaries/dependencies` is off for test files only. Shipped
+  code stays gated, and the public-API surface is still asserted
+  via `eslint.lintText` on a non-test fixture path.
+- **Reverse-replay runtime exercise is partial.** The native
+  `runInTransaction` executor and the op=delete reverse path ship
+  unexercised (no native vitest, no M1 delete action); both delta
+  engines have only `story_entries` / fixture coverage. First real
+  exercise: the 1.7 on-device smoke and the first classifier
+  slice.
+
+### Carried follow-ups (Slice 1.5b / later)
+
+- **Error-surfacing contract.** The `MutationResult.rejected`
+  phantom arm, the unexpected-throw-in-phase leak (an infra throw
+  escapes `runPipeline` without reverse-replay or ambient/turn
+  cleanup), and `PipelineError`'s M1-subset optional fields are
+  promoted to
+  [Slice 1.5b → Open questions](./05b-stub-and-recovery.md#open-questions),
+  so the plan-slice gate forces the decision before its fault suite
+  is built. The related action-layer hardening (an `assertNever`
+  over `PipelineAction['kind']` and an update-target-exists guard)
+  rides along with whichever contract is chosen.
+- **Desktop parallel-group `log_position` serialization is assumed,
+  not verified.** vitest cannot exercise the Electron IPC
+  concurrency path; the `deltas_log_position_uniq` index is the
+  correctness backstop. Cover in 1.5b's fault scenarios.

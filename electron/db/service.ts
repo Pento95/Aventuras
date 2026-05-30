@@ -45,12 +45,16 @@ export function exec(sqlText: string): void {
 // desktop (sqlite-proxy has no interactive transaction support).
 export function transaction(ops: { sql: string; params: unknown[] }[]): { ok: true } {
   const db = getDb()
-  db.exec('BEGIN')
   try {
+    db.exec('BEGIN')
     for (const op of ops) db.prepare(op.sql).run(...(op.params as never[]))
     db.exec('COMMIT')
   } catch (e) {
-    db.exec('ROLLBACK')
+    try {
+      db.exec('ROLLBACK')
+    } catch {
+      // BEGIN itself failed — no transaction to roll back; surface the original error.
+    }
     throw e
   }
   return { ok: true }

@@ -1,11 +1,15 @@
 import { sql } from 'drizzle-orm'
 import {
   type AnySQLiteColumn,
+  index,
   integer,
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+
+import type { EntryMetadata } from './entry-metadata'
 
 export const stories = sqliteTable('stories', {
   id: text('id').primaryKey(),
@@ -54,7 +58,7 @@ export const storyEntries = sqliteTable(
     kind: text('kind', { enum: ['user_action', 'ai_reply', 'system', 'opening'] }).notNull(),
     content: text('content').notNull(),
     chapterId: text('chapter_id'),
-    metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
+    metadata: text('metadata', { mode: 'json' }).$type<EntryMetadata>(),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.branchId, t.id] })],
@@ -91,4 +95,32 @@ export const pipelineRuns = sqliteTable('pipeline_runs', {
   outcome: text('outcome', { enum: ['completed', 'aborted', 'failed', 'recovered'] }),
 })
 
-export const dbSchema = { stories, branches, storyEntries, appSettings, pipelineRuns }
+export const deltas = sqliteTable(
+  'deltas',
+  {
+    id: text('id').primaryKey(),
+    branchId: text('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    // FK-less: story_entries has a composite PK (branch_id, id); a single-column
+    // FK is impossible. Null for non-entry-triggered actions.
+    entryId: text('entry_id'),
+    actionId: text('action_id').notNull(),
+    logPosition: integer('log_position').notNull(),
+    source: text('source', {
+      enum: ['ai_classifier', 'user_edit', 'lore_agent', 'chapter_close'],
+    }).notNull(),
+    targetTable: text('target_table').notNull(),
+    targetId: text('target_id').notNull(),
+    op: text('op', { enum: ['create', 'update', 'delete'] }).notNull(),
+    undoPayload: text('undo_payload', { mode: 'json' }).$type<Record<string, unknown> | null>(),
+    encodingVersion: integer('encoding_version').notNull().default(1),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    index('deltas_chain_idx').on(t.branchId, t.targetId, t.logPosition),
+    uniqueIndex('deltas_log_position_uniq').on(t.branchId, t.logPosition),
+  ],
+)
+
+export const dbSchema = { stories, branches, storyEntries, appSettings, pipelineRuns, deltas }

@@ -4,12 +4,24 @@ export {
   ensureAppSettingsSingleton,
 } from './app-settings-defaults'
 export { db } from './client'
-export { appSettings, branches, pipelineRuns, stories, storyEntries } from './schema'
+export { entryMetadataSchema } from './entry-metadata'
+export type { EntryMetadata } from './entry-metadata'
+export {
+  appSettings,
+  branches,
+  dbSchema,
+  deltas,
+  pipelineRuns,
+  stories,
+  storyEntries,
+} from './schema'
 export type {
   AppSettings,
   Branch,
+  Delta,
   NewAppSettings,
   NewBranch,
+  NewDelta,
   NewPipelineRun,
   NewStory,
   NewStoryEntry,
@@ -17,4 +29,6 @@ export type {
   Story,
   StoryEntry,
 } from './types'
+export { runInTransaction } from './transaction'
+export type { SqlOp } from './types'
 export { useDbMigrations } from './use-db-migrations'

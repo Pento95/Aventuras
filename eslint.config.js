@@ -153,6 +153,17 @@ module.exports = defineConfig([
     },
   },
 
+  // Tests + shared test fixtures legitimately reach across module internals
+  // (e.g. the in-memory test db). Public-API enforcement for shipped code is
+  // unaffected; the boundaries rule is still asserted via eslint.lintText on
+  // non-test fixture paths. See docs/code-conventions.md.
+  {
+    files: ['**/*.test.{ts,tsx}', '**/__tests__/**'],
+    rules: {
+      'boundaries/dependencies': 'off',
+    },
+  },
+
   {
     ignores: [
       'dist/**',

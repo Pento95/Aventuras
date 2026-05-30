@@ -1,0 +1,5 @@
+export { applyDeltaAction } from './apply-delta-action'
+export { reverseReplayDeltas, DeltaReplayError } from './reverse-replay'
+export { defineAction } from './define-action'
+export { computeUndoPayload, applyUndoPayload } from './delta-encoding'
+export type { DbCtx, DeltaSource, MutationResult, MutationSource, PipelineAction } from './types'

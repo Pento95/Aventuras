@@ -226,6 +226,26 @@ modal that consumes it lands with the Diagnostics Hub later.
   (Diagnostics-Hub-adjacent) in a later milestone. For milestone
   1, the report is logged via `logger` on any orphans recovered;
   the user sees nothing.
+- **Error-surfacing contract through the orchestrator and action
+  layer** (carried from [Slice 1.5a](./05a-pipeline-core.md)).
+  1.5a's orchestrator models phase failure only as a returned
+  `PhaseResult.failed`; an exception thrown from a phase — e.g.
+  `applyDeltaAction` hitting a DB constraint — currently escapes
+  `runPipeline` without reverse-replaying or clearing the ambient
+  `actionId` / ending the turn. Relatedly, `MutationResult.rejected`
+  exists in the action-layer type but is never produced (the action
+  is throw-only) and the orchestrator discards the return. This
+  slice's fault scenarios are the first code to produce real phase
+  errors, so they force the decision: do stub phases catch and
+  return `PhaseResult.failed` (no orchestrator change), or throw
+  (the orchestrator needs a `try`/`catch` around the phase loop
+  routing to `abortRun`, and `applyDeltaAction` either returns
+  `rejected` for the orchestrator to branch on or the dead arm is
+  dropped)? Resolve before building the fault suite — the chosen
+  path determines how each scenario reaches its `'failed'` /
+  `'aborted'` outcome. (`PipelineError`'s M1-subset optional fields
+  are self-correcting: the stub's first provider error forces them,
+  since TypeScript rejects populating a field absent from the type.)
 
 ## Implementation notes
 

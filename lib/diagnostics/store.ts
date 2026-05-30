@@ -59,4 +59,26 @@ export function useDiagnosticsStore<T>(selector: (state: DiagnosticsReadState) =
   return useStore(diagnosticsStore, selector as (state: DiagnosticsState) => T)
 }
 
+export function setDiagnosticsEnabled(enabled: boolean): void {
+  diagnosticsStore.getState().setEnabled(enabled)
+}
+
+export function setDiagnosticsDebugEnabled(enabled: boolean): void {
+  diagnosticsStore.getState().setDebugEnabled(enabled)
+}
+
+export function getDiagnosticsSnapshot(): Pick<
+  DiagnosticsReadState,
+  'enabled' | 'debugEnabled' | 'logEntries' | 'httpCalls' | 'turnCaptures'
+> {
+  const s = diagnosticsStore.getState()
+  return {
+    enabled: s.enabled,
+    debugEnabled: s.debugEnabled,
+    logEntries: s.logEntries,
+    httpCalls: s.httpCalls,
+    turnCaptures: s.turnCaptures,
+  }
+}
+
 export type { DiagnosticsState, DiagnosticsReadState }

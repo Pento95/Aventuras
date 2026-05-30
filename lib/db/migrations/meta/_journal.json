@@ -8,6 +8,13 @@
       "when": 1780082985527,
       "tag": "0000_dizzy_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1780155636362,
+      "tag": "0001_striped_prism",
+      "breakpoints": true
     }
   ]
 }

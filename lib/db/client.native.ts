@@ -3,7 +3,7 @@ import { bundledExtensions, openDatabaseSync } from 'expo-sqlite'
 
 import { dbSchema } from './schema'
 
-const expoDb = openDatabaseSync('aventuras.db')
+export const expoDb = openDatabaseSync('aventuras.db')
 expoDb.execSync('PRAGMA foreign_keys = ON;')
 
 // sqlite-vec at client init. No M1 feature uses vectors yet, so a failed load

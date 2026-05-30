@@ -39,5 +39,19 @@ export async function createTestDb() {
   await migrate(db, (queries) => Promise.resolve(queries.forEach((q) => sqlite.exec(q))), {
     migrationsFolder: 'lib/db/migrations',
   })
-  return { db, sqlite }
+  const runInTransaction = async (ops: { sql: string; params: unknown[] }[]): Promise<void> => {
+    try {
+      sqlite.exec('BEGIN')
+      for (const op of ops) sqlite.prepare(op.sql).run(...(op.params as never[]))
+      sqlite.exec('COMMIT')
+    } catch (err) {
+      try {
+        sqlite.exec('ROLLBACK')
+      } catch {
+        // BEGIN itself failed — no transaction to roll back; surface the original error.
+      }
+      throw err
+    }
+  }
+  return { db, sqlite, runInTransaction }
 }

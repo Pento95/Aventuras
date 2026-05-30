@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { appSettings, branches, dbSchema, pipelineRuns, stories, storyEntries } from './schema'
 
 describe('schema', () => {
-  it('exposes the five milestone-1 tables in dbSchema', () => {
+  it('exposes the six milestone-1 tables in dbSchema', () => {
     expect(Object.keys(dbSchema).sort()).toEqual(
-      ['appSettings', 'branches', 'pipelineRuns', 'stories', 'storyEntries'].sort(),
+      ['appSettings', 'branches', 'deltas', 'pipelineRuns', 'stories', 'storyEntries'].sort(),
     )
   })
 
