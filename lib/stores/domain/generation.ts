@@ -75,9 +75,20 @@ const generationStore = createStore<GenerationState>()((set) => ({
   __reset: () => set({ txState: { runs: new Map() } }),
 }))
 
-function getPerTurnContext(runId: string): PerTurnContext {
-  const run = generationStore.getState().txState.runs.get(runId)
-  if (!run) throw new Error(`getPerTurnContext: no run ${runId}`)
+let activeRunId: string | null = null
+
+function setActiveRun(runId: string): void {
+  activeRunId = runId
+}
+
+function clearActiveRun(): void {
+  activeRunId = null
+}
+
+function getPerTurnContext(): PerTurnContext {
+  if (activeRunId === null) throw new Error('getPerTurnContext: no active run')
+  const run = generationStore.getState().txState.runs.get(activeRunId)
+  if (!run) throw new Error(`getPerTurnContext: no run ${activeRunId}`)
   return {
     actionId: run.actionId,
     abortSignal: run.abortController.signal,
@@ -100,12 +111,17 @@ export const generation = {
   useGeneration,
   getTxState,
   getPerTurnContext,
+  setActiveRun,
+  clearActiveRun,
   startRun: api.startRun,
   setCurrentPhase: api.setCurrentPhase,
   recordPhaseResult: api.recordPhaseResult,
   finishRun: api.finishRun,
   abortRun: api.abortRun,
-  __reset: api.__reset,
+  __reset: () => {
+    clearActiveRun()
+    api.__reset()
+  },
 }
 
 export { generationStore }

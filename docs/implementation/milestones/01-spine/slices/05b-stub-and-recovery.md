@@ -201,52 +201,84 @@ modal that consumes it lands with the Diagnostics Hub later.
 
 ## Open questions
 
-- **Stub wire format.** `createFetchWithCapture` wraps a real
-  provider model, so the stub must drive _some_ provider factory
-  under the hood — reuse Slice 1.4's `createAnthropic` path with
-  Anthropic-shaped canned SSE (lowest friction; 1.4 already wires
-  `createAnthropic` + `createFetchWithCapture`, but couples
-  scenarios to Anthropic's wire format) or add a minimal
-  `openai-compatible` factory. The choice fixes the canned body
-  shape the fault injector emits. Resolve at implementation. (If
-  a transport-bypassing `MockLanguageModelV3` is chosen instead,
-  the milestone DoD's "one `httpCallSink` entry" can't be met by
-  the stub — that would need a DoD revisit, so prefer the
-  fetch-routed approach.)
-- **Production-build guard mechanism.** Compile-time build-mode
-  constant vs runtime throw at the provider factory — pick
-  whichever the Expo / Electron build config exposes cleanly.
-  Either satisfies "stub can't leak into a shipped app."
-- **Stub scenario set completeness.** Five scenarios cover the
-  spec's named failure modes. If Slice 1.7's smoke surfaces a
-  scenario the stub can't represent, extend the scenario enum
-  here; not expected.
-- **Recovery report consumer.** `RecoveryReport` is plumbed but
-  no UI consumes it this slice. Lands with the recovery modal
-  (Diagnostics-Hub-adjacent) in a later milestone. For milestone
-  1, the report is logged via `logger` on any orphans recovered;
-  the user sees nothing.
-- **Error-surfacing contract through the orchestrator and action
-  layer** (carried from [Slice 1.5a](./05a-pipeline-core.md)).
-  1.5a's orchestrator models phase failure only as a returned
-  `PhaseResult.failed`; an exception thrown from a phase — e.g.
-  `applyDeltaAction` hitting a DB constraint — currently escapes
-  `runPipeline` without reverse-replaying or clearing the ambient
-  `actionId` / ending the turn. Relatedly, `MutationResult.rejected`
-  exists in the action-layer type but is never produced (the action
-  is throw-only) and the orchestrator discards the return. This
-  slice's fault scenarios are the first code to produce real phase
-  errors, so they force the decision: do stub phases catch and
-  return `PhaseResult.failed` (no orchestrator change), or throw
-  (the orchestrator needs a `try`/`catch` around the phase loop
-  routing to `abortRun`, and `applyDeltaAction` either returns
-  `rejected` for the orchestrator to branch on or the dead arm is
-  dropped)? Resolve before building the fault suite — the chosen
-  path determines how each scenario reaches its `'failed'` /
-  `'aborted'` outcome. (`PipelineError`'s M1-subset optional fields
-  are self-correcting: the stub's first provider error forces them,
-  since TypeScript rejects populating a field absent from the type.)
+_All resolved at implementation; the decisions are recorded under
+[Implementation notes](#implementation-notes) (stub wire format,
+production guard, error-surfacing contract, `callWithRetry` scope).
+Cross-cutting deferrals surfaced during the build were routed to the
+[triage inbox](../../../triage.md)._
 
 ## Implementation notes
 
-_Populated at finish: notable deviations from the plan and resolved developer decisions._
+### Resolved developer decisions
+
+- **Error-surfacing contract: catch-and-return, plus orchestrator
+  hardening.** Stub phases catch provider and parse faults and return a
+  `PhaseResult` — aborts and fatals are values, never thrown, per the
+  spec. The orchestrator additionally wraps its phase loop and
+  `handleEvent` in a `try`/`catch` so an unexpected throw routes to
+  `abortRun` (reverse-replay, ambient-`actionId` clear, turn finalize)
+  instead of escaping `runPipeline`. `handleEvent` consumes
+  `applyDeltaAction`'s `MutationResult` and throws on `rejected`.
+  Error-kind routing: an action-layer throw or a rejected mutation maps
+  to `kind: 'action-layer'`; a generic phase-body throw maps to
+  `kind: 'orchestrator'`. Action-layer hardening rode along: an
+  `assertNever` over `PipelineAction['kind']` and an update-target-exists
+  guard that returns `rejected` rather than updating zero rows.
+- **Zero-arg `getPerTurnContext()`.** The orchestrator tracks the active
+  run through a `domain.setActiveRun` / `clearActiveRun` pointer set at
+  `beginRun` and cleared at commit and abort; the store getter resolves
+  that run. Phases stay zero-arg per the spec. This completes the API
+  1.5a intended — 1.5a shipped a `runId`-keyed stopgap with no production
+  caller.
+- **Stub reuses the Anthropic path.** The `'stub'` provider type drives
+  `createAnthropic` with a scenario-parameterized fault-injecting `fetch`
+  routed through `createFetchWithCapture`; canned bodies are
+  Anthropic-shaped JSON. The scenario rides in the `modelId` argument, so
+  `ProviderInstance` needed no new field, and no dependency was added.
+- **Production guard via `__DEV__`.** `createProviderModel` throws on
+  `'stub'` creation in production builds, guarded on `__DEV__` and
+  mirroring the `lib/diagnostics/logger.ts` idiom; vitest leaves
+  `__DEV__` undefined, so the stub stays available in tests.
+- **`callWithRetry` shipped now.** The two-tier (provider, parse) retry
+  helper and a provider-error classifier live in `lib/ai`, emitting a
+  `lib/ai`-local `CallRetryError` union so `lib/ai` carries no upward
+  dependency on `lib/pipeline`'s `PipelineError`. The helper returns a
+  discriminated `ok` / `failed` / `aborted` union so the accumulated
+  recoverable list survives the fatal and abort paths — a refinement of
+  the spec's illustrative `{ result, recoverable }` signature.
+- **Ambient `actionId` threaded through the captured fetch.**
+  `getActionId` is wired into `createFetchWithCapture` for both the
+  `anthropic` and `stub` cases, closing the `httpCallSink`-`actionId`
+  half deferred from 1.5a.
+
+### Notable deviations and constraints for future slices
+
+- **Recovery catches every per-orphan error, not only
+  `DeltaReplayError`.** `recoverInFlightRuns` must never block boot, so
+  its per-orphan `catch` is generic (matching the canonical spec's
+  pseudocode). An earlier draft re-threw non-`DeltaReplayError`s, which
+  would have blocked boot when an orphan's marker write itself failed.
+  Keep the catch generic.
+- **`mid-stream-timeout` is exercised without a real timer.** The
+  scenario's stub `fetch` rejects immediately with a `TimeoutError`
+  `DOMException` (which the AI SDK treats as an abort, so no internal
+  backoff); the phase converts it to a `ProviderTimeoutError`. The
+  asserted provider-timeout → retry → fatal path is identical to a
+  genuinely stalled stream, but the test is load-deterministic — a
+  real-timer version flaked under full-suite load. True mid-stream
+  partial-content streaming stays Scope: out. As a result the
+  hang-until-abort `fetch` survives only in the `cancellation-respects`
+  scenario, whose abort lands before phase entry, so that branch is
+  covered by the unit test rather than end-to-end.
+- **`CallRetryError` → `PipelineError` mapping is test-only.** No
+  production pipeline kind ships here, so the mapper lives in the fault
+  suite; the first real pipeline kind will need a shipped equivalent.
+
+### Carried follow-ups
+
+Cross-cutting deferrals with no single downstream owner were routed to
+the [triage inbox](../../../triage.md): the orchestrator
+finalization-write singleton-leak window, the chained-execution
+context-threading gap, the structured `action-layer` `PipelineError`
+fields, the shipped `CallRetryError` → `PipelineError` mapper, and the
+`generation-pipeline.md` `callWithRetry` signature reconciliation.

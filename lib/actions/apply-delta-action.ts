@@ -10,6 +10,10 @@ import type { DbCtx, MutationResult, PipelineAction } from './types'
 
 type Args = { action: PipelineAction; actionId: string; branchId: string; entryId?: string | null }
 
+function assertNever(x: never): never {
+  throw new Error(`applyDeltaAction: unhandled action kind ${JSON.stringify(x)}`)
+}
+
 // MAX+1-within-branch as a subquery so the assignment is atomic inside the INSERT.
 function nextLogPosition(branchId: string) {
   return sql<number>`(SELECT COALESCE(MAX(${deltas.logPosition}), 0) + 1 FROM ${deltas} WHERE ${deltas.branchId} = ${branchId})`
@@ -31,8 +35,7 @@ export async function applyDeltaAction(args: Args, ctx: DbCtx): Promise<Mutation
     op = 'create'
     undoPayload = null
     ops.push(ctx.db.insert(storyEntries).values(entry).toSQL())
-  } else {
-    // updateStoryEntryMetadata
+  } else if (action.kind === 'updateStoryEntryMetadata') {
     const { branchId: bid, id, metadata } = action.payload
     targetTable = 'story_entries'
     targetId = id
@@ -41,7 +44,10 @@ export async function applyDeltaAction(args: Args, ctx: DbCtx): Promise<Mutation
       .select()
       .from(storyEntries)
       .where(and(eq(storyEntries.branchId, bid), eq(storyEntries.id, id)))
-    const before = (current?.metadata ?? {}) as Record<string, unknown>
+    if (!current) {
+      return { status: 'rejected', reason: `update target story_entries ${bid}:${id} not found` }
+    }
+    const before = (current.metadata ?? {}) as Record<string, unknown>
     // Column-keyed: reverse-replay iterates undo_payload's top-level keys as
     // target columns. metadata is the column; the inner object is its partial.
     undoPayload = {
@@ -54,6 +60,8 @@ export async function applyDeltaAction(args: Args, ctx: DbCtx): Promise<Mutation
         .where(and(eq(storyEntries.branchId, bid), eq(storyEntries.id, id)))
         .toSQL(),
     )
+  } else {
+    return assertNever(action)
   }
 
   const deltaId = generateId('delta')

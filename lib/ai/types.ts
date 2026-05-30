@@ -6,6 +6,7 @@ export type ProviderType =
   | 'nanogpt'
   | 'nvidia-nim'
   | 'openai-compatible'
+  | 'stub'
 
 export type ProviderInstance = {
   id: string

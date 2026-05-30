@@ -19,6 +19,7 @@ const setHttpCallKnownSecretValues = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/diagnostics', () => ({
   httpCallSink: sink,
   setHttpCallKnownSecretValues,
+  getCurrentActionId: () => undefined,
 }))
 
 describe('getModel', () => {

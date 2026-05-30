@@ -1,6 +1,12 @@
 import { eq } from 'drizzle-orm'
 
-import { DeltaReplayError, applyDeltaAction, reverseReplayDeltas, type DbCtx } from '@/lib/actions'
+import {
+  DeltaReplayError,
+  applyDeltaAction,
+  reverseReplayDeltas,
+  type DbCtx,
+  type MutationResult,
+} from '@/lib/actions'
 import { pipelineRuns } from '@/lib/db'
 import {
   clearCurrentActionId,
@@ -14,6 +20,22 @@ import { domain, type RunState } from '@/lib/stores'
 import { pipelineEventBus } from './event-bus'
 import { getPipeline } from './registry'
 import type { PhaseEmittedEvent, PhaseNode, PhaseResult, PipelineError, TxResult } from './types'
+
+class ActionLayerError extends Error {
+  readonly detail: string
+  constructor(detail: string) {
+    super(detail)
+    this.name = 'ActionLayerError'
+    this.detail = detail
+  }
+}
+
+class ActionRejectedError extends ActionLayerError {
+  constructor(reason: string) {
+    super(reason)
+    this.name = 'ActionRejectedError'
+  }
+}
 
 export type RunCtx = { storyId: string | null; branchId: string } & DbCtx
 
@@ -40,6 +62,7 @@ async function beginRun(kind: string, ctx: RunCtx): Promise<RunState> {
     startedAt: Date.now(),
   })
   domain.startRun(run)
+  domain.setActiveRun(run.runId)
   setCurrentActionId(run.actionId)
   turnCaptureSink.beginTurn({ actionId: run.actionId, branchId: run.branchId })
   pipelineEventBus.emit({ type: 'run_start', runId: run.runId, kind, actionId: run.actionId })
@@ -48,15 +71,23 @@ async function beginRun(kind: string, ctx: RunCtx): Promise<RunState> {
 
 async function handleEvent(event: PhaseEmittedEvent, run: RunState, ctx: RunCtx): Promise<void> {
   if (event.type === 'delta_emitted') {
-    await applyDeltaAction(
-      {
-        action: event.action,
-        actionId: run.actionId,
-        branchId: run.branchId,
-        entryId: event.entryId ?? null,
-      },
-      ctx,
-    )
+    let result: MutationResult
+    try {
+      result = await applyDeltaAction(
+        {
+          action: event.action,
+          actionId: run.actionId,
+          branchId: run.branchId,
+          entryId: event.entryId ?? null,
+        },
+        ctx,
+      )
+    } catch (e) {
+      // A throw from the action layer (e.g. a DB constraint) is an action-layer
+      // failure, not an orchestrator bug — preserve the kind for diagnostics.
+      throw new ActionLayerError(e instanceof Error ? e.message : String(e))
+    }
+    if (result.status === 'rejected') throw new ActionRejectedError(result.reason)
   } else if (event.type === 'recoverable_error') {
     logger.warn('pipeline.recoverable_error', { detail: event.error.detail ?? event.error.kind })
   }
@@ -127,6 +158,7 @@ async function commitRun(run: RunState, ctx: RunCtx): Promise<TxResult> {
     .where(eq(pipelineRuns.runId, run.runId))
   turnCaptureSink.endTurn(run.actionId, 'completed')
   clearCurrentActionId()
+  domain.clearActiveRun()
   logger.debug('pipeline.run_complete', { runId: run.runId, kind: run.kind, outcome: 'completed' })
   pipelineEventBus.emit({
     type: 'run_complete',
@@ -160,6 +192,7 @@ async function abortRun(
     .where(eq(pipelineRuns.runId, run.runId))
   turnCaptureSink.endTurn(run.actionId, outcome, cause.reason)
   clearCurrentActionId()
+  domain.clearActiveRun()
   logger.error('pipeline.run_aborted', { runId: run.runId, outcome })
   pipelineEventBus.emit({
     type: 'run_complete',
@@ -175,11 +208,19 @@ async function abortRun(
 export async function runPipeline(kind: string, ctx: RunCtx): Promise<TxResult> {
   const pipeline = getPipeline(kind)
   const run = await beginRun(kind, ctx)
-  for (const node of pipeline.phases) {
-    const result = await runNode(node, run, ctx)
-    if (result.status === 'failed')
-      return abortRun(run, ctx, { reason: 'phase-failure', error: result.error })
-    if (result.status === 'aborted') return abortRun(run, ctx, { reason: 'user-cancel' })
+  try {
+    for (const node of pipeline.phases) {
+      const result = await runNode(node, run, ctx)
+      if (result.status === 'failed')
+        return abortRun(run, ctx, { reason: 'phase-failure', error: result.error })
+      if (result.status === 'aborted') return abortRun(run, ctx, { reason: 'user-cancel' })
+    }
+  } catch (e) {
+    const error: PipelineError =
+      e instanceof ActionLayerError
+        ? { kind: 'action-layer', detail: e.detail }
+        : { kind: 'orchestrator', detail: e instanceof Error ? e.message : String(e) }
+    return abortRun(run, ctx, { reason: 'phase-failure', error })
   }
   return commitRun(run, ctx)
 }
