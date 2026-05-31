@@ -376,9 +376,11 @@ story` actions. Reset destroys per-story knobs but preserves all
 
 Zod is a v1 dependency. `app_settings` config is zod-parsed at
 hydrate via `appSettingsConfigSchema`; on a parse failure boot
-currently logs and falls back to defaults — the blocking recovery
-screen above lands with the slice that introduces real
-`app_settings` writes. Per-story parsing (`stories.definition`,
+currently logs and falls back to defaults — an M1 stopgap. The
+blocking recovery screen above lands in
+[slice 1.7 (UI shells)](./implementation/milestones/01-spine/slices/07-ui-shells.md),
+which assembles the bootstrap order and owns the parse-failure
+branch. Per-story parsing (`stories.definition`,
 `stories.settings`) arrives with the story-open path. The
 enum-union dedup that drizzle `$inferSelect` will own is tracked in
 [`parked.md → Drizzle schemas as source of truth`](./parked.md#drizzle-schemas-as-source-of-truth-for-typed-enum-unions).

@@ -128,12 +128,29 @@ happens when real interactive features land.
   and 1.6:
   1. Migrations apply (from `lib/db/`).
   2. Crash recovery pass runs (from `lib/pipeline/`).
-  3. `hydrateAppSettings()` (from `lib/stores/`).
+  3. `hydrateAppSettings()` (from `lib/stores/`) — on a config
+     parse failure, halts and renders the `app_settings`
+     recovery screen (below) rather than proceeding to step 4.
   4. i18n init (loads default `en` resources).
   5. QueryClientProvider mounts the React tree.
   6. I18nextProvider wraps below QueryClientProvider.
   7. `<Toaster>` mounts inside the provider tree.
   8. Expo Router renders.
+- **`app_settings` recovery screen** — boot-blocking screen for
+  a **config parse failure** (corrupt / unparseable
+  `app_settings` row), per
+  [`architecture.md` → Settings: strict types, defaults at load](../../../../architecture.md#settings-strict-types-defaults-at-load).
+  A bootstrap concern, distinct from crash recovery and from the
+  settings screen's deferred interactive flows. Two actions:
+  `Open file` (reveal the SQLite file in the OS file manager —
+  desktop) and `Reset settings` (write a fresh default
+  `app_settings` row, then re-hydrate — self-contained, needs no
+  provider infrastructure). Replaces the M1 default-on-failure
+  stopgap: `hydrateAppSettings`'s parse-throw branch stops
+  defaulting and signals the bootstrap to render this screen,
+  while the fresh-install empty-row branch still hydrates
+  defaults. No automatic reset — losing configured providers +
+  API keys is destructive.
 - Smoke trigger in the reader-composer:
   - Debug-only affordance — visible in `pnpm dev` builds and
     gated by a build-time constant for production builds.
@@ -208,6 +225,12 @@ happens when real interactive features land.
   `stores.domain.setDiagnosticsEnabled` →
   `app_settings.diagnostics.enabled` row updated, store
   reflects the change, subsequent app start respects it).
+- `app_settings` recovery screen: with a deliberately
+  corrupted `app_settings` config row, boot halts at the
+  recovery screen instead of mounting the normal tree;
+  `Reset settings` writes a fresh default row and boot
+  proceeds; a fresh-install empty database still boots to
+  defaults without showing the screen.
 - Smoke trigger in reader-composer fires a stub-LLM pipeline
   run that completes end-to-end:
   - Synthetic story and branch created on first click if no
@@ -241,6 +264,12 @@ happens when real interactive features land.
 - **Bootstrap order.** Unit test for the app-root effect
   that runs migrations, recovery, hydration in sequence.
   Assert each phase's completion before the next starts.
+- **`app_settings` recovery branch.** Unit test: seed a
+  corrupt `app_settings` config row, run the bootstrap, assert
+  it halts into the recovery state (no normal-tree mount);
+  invoke `Reset settings`, assert a fresh default row is
+  written and hydration then succeeds. Seed an absent row,
+  assert it boots to defaults without recovery.
 - **Empty story list renders.** Storybook test that the
   landing screen renders its empty state when no stories
   exist.
@@ -300,6 +329,18 @@ happens when real interactive features land.
   `getAppSettings().assignments` walk must not mutate in
   place. Freezing is deferred to the Zod-parsed-copy
   milestone.
+- **`Open file` on Android.** The reveal-the-SQLite-file action
+  is desktop-meaningful (Electron opens the OS file manager for
+  hand-repair); Android has no user-accessible path to edit.
+  Resolve whether Android shows `Reset settings` only, or a
+  platform-specific alternative.
+- **Two `app_settings` parse sites.** Config
+  (`appSettingsConfigSchema`, in `hydrateAppSettings`) and
+  diagnostics (`appSettingsDiagnosticsSchema`, the
+  `lib/diagnostics` module) parse the same row independently.
+  Config failure is destructive and blocks at the recovery
+  screen; decide whether a diagnostics-only parse failure also
+  blocks or simply defaults the toggle and continues.
 
 ## Implementation notes
 
