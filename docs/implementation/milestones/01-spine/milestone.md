@@ -41,14 +41,15 @@ without real provider traffic.
 The UI half of the spine — base Zustand stores (including the
 `useToasts` queue) plus empty / skeletal screens — runs in
 parallel with the AI / pipeline half once the database layer is in
-place. **i18n install (`i18next` + `react-i18next`) and the
-`<Toaster>` mount at app root land alongside the UI shells in
-slice 1.7**, so every chrome string ships translation-routed from
-day one and any subsystem can fire toasts immediately — both per
-the [`tech-stack.md`](../../../tech-stack.md) day-one-install
+place. **The i18n install (`i18next` + `react-i18next`), the
+`<Toaster>` mount, and the boot-order assembly land in slice
+1.7a, ahead of the UI shells in 1.7b**, so every chrome string
+ships translation-routed from day one and any subsystem can fire
+toasts immediately — both per the
+[`tech-stack.md`](../../../tech-stack.md) day-one-install
 rationale (retrofitting hardcoded strings or wiring toasts later
-is the tax to avoid). The two paths reconverge at the end-to-end
-pipeline test: a stub LLM call triggered from UI flows through the
+is the tax to avoid). The two paths reconverge in 1.7c's
+end-to-end smoke: a stub LLM call triggered from UI flows through the
 action layer, executes against the pipeline framework, emits
 through logger + sinks, and writes a `pipeline_runs` row.
 
@@ -133,23 +134,34 @@ Slice docs land as each slice is authored (one per slice under
    QueryClient setup for the React Query cache substrate.
    Action-layer wiring against domain stores.
 
-7. **Slice 1.7 — UI shells + i18n + Toaster mount.** Empty story
-   list (landing), reader-composer with existing pieces wired,
-   settings screen layouts. **i18next + react-i18next install**
-   with `locales/en/*` namespace skeleton — every chrome string
-   in this slice routes through `t()` from day one (per
-   [`tech-stack.md → i18n`](../../../tech-stack.md), specifically
-   the day-one-install rule to avoid the retrofit tax).
-   **`<Toaster>` mounted at app root** consuming `useToasts`
-   from slice 1.6. End-to-end pipeline trigger from UI as the
-   milestone's verifying smoke.
+7. **Slice 1.7 — UI shells + i18n + Toaster mount + smoke.** Split
+   three ways along the boot / screens / verification seams:
+   - [**Slice 1.7a — App root: boot order, diagnostics ownership,
+     recovery.**](./slices/07a-app-root-boot.md) The **i18next +
+     react-i18next install** with `locales/en/*` skeleton, the
+     **`<Toaster>` mount** consuming `useToasts` from 1.6, the
+     reassembled bootstrap order (migrations → crash recovery →
+     blocking app-settings hydrate → providers), the diagnostics
+     gate ownership rework (the appSettings store owns the
+     persisted toggles behind an injected gate; supersedes 1.6's
+     deferral), and the boot-blocking `app_settings` recovery
+     screen.
+   - [**Slice 1.7b — UI shells + navigation.**](./slices/07b-ui-shells.md)
+     Empty story list (landing), reader-composer with existing
+     pieces wired, settings screen layouts (diagnostics toggle the
+     only interactive control), the Diagnostics Hub stub route, and
+     navigation wiring. Every chrome string routes through `t()`.
+   - [**Slice 1.7c — End-to-end smoke.**](./slices/07c-smoke.md)
+     The `'smoke'` pipeline kind, the debug-only trigger in the
+     reader-composer, and the end-to-end run that meets the
+     milestone's verifying-smoke Definition of Done.
 
 ## Dependency graph
 
 ```
 1.1 → 1.2 ─┬→ 1.3 ─┬→ 1.4 ──────────┐
            │       │                ├→ 1.5b ─┐
-           │       └→ 1.5a ─┬────────┘        ├→ 1.7
+           │       └→ 1.5a ─┬────────┘        ├→ 1.7a → 1.7b → 1.7c
            │                ↓                 │
            └──────────────→ 1.6 ──────────────┘
 ```
@@ -170,12 +182,19 @@ Slice docs land as each slice is authored (one per slice under
 - **1.6 (stores)** needs schema-shaped types (1.2) and the
   `lib/stores/` skeleton (1.5a), but not the orchestrator or
   stub; it can otherwise proceed alongside the pipeline branch.
-- **1.7 (UI shells)** gates on 1.6 (stores) and 1.5b for the
-  end-to-end smoke trigger (1.5b transitively carries 1.5a).
+- **1.7a (app root / boot)** gates on 1.6 (appSettings store +
+  hydrate, QueryClient, `useToasts`) and 1.5b (the
+  `recoverInFlightRuns` pass it wires into boot; 1.5b
+  transitively carries 1.5a).
+- **1.7b (UI shells)** gates on 1.7a (the provider tree, i18n
+  instance, `<Toaster>`, and diagnostics action its screens
+  consume) and 1.6 (navigation store).
+- **1.7c (smoke)** gates on 1.7b (the reader-composer route it
+  injects into) and 1.5b (the stub LLM it triggers).
 
 Parallel paths after 1.2: {1.3, 1.4, 1.5a, 1.5b} on the AI /
-pipeline branch runs alongside {1.6, 1.7} on the UI branch,
-reconverging at 1.7.
+pipeline branch runs alongside {1.6, 1.7a, 1.7b, 1.7c} on the UI
+branch, reconverging at 1.7c.
 
 ## Slice contracts
 
@@ -195,6 +214,12 @@ The 1.4 / 1.5b boundary (what a "model call" looks like) is
 sequenced: 1.4 lands, the provider-abstraction contract is fixed
 by implementation, then 1.5b's stub builds on it. 1.5a doesn't
 touch the model-call boundary. No pre-authored contract required.
+
+The 1.7a → 1.7b → 1.7c chain is likewise sequenced: 1.7a fixes the
+diagnostics master-toggle action signature and the i18n `t()`
+instance that 1.7b's settings toggle and chrome consume; 1.7b fixes
+the reader-composer route that 1.7c's smoke trigger injects into.
+No pre-authored contract required.
 
 ## Definition of done
 
@@ -233,11 +258,11 @@ touch the model-call boundary. No pre-authored contract required.
   Resolved in slice 1.5a rather than the milestone.
 - **Cross-component ephemeral store inventory.** The
   `lib/stores/ui/` folder may end up holding only a handful of
-  stores; the exact set emerges from 1.7 (UI shells). Not a
+  stores; the exact set emerges from 1.7b (UI shells). Not a
   milestone-level blocker.
 - **End-to-end smoke trigger surface in the reader-composer.**
   The reader-composer's existing pieces don't include a "trigger
-  generation" button; slice 1.7 decides whether a temporary
+  generation" button; slice 1.7c decides whether a temporary
   trigger lands at the bottom of the composer or as a debug-mode
   affordance. Removable before milestone 2 if production design
   supersedes it.

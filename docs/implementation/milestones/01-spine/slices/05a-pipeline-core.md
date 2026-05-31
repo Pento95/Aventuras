@@ -18,7 +18,7 @@
   build on the orchestrator, action layer, reverse-replay
   primitive, and `pipeline_runs` writers this slice ships);
   [Slice 1.6](./06-base-stores.md) (extends the `lib/stores/`
-  module this slice creates); [Slice 1.7](./07-ui-shells.md)
+  module this slice creates); [Slice 1.7c](./07c-smoke.md)
   (the milestone-1 end-to-end smoke triggers a pipeline run
   through everything this slice ships).
 
@@ -40,7 +40,7 @@ writes and threads the ambient `actionId` through the logger and
 turn-capture sinks; what remains is the realistic fault-injection
 surface and boot-time recovery ([Slice 1.5b](./05b-stub-and-recovery.md)),
 the rest of the domain stores ([Slice 1.6](./06-base-stores.md)),
-and the UI wiring ([Slice 1.7](./07-ui-shells.md)).
+and the UI wiring ([Slice 1.7b](./07b-ui-shells.md)).
 
 ## Background
 

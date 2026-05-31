@@ -381,7 +381,7 @@ Zod is a v1 dependency. `app_settings` config is zod-parsed at
 hydrate via `appSettingsConfigSchema`; on a parse failure boot
 currently logs and falls back to defaults — an M1 stopgap. The
 blocking recovery screen above lands in
-[slice 1.7 (UI shells)](./implementation/milestones/01-spine/slices/07-ui-shells.md),
+[slice 1.7a (app root / boot)](./implementation/milestones/01-spine/slices/07a-app-root-boot.md),
 which assembles the bootstrap order and owns the parse-failure
 branch. Per-story parsing (`stories.definition`,
 `stories.settings`) arrives with the story-open path. The

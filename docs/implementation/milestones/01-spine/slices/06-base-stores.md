@@ -350,12 +350,12 @@ handles are exported from their domain files (matching the
 index-only public API is the contract, guarded by a boundaries-lint
 surface test plus a typecheck fixture.
 
-**Carry-forward for Slice 1.7:** `getAppSettings()` / `getNavigation()`
-return live store references (matching the generation store's
-`getTxState`); the hydrate-time Zod parse does not freeze them, so
-consumers must treat results as read-only until the parsed snapshot is
-frozen (deferred) — flagged in
-[Slice 1.7 Open questions](./07-ui-shells.md#open-questions).
+**Carry-forward for Slice 1.7a / 1.7b:** `getAppSettings()` /
+`getNavigation()` return live store references (matching the
+generation store's `getTxState`); the hydrate-time Zod parse does not
+freeze them, so consumers must treat results as read-only until the
+parsed snapshot is frozen (deferred) — flagged in
+[Slice 1.7a Open questions](./07a-app-root-boot.md#open-questions).
 
 **Doc-hygiene followups queued** in
 [`triage.md`](../../../triage.md): clarify `code-conventions.md`

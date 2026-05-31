@@ -10,9 +10,11 @@
   (the provider abstraction, `httpCallSink`, and the
   `createFetchWithCapture` wrapper the stub routes its calls
   through).
-- **Blocks:** [Slice 1.7](./07-ui-shells.md) (the milestone-1
-  end-to-end smoke triggers the stub through the orchestrator
-  and expects an `httpCallSink` entry).
+- **Blocks:** [Slice 1.7a](./07a-app-root-boot.md) (its boot
+  sequence wires the `recoverInFlightRuns()` crash-recovery pass
+  this slice ships) and [Slice 1.7c](./07c-smoke.md) (the
+  milestone-1 end-to-end smoke triggers the stub through the
+  orchestrator and expects an `httpCallSink` entry).
 
 ## Goal
 
