@@ -13,7 +13,7 @@ import { SettingsRecoveryScreen } from '@/components/shells/settings-recovery-sc
 import { Toaster } from '@/components/ui/toast'
 import { useBootstrap } from '@/lib/boot'
 import { queryClient } from '@/lib/cache'
-import { db, ensureAppSettingsSingleton, useDbMigrations } from '@/lib/db'
+import { DrizzleStudioDevTools, db, ensureAppSettingsSingleton, useDbMigrations } from '@/lib/db'
 import { DensityProvider } from '@/lib/density'
 import { i18n } from '@/lib/i18n'
 import { ThemeProvider } from '@/lib/themes'
@@ -61,6 +61,7 @@ export default function RootLayout() {
                     <Stack screenOptions={{ headerShown: false }} />
                     <Toaster />
                     <PortalHost />
+                    <DrizzleStudioDevTools />
                   </BottomSheetModalProvider>
                 </I18nextProvider>
               </DensityProvider>

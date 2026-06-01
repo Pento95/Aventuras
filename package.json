@@ -30,7 +30,8 @@
     "storybook:build": "storybook build",
     "build-storybook": "storybook build",
     "themes:audit": "tsx scripts/themes-audit.ts",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:studio:desktop": "drizzle-kit studio --config drizzle.studio.config.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.81",
@@ -116,6 +117,7 @@
     "@vitest/coverage-v8": "^4.1.5",
     "autoprefixer": "^10.5.0",
     "babel-plugin-inline-import": "^3.0.0",
+    "better-sqlite3": "^12.10.0",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.10",
@@ -129,6 +131,7 @@
     "eslint-plugin-react-native": "^5.0.0",
     "eslint-plugin-storybook": "10.3.5",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "expo-drizzle-studio-plugin": "^0.2.1",
     "jsdom": "^29.1.1",
     "lefthook": "^2.1.6",
     "only-allow": "^1.2.2",
@@ -212,5 +215,10 @@
     "node": ">=24",
     "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@10.33.1"
+  "packageManager": "pnpm@10.33.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  }
 }

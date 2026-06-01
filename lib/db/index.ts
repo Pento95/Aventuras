@@ -16,6 +16,7 @@ export type {
   ProviderInstance,
 } from './app-settings-schema'
 export { db } from './client'
+export { DrizzleStudioDevTools } from './drizzle-studio-devtools'
 export { entryMetadataSchema } from './entry-metadata'
 export type { EntryMetadata } from './entry-metadata'
 export {
