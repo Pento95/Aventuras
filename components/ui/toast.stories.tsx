@@ -45,6 +45,9 @@ export const Live: Story = {
         >
           <Text>Info</Text>
         </Button>
+        <Button variant="secondary" onPress={() => toast.warning('Translation: 3 rows missing.')}>
+          <Text>Warning</Text>
+        </Button>
       </View>
       <Toaster />
     </View>
@@ -68,6 +71,7 @@ export const SeverityRow: Story = {
         severity="info"
         message="Provider connected. Default model: gpt-4. Change anytime in Settings."
       />
+      <StaticToast severity="warning" message="Translation: 3 rows missing." />
     </View>
   ),
 }
@@ -121,6 +125,7 @@ export const ThemeMatrix: Story = {
             <StaticToast severity="success" message="Saved." />
             <StaticToast severity="error" message="Failed." />
             <StaticToast severity="info" message="Info message." />
+            <StaticToast severity="warning" message="Warning message." />
           </View>
         </View>
       ))}

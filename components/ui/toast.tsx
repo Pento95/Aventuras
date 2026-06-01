@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle, Info, X } from 'lucide-react-native'
+import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from 'lucide-react-native'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -24,12 +24,14 @@ import { NativeOnlyAnimatedView } from './native-only-animated-view'
 const DURATION_MS: Record<ToastSeverity, number> = {
   success: 3000,
   info: 5000,
+  warning: 5000,
   error: 7000,
 }
 
 const ARIA_LIVE: Record<ToastSeverity, 'polite' | 'assertive'> = {
   success: 'polite',
   info: 'polite',
+  warning: 'polite',
   error: 'assertive',
 }
 
@@ -37,18 +39,21 @@ const ICON_BY_SEVERITY = {
   success: CheckCircle,
   error: AlertCircle,
   info: Info,
+  warning: AlertTriangle,
 } as const
 
 const BG_BY_SEVERITY: Record<ToastSeverity, string> = {
   success: 'bg-success',
   error: 'bg-danger',
   info: 'bg-info',
+  warning: 'bg-warning',
 }
 
 const FG_BY_SEVERITY: Record<ToastSeverity, string> = {
   success: 'text-success-fg',
   error: 'text-danger-fg',
   info: 'text-info-fg',
+  warning: 'text-warning-fg',
 }
 
 const DRAG_DISMISS_THRESHOLD_PX = 50

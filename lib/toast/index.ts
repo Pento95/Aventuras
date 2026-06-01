@@ -11,6 +11,7 @@ export const toast = {
   success: (message: string) => toastStore.show('success', message),
   error: (message: string) => toastStore.show('error', message),
   info: (message: string) => toastStore.show('info', message),
+  warning: (message: string) => toastStore.show('warning', message),
   dismiss: (id: string) => toastStore.dismiss(id),
 }
 

@@ -3,7 +3,7 @@
 // avoids pulling Zustand in for one consumer. Toaster mounts once at
 // the app root, subscribes to changes, and renders the queue.
 
-export type ToastSeverity = 'success' | 'error' | 'info'
+export type ToastSeverity = 'success' | 'error' | 'info' | 'warning'
 
 export type ToastItem = {
   id: string
