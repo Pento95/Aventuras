@@ -65,17 +65,19 @@ explicit.
     production via `__DEV__` (Slice 1.5b), so the button gating is
     belt-and-suspenders — the button must still be hidden / no-op
     in production, not rely on the provider throw.
-  - On click: if `useNavigation.getState().currentBranchId` is
-    null, create a synthetic story and branch via direct `lib/db/`
-    writes (`TODO(spine)`) and call `setCurrentStory` then
-    `setCurrentBranch`.
-  - Then call
-    `orchestrator.beginRun({ kind: 'smoke', branchId, ... })`.
+  - On click: ensure a synthetic story and branch by fixed id
+    (`story_smoke` / `branch_smoke`) via direct `lib/db/` writes
+    (`TODO(spine)`, create-if-absent — not a `currentBranchId === null`
+    guard; see [Implementation notes](#implementation-notes)), then
+    call `setCurrentStory` / `setCurrentBranch`.
+  - Then call `runPipeline('smoke', ctx)` (the public orchestrator
+    entry).
   - Visual feedback: a non-blocking indicator showing
-    in-flight / completed / failed state, sourced from a
-    `useGeneration` selector.
-  - A success / failure toast, proving the `useToasts` → `<Toaster>`
-    path Slice 1.7a mounted.
+    in-flight / completed / failed state — in-flight from a
+    `useGeneration` selector (`txState.runs.size`), terminal from the
+    awaited `TxResult`.
+  - A success / failure toast, proving the imperative `toast` →
+    `<Toaster>` path Slice 1.7a mounted.
 - **Removal followup** logged in
   [`docs/followups.md`](../../../../followups.md) at merge — the
   trigger and its synthetic-story bootstrap are removed when real
@@ -104,7 +106,8 @@ explicit.
   end-to-end:
   - Synthetic story and branch created on first click if no current
     branch.
-  - `orchestrator.beginRun({ kind: 'smoke', ... })` called.
+  - `runPipeline('smoke', ctx)` called (the public orchestrator
+    entry; `beginRun` is an internal step).
   - `pipeline_runs` row inserted with `finished_at` NULL, then
     updated to `outcome='completed'`.
   - At least one `logger.warn` or `logger.error` emission shows up
@@ -113,8 +116,9 @@ explicit.
     outbound call, threaded with the run's `actionId`).
   - One `TurnCapture` populated and finalized with
     `outcome='completed'`.
-  - Generation store reflects the run lifecycle: `currentRun`
-    non-null during, null after.
+  - Generation store reflects the run lifecycle: `txState.runs`
+    non-empty during, empty after (the store has no `currentRun`
+    field).
   - A success / failure toast fires.
 - Production-build debug-trigger gating: built with the
   production-mode constant, the trigger is either absent from the
@@ -143,23 +147,54 @@ explicit.
 
 ## Open questions
 
-- **Synthetic story and branch shape.** What title, what branch
-  name? Likely "Smoke test story" / "main" defaults; confirm at
-  authoring. The synthetic data exists only to satisfy the
-  orchestrator's branch-context requirement.
-- **Smoke pipeline kind definition.** Defined inline this slice as
-  `'smoke'`. If a later milestone defines a real pipeline kind that
-  overlaps this name, the smoke kind renames or moves to a
-  `pipelines/smoke.ts` file scoped to debug builds.
-- **Trigger UI placement.** Author's call at implementation time —
-  a small affordance at the bottom of the composer, or hidden
-  behind a developer-menu open. Pick the lower-noise option. (The
-  milestone previously flagged this.)
-- **Removal commit.** Track the smoke trigger and its synthetic
-  story bootstrap removal as a followup in
-  [`docs/followups.md`](../../../../followups.md) at the time this
-  slice merges.
+None remaining. The four planning questions — synthetic story/branch
+shape, `'smoke'` kind definition, trigger placement, and the removal
+followup — were resolved during planning and implementation; the
+notable choices are recorded in
+[Implementation notes](#implementation-notes) and the followup is logged
+in [`docs/followups.md`](../../../../followups.md). One forward-looking
+contingency stands: if a later milestone defines a real pipeline kind
+named `smoke`, this debug kind renames or moves to a `pipelines/smoke.ts`
+scoped to debug builds.
 
 ## Implementation notes
 
-_Populated at finish: notable deviations from the plan and resolved developer decisions._
+- **`lib/ai` gained a `registerStubProvider()` dev seam — an unplanned
+  public-API touch.** The temporary provider registry had only
+  test-only writers (`set*ForTests` / `reset*ForTests`, unexported), so
+  in a dev build `getModel('stub', 'happy')` threw "not configured" at
+  runtime. `registerStubProvider()` (idempotent, returns the `'stub'`
+  id) is the narrowest runtime seam and reuses the resolution path
+  `getModel` already walks. It is part of what the removal followup rips
+  out when real provider-settings UI lands.
+- **The synthetic branch is keyed off a fixed id with create-if-absent,
+  not the brief's `currentBranchId === null` guard.** Slice 1.7b's
+  landing "Open reader (debug)" button seeds `currentStory` /
+  `currentBranch = '__debug__'` — non-null but with no DB row — so a
+  null-check would skip creation and the `createStoryEntry` delta would
+  FK-fail. `runSmoke` ensures `story_smoke` / `branch_smoke` by fixed id
+  (story title "Smoke test story", branch name "main"), robust to the
+  sentinel and to repeat clicks.
+- **The phase emits one benign `recoverable_error` on purpose.** The
+  happy path otherwise logs only `pipeline.run_complete` at debug, and
+  `isDebugEnabled` is not `__DEV__`-forced (only `isEnabled` is —
+  `lib/boot/bootstrap.ts`), so that line is dropped by default in a dev
+  build. The orchestrator logs `recoverable_error` at warn and the run
+  still completes, which is what makes the "≥1 `logger.warn`" criterion
+  hold on-device. Do not remove the emission without replacing the warn
+  source.
+- **In-flight state reads a `useGeneration` selector
+  (`txState.runs.size`); the terminal outcome comes from the awaited
+  `TxResult`, not the store.** The generation store has no `currentRun`
+  field and empties `txState.runs` on finish, so there is no terminal
+  record for a selector — the acceptance criterion's "non-null during,
+  null after" maps to `txState.runs` non-empty during / empty after.
+- **Tested at the `runSmoke(deps)` seam against `createTestDb()`, not a
+  route render + click.** The `unit` vitest project is node-env, the
+  runtime `db` is an Electron-IPC singleton with no vitest backing, and
+  the repo exercises component interaction via Storybook. `runSmoke`
+  fires its own toast so the success path is node-testable; a second
+  test proves the production no-op. No Storybook story / inventory row
+  ships for the throwaway trigger. The public orchestrator entry is
+  `runPipeline(kind, ctx)` — the brief's `orchestrator.beginRun` is an
+  internal step.
