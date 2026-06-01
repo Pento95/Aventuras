@@ -90,10 +90,13 @@ type IconActionProps = Omit<PressableProps, 'children' | 'aria-label'> & {
   className?: string
 }
 
+// Expand the tap zone to the 44px phone floor at regular density (the phone
+// default): visible + 2·slop = 44 (24+2·10, 28+2·8, 32+2·6). Comfortable
+// overshoots harmlessly; desktop (compact, mouse) needs no floor.
 const HIT_SLOPS = {
-  sm: 8,
-  md: 6,
-  lg: 4,
+  sm: 10,
+  md: 8,
+  lg: 6,
 } satisfies Record<IconActionSize, number>
 
 const SIZE_TO_ICON_SIZE: Record<IconActionSize, IconSizeVariant> = {
