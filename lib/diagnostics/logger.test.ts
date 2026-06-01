@@ -61,4 +61,14 @@ describe('logger', () => {
     expect(warnSpy.mock.calls.some((c) => String(c[0]).includes('non-snake_case'))).toBe(true)
     expect(diagnosticsStore.getState().logEntries).toHaveLength(1)
   })
+
+  it('ring buffer caps at 500 and evicts the first 100 when 600 emit through the logger', () => {
+    configureDiagnosticsGate({ isEnabled: () => true, isDebugEnabled: () => true })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (let i = 0; i < 600; i++) logger.warn('pipeline.recovered', { i })
+    const { logEntries } = diagnosticsStore.getState()
+    expect(logEntries).toHaveLength(500)
+    expect(logEntries[0].fields.i).toBe(100) // first 100 emissions evicted
+    expect(logEntries[499].fields.i).toBe(599)
+  })
 })

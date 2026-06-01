@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-native-web-vite'
 import { useEffect } from 'react'
 import { View } from 'react-native'
+import { expect, screen } from 'storybook/test'
 
 import { themes } from '@/lib/themes'
 import { toast, toastStore, type ToastItem } from '@/lib/toast'
@@ -59,6 +60,27 @@ export const Live: Story = {
       <Toaster />
     </View>
   ),
+}
+
+// Mounting <Toaster/> and enqueueing renders the toast (role=status) — the
+// queue → mount proof the 1.7a brief deferred here from a render assertion.
+// Reset in beforeEach (before the Toaster subscribes); __reset clears listeners,
+// so resetting inside play would orphan the live subscription.
+export const RendersEnqueuedToast: Story = {
+  parameters: { layout: 'fullscreen' },
+  beforeEach: () => {
+    toastStore.__reset()
+  },
+  render: () => (
+    <View className="min-h-screen p-6">
+      <Toaster />
+    </View>
+  ),
+  play: async () => {
+    toast.success('Smoke toast rendered.')
+    const status = await screen.findByRole('status')
+    await expect(status).toHaveTextContent('Smoke toast rendered.')
+  },
 }
 
 // Static severity row — for visual / theme-matrix verification

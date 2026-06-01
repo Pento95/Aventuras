@@ -61,6 +61,16 @@ describe('http redaction', () => {
     })
   })
 
+  it('refreshes the comparator on key rotation: new key matches, old key no longer does', () => {
+    setHttpCallKnownSecretValues(['sk-old-key'])
+    expect(redactHeaderValue('Bearer sk-old-key')).toBe('***')
+
+    setHttpCallKnownSecretValues(['sk-new-key'])
+    expect(redactHeaderValue('Bearer sk-new-key')).toBe('***')
+    expect(redactHeaderValue('Bearer sk-old-key')).toBe('Bearer sk-old-key')
+    expect(redactUrl('/r?token=sk-old-key')).toBe('/r?token=sk-old-key')
+  })
+
   it('redacts query string values by exact match', () => {
     setHttpCallKnownSecretValues(['sk-test-abc', '123'])
 
