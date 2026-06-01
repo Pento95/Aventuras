@@ -29,3 +29,13 @@ for the placement rule.
   consumer" rationale is now stale since Zustand landed in 1.3 / 1.5a);
   migrating to a vanilla store for consistency with `diagnosticsStore`
   / `generationStore` is optional and non-functional.
+
+- **Smoke trigger + synthetic-story scaffolding is debug-only.**
+  [Slice 1.7c](./implementation/milestones/01-spine/slices/07c-smoke.md)
+  shipped a `__DEV__`-gated "Run smoke" button in the reader-composer,
+  the `components/reader/smoke/` module (the `'smoke'` pipeline, its
+  phase, and `runSmoke`'s synthetic story/branch bootstrap), and the
+  `registerStubProvider()` dev seam in `lib/ai`. All of it is
+  scaffolding flagged `TODO(spine)`; remove the module, the reader-route
+  trigger, and the `lib/ai` seam when real story-creation and
+  provider-settings UI land.
