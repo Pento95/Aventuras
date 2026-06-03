@@ -154,7 +154,12 @@ memory pipeline (M3) needs to tune against.
   [`generation-pipeline.md → ID placeholder substitution`](../generation-pipeline.md#id-placeholder-substitution);
   per-pipeline-kind config pre-flight scope with
   `run_complete(failed)` emission before phase 0 per
-  [`generation-pipeline.md → Config pre-flight validation`](../generation-pipeline.md#config-pre-flight-validation);
+  [`generation-pipeline.md → Config pre-flight validation`](../generation-pipeline.md#config-pre-flight-validation)
+  — needs two framework pieces M1 didn't ship: phases declaring their
+  resolver inputs (a `Pipeline` / `PhaseNode` addition; M1 phases are
+  opaque generators) and the agent→profile→provider resolution chain
+  (M1's `lib/ai/model.ts` resolves only an explicit `providerId` and
+  `modelId`);
   crash-recovery modal (`pendingRecoveryReport` slot, boot
   ordering migrations → stores → recovery → render, loading screen until render) per
   [`generation-pipeline.md → Recovery modal`](../generation-pipeline.md#recovery-modal);
