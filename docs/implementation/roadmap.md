@@ -382,11 +382,12 @@ companions.
   tab) already exists from M4.3. Per-chapter `retrieval_count`
   reset under the chapter-close `action_id` (paired with M3.4's
   per-injection increment). This is the first real `chainsTo`
-  consumer (per-turn → chapter-close), so the orchestrator's
-  `commitRun` must execute the chained successor and thread its
-  fresh `actionId` and active-run pointer through the transition —
-  Slice 1.5b ships only the synchronous store transition and clears
-  both at commit.
+  consumer (per-turn → chapter-close): M5.2 declares per-turn's
+  `chainsTo` predicate and builds the chapter-close pipeline. The
+  orchestrator's chained-execution capability (driving the successor
+  through its own commit, threading its fresh `actionId` and
+  active-run pointer) already landed in 1.5a during post-M1
+  reconciliation, so M5.2 needs no orchestrator change.
 - M5.3 — Chapter timeline screen per
   [`docs/ui/screens/chapter-timeline/chapter-timeline.md`](../ui/screens/chapter-timeline/chapter-timeline.md);
   chapter delete routes through the deep-rollback surface (M5.5).

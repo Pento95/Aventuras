@@ -145,10 +145,31 @@ async function runNode(node: PhaseNode, run: RunState, ctx: RunCtx): Promise<Pha
   return result
 }
 
-async function commitRun(run: RunState, ctx: RunCtx): Promise<TxResult> {
+async function startChainedSuccessor(run: RunState, ctx: RunCtx): Promise<void> {
+  await ctx.db.insert(pipelineRuns).values({
+    runId: run.runId,
+    kind: run.kind,
+    actionId: run.actionId,
+    storyId: ctx.storyId,
+    startedAt: Date.now(),
+  })
+  domain.setActiveRun(run.runId)
+  setCurrentActionId(run.actionId)
+  turnCaptureSink.beginTurn({ actionId: run.actionId, branchId: run.branchId })
+  pipelineEventBus.emit({
+    type: 'run_start',
+    runId: run.runId,
+    kind: run.kind,
+    actionId: run.actionId,
+  })
+}
+
+async function commitRun(
+  run: RunState,
+  ctx: RunCtx,
+): Promise<{ tx: TxResult; successor?: RunState }> {
   const pipeline = getPipeline(run.kind)
-  const nextKind = pipeline.chainsTo?.(run, undefined) ?? null
-  // TODO :Chained execution is not yet implemented
+  const nextKind = pipeline.chainsTo?.(run) ?? null
   const successor = nextKind ? newRunState(nextKind, ctx) : undefined
   domain.finishRun(run.runId, successor)
   try {
@@ -176,7 +197,7 @@ async function commitRun(run: RunState, ctx: RunCtx): Promise<TxResult> {
     actionId: run.actionId,
     outcome: 'completed',
   })
-  return { runId: run.runId, actionId: run.actionId, outcome: 'completed' }
+  return { tx: { runId: run.runId, actionId: run.actionId, outcome: 'completed' }, successor }
 }
 
 async function abortRun(
@@ -224,22 +245,44 @@ async function abortRun(
   return { runId: run.runId, actionId: run.actionId, outcome, ...(error ? { error } : {}) }
 }
 
-export async function runPipeline(kind: string, ctx: RunCtx): Promise<TxResult> {
-  const pipeline = getPipeline(kind)
-  const run = await beginRun(kind, ctx)
+type AbortCause = { reason: 'user-cancel' | 'phase-failure'; error?: PipelineError }
+type PhaseOutcome = { kind: 'completed' } | { kind: 'aborted'; cause: AbortCause }
+
+async function runPhases(run: RunState, ctx: RunCtx): Promise<PhaseOutcome> {
+  const pipeline = getPipeline(run.kind)
   try {
     for (const node of pipeline.phases) {
       const result = await runNode(node, run, ctx)
       if (result.status === 'failed')
-        return abortRun(run, ctx, { reason: 'phase-failure', error: result.error })
-      if (result.status === 'aborted') return abortRun(run, ctx, { reason: 'user-cancel' })
+        return { kind: 'aborted', cause: { reason: 'phase-failure', error: result.error } }
+      if (result.status === 'aborted') return { kind: 'aborted', cause: { reason: 'user-cancel' } }
     }
   } catch (e) {
     const error: PipelineError =
       e instanceof ActionLayerError
         ? { kind: 'action-layer', detail: e.detail }
         : { kind: 'orchestrator', detail: e instanceof Error ? e.message : String(e) }
-    return abortRun(run, ctx, { reason: 'phase-failure', error })
+    return { kind: 'aborted', cause: { reason: 'phase-failure', error } }
   }
-  return commitRun(run, ctx)
+  return { kind: 'completed' }
+}
+
+export async function runPipeline(kind: string, ctx: RunCtx): Promise<TxResult> {
+  let run = await beginRun(kind, ctx)
+  // Drive the run; on a chained commit, drive the successor too. The whole chain is
+  // awaited, but the caller gets the ORIGIN run's result — downstream chain outcomes
+  // are observed on the event bus, not the return value.
+  let originResult: TxResult | undefined
+  for (;;) {
+    const outcome = await runPhases(run, ctx)
+    if (outcome.kind === 'aborted') {
+      const tx = await abortRun(run, ctx, outcome.cause)
+      return originResult ?? tx
+    }
+    const { tx, successor } = await commitRun(run, ctx)
+    originResult ??= tx
+    if (!successor) return originResult
+    await startChainedSuccessor(successor, ctx)
+    run = successor
+  }
 }

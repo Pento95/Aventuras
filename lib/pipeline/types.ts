@@ -51,7 +51,7 @@ export type Pipeline = {
   affordance: 'invisible' | 'pill-only' | 'pill-and-banner'
   gateBehavior: 'hard-gate' | 'no-gate'
   concurrencyPolicy: ConcurrencyPolicy
-  chainsTo?: (run: RunState, app: unknown) => string | null
+  chainsTo?: (run: RunState) => string | null
 }
 
 export type TxResult = {

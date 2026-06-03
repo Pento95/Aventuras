@@ -302,9 +302,13 @@ cross-branch concurrency is parked.
   here per spec (Path B for `stream_chunk` events) but no UI
   consumes streaming chunks yet, and no streaming phase runs
   until the stub lands in 1.5b.
-- Chained pipelines (`chainsTo`). The framework supports the
-  declaration and the synchronous transition; no concrete chain
-  runs.
+- Concrete `chainsTo` predicates and the kinds they target
+  (per-turn → chapter-close ships with M5.2). No concrete kind
+  declares `chainsTo` in M1, so no real chain runs. The framework's
+  chained-execution capability — declaration, synchronous transition,
+  and driving the successor to its own commit — is complete; the last
+  of these landed in post-M1 reconciliation (see
+  [Implementation notes](#implementation-notes)).
 - Cross-branch concurrency. Single-writer-per-branch invariant
   holds for v1; the ambient `actionId` module-level slot is
   sufficient under that invariant.
@@ -359,8 +363,13 @@ cross-branch concurrency is parked.
 - **Generation store namespace shape.** Fixture import via the
   namespace; deep-import of the raw handle expected to fail
   lint.
-- **Chained-transition synchronicity.** Synchronous `txState`
-  read after a chained `commitRun` shows the successor present.
+- **Chained execution.** A synthetic `pred` declaring
+  `chainsTo: () => 'succ'` drives `succ` to completion: both markers
+  finalize `completed`, `run_start` / `run_complete` fire for both in
+  order, the map clears, and at the instant `pred` completes a
+  hard-gate `succ` is already present (no-edit-window invariant). A
+  failing successor reverse-replays only its own deltas; the
+  predecessor stays committed.
 - **Public-API surfaces.** Fixture files import only via each
   module's `index.ts`; deep-import attempts fail lint.
 
@@ -469,3 +478,22 @@ ID generation, ambient lint guardrail)._
   not verified.** vitest cannot exercise the Electron IPC
   concurrency path; the `deltas_log_position_uniq` index is the
   correctness backstop. Cover in 1.5b's fault scenarios.
+
+### Post-M1 reconciliation
+
+- **Chained execution completed (was scope:out).** 2026-06-03. The
+  original brief shipped only the synchronous store transition
+  (predecessor-remove + successor-add in one `setState`) and parked
+  the successor unexecuted, deferring execution to M5.2. The
+  orchestrator now drives the chained successor to its own
+  commit/abort: `runPipeline` loops over commits, `commitRun` returns
+  the successor, and `startChainedSuccessor` brings it live (marker
+  row, active pointers, turn capture, `run_start`) before its phases
+  run — marker-before-phases so a mid-chain crash recovers by the
+  successor's own `actionId`. `runPipeline` awaits the whole chain and
+  returns the origin run's `TxResult`; downstream outcomes are
+  bus-observable. `chainsTo` narrowed to
+  `(run: RunState) => string | null` (dropped the `app` arg) — the
+  predicate sources its own deps at the definition site, keeping the
+  orchestrator agnostic to app state. Still out: concrete predicates
+  and kinds; "no concrete chain runs" holds in M1.

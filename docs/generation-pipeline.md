@@ -61,7 +61,7 @@ interface Pipeline {
   affordance: 'invisible' | 'pill-only' | 'pill-and-banner'
   gateBehavior: 'hard-gate' | 'no-gate' // 'scoped-gate' deferred
   concurrencyPolicy: ConcurrencyPolicy
-  chainsTo?: (run: RunState, app: AppState) => string | null
+  chainsTo?: (run: RunState) => string | null // consulted at commit; sources its own deps
 }
 
 export const pipelines: ReadonlyMap<string, Pipeline>
@@ -1060,16 +1060,24 @@ const perTurnPipeline: Pipeline = {
   gateBehavior: 'hard-gate',
   affordance: 'pill-and-banner',
   concurrencyPolicy: { blockedBy: ['per-turn', 'chapter-close'] },
-  chainsTo: (run, app) => {
-    const tokens = computeTokensSinceLastChapter(app.story)
-    return tokens >= app.story.settings.chapterCloseThreshold
+  chainsTo: (run) => {
+    const story = getStory(run.storyId)
+    const tokens = openRegionTokens(run.branchId)
+    return tokens >= story.settings.chapterTokenThreshold && story.settings.chapterAutoClose
       ? 'chapter-close'
       : null
   },
 }
 ```
 
-Reading per-turn's declaration tells you what it chains to.
+Reading per-turn's declaration tells you what it chains to. The
+predicate takes only `run` and sources its own dependencies (story
+settings, the open-region token count) at the definition site, read
+synchronously at commit — the orchestrator passes nothing but `run`
+and stays agnostic to app state. `chapterAutoClose = false` makes it
+return `null` even past threshold (the close is surfaced as a manual
+affordance instead); manual close is a direct `chapter-close` dispatch,
+not a chain.
 
 The chained chapter-close generates its **own fresh `actionId`** —
 per-turn's deltas and chapter-close's deltas are independently
@@ -1081,7 +1089,7 @@ per-turn. No intermediates inherit.
 ```ts
 function commitRun(run: RunState): void {
   const pipeline = pipelines.get(run.kind)!
-  const nextKind = pipeline.chainsTo?.(run, getAppState())
+  const nextKind = pipeline.chainsTo?.(run)
 
   useGenerationStore.setState((s) => {
     const runs = new Map(s.txState.runs)
@@ -1102,6 +1110,13 @@ successor addition there's no async boundary, no microtask, no
 React render. The gate-blocking selector evaluates against the
 new `txState` (still has a hard-gate run present) on the next
 render. User edit window: zero.
+
+The swap only _places_ the successor; the orchestrator then begins it
+(its own marker row, fresh `actionId`, active-run pointer, `run_start`)
+and drives its phases to its own commit/abort — see
+[Run state transitions](#run-state-transitions). `runPipeline` awaits the whole chain
+and returns the **origin** run's result; downstream chain outcomes are
+observed on the event bus, not the return value.
 
 (Invariant depends on Zustand's setState being synchronous; pin
 in tests if a state-library swap ever happens.)

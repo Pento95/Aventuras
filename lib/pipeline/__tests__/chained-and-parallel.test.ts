@@ -1,8 +1,15 @@
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { type PipelineAction } from '@/lib/actions'
-import { deltas, storyEntries } from '@/lib/db'
-import { definePipeline, runPipeline, type PhaseResult } from '@/lib/pipeline'
+import { deltas, pipelineRuns, storyEntries } from '@/lib/db'
+import {
+  definePipeline,
+  isUserEditBlocked,
+  pipelineEventBus,
+  runPipeline,
+  type PhaseResult,
+} from '@/lib/pipeline'
 import { domain } from '@/lib/stores'
 
 import { makeHarness, resetSingletons } from './harness'
@@ -26,12 +33,19 @@ function createEntry(id: string): { type: 'delta_emitted'; action: PipelineActio
   }
 }
 
+async function* entryThen(
+  id: string,
+  outcome: PhaseResult,
+): AsyncGenerator<ReturnType<typeof createEntry>, PhaseResult> {
+  yield createEntry(id)
+  return outcome
+}
+
 describe('chained transition', () => {
   beforeEach(() => resetSingletons())
   afterEach(() => resetSingletons())
 
-  it('leaves the successor present in txState with no empty intermediate', async () => {
-    const { ctx } = await makeHarness()
+  function defineChain(): void {
     definePipeline({ kind: 'succ', phases: [{ name: 'p', run: noop }], ...base })
     definePipeline({
       kind: 'pred',
@@ -39,11 +53,77 @@ describe('chained transition', () => {
       chainsTo: () => 'succ',
       ...base,
     })
+  }
+
+  it('drives the chained successor to completion and clears the map', async () => {
+    const { db, ctx } = await makeHarness()
+    defineChain()
+
+    const starts: string[] = []
+    const completes: string[] = []
+    const offStart = pipelineEventBus.subscribe('run_start', (e) => starts.push(e.kind))
+    const offComplete = pipelineEventBus.subscribe('run_complete', (e) => completes.push(e.kind))
+    const result = await runPipeline('pred', ctx)
+    offStart()
+    offComplete()
+
+    expect(result.outcome).toBe('completed')
+    // returns the ORIGIN run's result, not the successor's
+    const [originRow] = await db
+      .select()
+      .from(pipelineRuns)
+      .where(eq(pipelineRuns.runId, result.runId))
+    expect(originRow.kind).toBe('pred')
+
+    expect(starts).toEqual(['pred', 'succ']) // both ran, predecessor first
+    expect(completes).toEqual(['pred', 'succ'])
+
+    const rows = await db.select().from(pipelineRuns)
+    expect(rows.length).toBe(2)
+    expect(rows.every((r) => r.outcome === 'completed' && r.finishedAt !== null)).toBe(true)
+
+    expect(domain.getTxState().runs.size).toBe(0) // successor executed and cleared
+  })
+
+  it('keeps a hard-gate run present across the transition (no edit window)', async () => {
+    const { ctx } = await makeHarness()
+    defineChain()
+
+    let blockedAtPredComplete: boolean | null = null
+    const off = pipelineEventBus.subscribe('run_complete', (e) => {
+      if (e.kind === 'pred') blockedAtPredComplete = isUserEditBlocked(domain.getTxState())
+    })
+    await runPipeline('pred', ctx)
+    off()
+
+    // at the instant pred completes, the hard-gate successor is already swapped in
+    expect(blockedAtPredComplete).toBe(true)
+  })
+
+  it('a failing successor reverses only its own deltas; predecessor stays committed', async () => {
+    const { db, ctx } = await makeHarness()
+    const succFail: PhaseResult = {
+      status: 'failed',
+      error: { kind: 'phase-logic', detail: 'succ fail' },
+    }
+    definePipeline({
+      kind: 'succ',
+      phases: [{ name: 'p', run: () => entryThen('entry_succ', succFail) }],
+      ...base,
+    })
+    definePipeline({
+      kind: 'pred',
+      phases: [{ name: 'p', run: () => entryThen('entry_pred', { status: 'completed' }) }],
+      chainsTo: () => 'succ',
+      ...base,
+    })
 
     const result = await runPipeline('pred', ctx)
-    expect(result.outcome).toBe('completed')
-    const runs = [...domain.getTxState().runs.values()]
-    expect(runs.map((r) => r.kind)).toEqual(['succ']) // predecessor gone, successor present
+
+    expect(result.outcome).toBe('completed') // origin (pred) committed
+    const entries = await db.select().from(storyEntries)
+    expect(entries.map((e) => e.id)).toEqual(['entry_pred']) // succ's entry reversed
+    expect(domain.getTxState().runs.size).toBe(0)
   })
 })
 
