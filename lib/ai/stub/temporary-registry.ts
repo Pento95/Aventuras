@@ -1,18 +1,18 @@
 import { setHttpCallKnownSecretValues } from '@/lib/diagnostics'
 
-import type { ProviderInstance } from '../types'
+import type { ProviderInstanceWithStub } from '../types'
 
-let providers: ProviderInstance[] = []
+let providers: ProviderInstanceWithStub[] = []
 
 function syncProviderSecrets(): void {
   setHttpCallKnownSecretValues(providers.map((provider) => provider.apiKey))
 }
 
-export function findTemporaryProvider(providerId: string): ProviderInstance | undefined {
+export function findTemporaryProvider(providerId: string): ProviderInstanceWithStub | undefined {
   return providers.find((provider) => provider.id === providerId)
 }
 
-export function setTemporaryProvidersForTests(nextProviders: ProviderInstance[]): void {
+export function setTemporaryProvidersForTests(nextProviders: ProviderInstanceWithStub[]): void {
   providers = [...nextProviders]
   syncProviderSecrets()
 }

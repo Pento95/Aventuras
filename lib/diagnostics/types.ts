@@ -11,8 +11,6 @@ export type LogEntry = {
   actionId?: string
 }
 
-// Stub shapes from docs/observability.md so slices 1.4 / 1.5 have a target to
-// fill. Canonical spec wins if these gain fields during 1.4 / 1.5 authoring.
 export type HttpCall = {
   id: string
   startedAt: number

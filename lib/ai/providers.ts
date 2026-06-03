@@ -5,11 +5,14 @@ import { getCurrentActionId } from '@/lib/diagnostics'
 
 import { makeScenarioFetch, type StubScenario } from './stub/scenarios'
 import { createFetchWithCapture } from './transport/fetch'
-import type { ProviderInstance } from './types'
+import { type ProviderInstanceWithStub } from './types'
 
 type AnthropicModelId = Parameters<AnthropicProvider>[0]
 
-export function createProviderModel(provider: ProviderInstance, modelId: string): LanguageModel {
+export function createProviderModel(
+  provider: ProviderInstanceWithStub,
+  modelId: string,
+): LanguageModel {
   switch (provider.type) {
     case 'anthropic': {
       const anthropic = createAnthropic({

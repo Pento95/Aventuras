@@ -1,8 +1,5 @@
 import { z } from 'zod'
 
-// Source of truth for story_entries.metadata. z.infer feeds the drizzle column
-// $type so the row type derives from this one definition (no duplication).
-// Shape per docs/data-model.md → Entry metadata shape.
 export const entryMetadataSchema = z.object({
   tokens: z
     .object({ prompt: z.number(), completion: z.number(), reasoning: z.number().optional() })

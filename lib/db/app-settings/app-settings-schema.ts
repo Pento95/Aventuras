@@ -1,10 +1,5 @@
 import { z } from 'zod'
 
-// Source of truth for the app_settings JSON columns. z.infer feeds the drizzle
-// column $type so the row type derives from these definitions (no duplication),
-// and the parse runs at the DB->memory boundary (the $type cast is unchecked).
-// Shapes per docs/data-model.md -> "Provider instances" / "Profiles".
-
 const providerCapabilitiesSchema = z.object({
   reasoning: z.boolean().optional(),
   structuredOutput: z.boolean().optional(),

@@ -106,7 +106,6 @@ function useGeneration<T>(selector: (s: { txState: TxState }) => T): T {
 
 const api = generationStore.getState()
 
-// Package-private raw handle stays unexported from lib/stores/index.ts.
 export const generation = {
   useGeneration,
   getTxState,

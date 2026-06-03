@@ -1,12 +1,12 @@
 import { and, desc, eq } from 'drizzle-orm'
 
-import { deltas } from '@/lib/db'
 import type { Delta, SqlOp } from '@/lib/db'
+import { deltas } from '@/lib/db'
 
+import type { DbCtx } from '../types'
 import { applyUndoPayload } from './delta-encoding'
-import { COLUMN_SCHEMAS, TARGET_TABLES } from './registries'
 import type { TargetTableDescriptor } from './registries'
-import type { DbCtx } from './types'
+import { COLUMN_SCHEMAS, TARGET_TABLES } from './registries'
 
 export class DeltaReplayError extends Error {
   readonly actionId: string

@@ -7,12 +7,12 @@ import { type BootHydrateResult, hydrateAppSettings } from './app-settings'
 
 type AnyDb = BaseSQLiteDatabase<'sync' | 'async', unknown, Record<string, unknown>>
 
-export function readAppSettingsRow(database: AnyDb = db): Promise<unknown> {
-  return database
+export async function readAppSettingsRow(database: AnyDb = db): Promise<unknown> {
+  const rows = await database
     .select()
     .from(appSettingsTable)
     .where(eq(appSettingsTable.id, APP_SETTINGS_SINGLETON_ID))
-    .then((rows) => rows[0])
+  return rows[0]
 }
 
 export function rehydrateAppSettings(database: AnyDb = db): Promise<BootHydrateResult> {

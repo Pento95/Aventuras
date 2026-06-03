@@ -31,9 +31,6 @@ export const diagnosticsStore = createStore<DiagnosticsState>()((set) => ({
   __reset: () => set({ ...emptySlices }),
 }))
 
-// "Off means off": the master-toggle off-write clears all three in-memory ring
-// buffers atomically (observability spec). Persisted probe_captures untouched.
-// Decoupled from the gate — the gate now lives in lib/diagnostics/gate.ts.
 export function clearBuffers(): void {
   diagnosticsStore.setState({ logEntries: [], httpCalls: [], turnCaptures: [] })
 }
@@ -49,4 +46,4 @@ export function getDiagnosticsSnapshot(): DiagnosticsReadState {
   return { logEntries: s.logEntries, httpCalls: s.httpCalls, turnCaptures: s.turnCaptures }
 }
 
-export type { DiagnosticsState, DiagnosticsReadState }
+export type { DiagnosticsReadState, DiagnosticsState }

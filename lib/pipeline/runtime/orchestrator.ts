@@ -17,9 +17,9 @@ import {
 import { generateId } from '@/lib/ids'
 import { domain, type RunState } from '@/lib/stores'
 
-import { pipelineEventBus } from './event-bus'
 import { getPipeline } from '../authoring/registry'
 import type { PhaseEmittedEvent, PhaseNode, PhaseResult, PipelineError, TxResult } from '../types'
+import { pipelineEventBus } from './event-bus'
 
 class ActionLayerError extends Error {
   readonly detail: string
@@ -148,8 +148,7 @@ async function runNode(node: PhaseNode, run: RunState, ctx: RunCtx): Promise<Pha
 async function commitRun(run: RunState, ctx: RunCtx): Promise<TxResult> {
   const pipeline = getPipeline(run.kind)
   const nextKind = pipeline.chainsTo?.(run, undefined) ?? null
-  // Chained execution is parked (Scope:out); 1.5a performs only the synchronous
-  // store transition so the gate stays closed across the boundary.
+  // TODO :Chained execution is not yet implemented
   const successor = nextKind ? newRunState(nextKind, ctx) : undefined
   domain.finishRun(run.runId, successor)
   try {
@@ -159,8 +158,7 @@ async function commitRun(run: RunState, ctx: RunCtx): Promise<TxResult> {
       .where(eq(pipelineRuns.runId, run.runId))
   } catch (e) {
     // The run's writes already committed; a failed marker leaves an orphan that
-    // boot recovery reconciles. Finish cleanly regardless — the ambient actionId
-    // and active-run slot must never leak into the next run.
+    // boot recovery reconciles. Finish cleanly regardless.
     logger.error('pipeline.marker_write_failed', {
       runId: run.runId,
       outcome: 'completed',

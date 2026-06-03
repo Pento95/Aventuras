@@ -5,10 +5,10 @@ import { app, BrowserWindow, ipcMain, net, protocol, shell } from 'electron'
 
 import {
   exec as dbExec,
-  getDbFilePath,
-  initDb,
   query as dbQuery,
   transaction as dbTransaction,
+  getDbFilePath,
+  initDb,
 } from './db/service'
 import type { DbProxyMethod } from './db/types'
 
@@ -82,7 +82,6 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   await initDb()
   registerBundleProtocol()
-  ipcMain.handle('native:ping', () => 'pong')
   ipcMain.handle('native:reveal-db-file', () => {
     shell.showItemInFolder(getDbFilePath())
   })

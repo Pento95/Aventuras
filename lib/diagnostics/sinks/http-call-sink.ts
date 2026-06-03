@@ -1,8 +1,9 @@
+import { ulid } from 'ulid'
+
 import { redactHeaders, redactResponseHeaders, redactUrl } from './http-redaction'
 import { isDiagnosticsEnabled } from '../core/gate'
 import { loggerWithoutTurn } from '../core/logger'
 import { diagnosticsStore } from '../core/store'
-import { ulid } from '../core/ulid'
 import type { HttpCall } from '../types'
 
 const HTTP_CALLS_CAP = 200

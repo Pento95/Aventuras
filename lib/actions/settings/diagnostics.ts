@@ -6,9 +6,6 @@ import { domain, rehydrateAppSettings } from '@/lib/stores'
 
 import type { SettingsActionCtx } from './types'
 
-// Persist a merged diagnostics object, then re-hydrate the mirror from SQLite
-// (canonical). The current value comes from the hydrated store — the action's
-// only caller is the settings UI, where the store is live post-boot.
 async function persist(ctx: SettingsActionCtx, next: AppSettingsDiagnostics): Promise<void> {
   await ctx.db
     .update(appSettings)

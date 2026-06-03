@@ -50,9 +50,6 @@ export type BootHydrateResult = { status: 'ok' } | { status: 'config-corrupt'; e
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err))
 
-// A read throw (unparseable JSON column) is treated as config corruption, not a
-// transient miss — halting at the recovery screen beats silently defaulting away
-// providers/keys. `read` is injected so the core is sqlite-free under test.
 export async function hydrateAppSettings(read: () => Promise<unknown>): Promise<BootHydrateResult> {
   let raw: unknown
   try {

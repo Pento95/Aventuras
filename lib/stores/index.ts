@@ -2,11 +2,8 @@ import { appSettings } from './domain/app-settings'
 import { generation } from './domain/generation'
 import { navigation } from './domain/navigation'
 
-// Namespaced public API. Raw store handles (generationStore, appSettingsStore,
-// navigationStore) are never exported — the namespace shape is what prevents
-// setState from outside the module.
 export const domain = {
-  // generation (Slice 1.5a)
+  // generation
   useGeneration: generation.useGeneration,
   getTxState: generation.getTxState,
   getPerTurnContext: generation.getPerTurnContext,
@@ -17,10 +14,10 @@ export const domain = {
   recordPhaseResult: generation.recordPhaseResult,
   finishRun: generation.finishRun,
   abortRun: generation.abortRun,
-  // app-settings read-model (Slice 1.6)
+  // app-settings read
   useAppSettings: appSettings.useAppSettings,
   getAppSettings: appSettings.getAppSettings,
-  // navigation (Slice 1.6)
+  // navigation
   useNavigation: navigation.useNavigation,
   getNavigation: navigation.getNavigation,
   setCurrentStory: navigation.setCurrentStory,
@@ -38,6 +35,6 @@ export const ui = {}
 export { hydrateAppSettings } from './domain/app-settings'
 export { readAppSettingsRow, rehydrateAppSettings } from './domain/app-settings-read'
 
-export type { PerTurnContext, RunState, TxState } from './domain/generation'
 export type { AppSettingsSnapshot, BootHydrateResult } from './domain/app-settings'
+export type { PerTurnContext, RunState, TxState } from './domain/generation'
 export type { NavigationSnapshot } from './domain/navigation'

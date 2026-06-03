@@ -1,8 +1,3 @@
-// Singleton Toast store. Custom emitter (instead of Zustand) keeps
-// the surface tiny — three actions, one subscription primitive — and
-// avoids pulling Zustand in for one consumer. Toaster mounts once at
-// the app root, subscribes to changes, and renders the queue.
-
 export type ToastSeverity = 'success' | 'error' | 'info' | 'warning'
 
 // Optional single-action affordance rendered inline before the × close.
@@ -33,8 +28,6 @@ function notify() {
 }
 
 function show(severity: ToastSeverity, message: string, options?: ToastOptions): string {
-  // Stable per-process IDs are good enough for a transient queue;
-  // we never persist or reconcile toasts across reloads.
   const id = `toast-${++nextId}`
   const item: ToastItem = {
     id,
@@ -43,9 +36,7 @@ function show(severity: ToastSeverity, message: string, options?: ToastOptions):
     ...(options?.action ? { action: options.action } : {}),
   }
 
-  // Cap-3 queue: when full, drop the oldest. The Toast component's
-  // own auto-dismiss timer otherwise runs to completion; here we
-  // unmount it ahead of schedule so the new arrival has a slot.
+  // Cap queue. When full, drop the oldest.
   if (toasts.length >= QUEUE_CAP) {
     toasts = [...toasts.slice(1), item]
   } else {

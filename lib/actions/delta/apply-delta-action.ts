@@ -1,12 +1,12 @@
 import { and, eq, sql } from 'drizzle-orm'
 
-import { deltas, storyEntries } from '@/lib/db'
 import type { SqlOp } from '@/lib/db'
+import { deltas, storyEntries } from '@/lib/db'
 import { generateId } from '@/lib/ids'
 
+import type { DbCtx, MutationResult, PipelineAction } from '../types'
 import { computeUndoPayload } from './delta-encoding'
 import { COLUMN_SCHEMAS } from './registries'
-import type { DbCtx, MutationResult, PipelineAction } from './types'
 
 type Args = { action: PipelineAction; actionId: string; branchId: string; entryId?: string | null }
 
@@ -28,40 +28,44 @@ export async function applyDeltaAction(args: Args, ctx: DbCtx): Promise<Mutation
   let op: 'create' | 'update' | 'delete'
   let undoPayload: Record<string, unknown> | null
 
-  if (action.kind === 'createStoryEntry') {
-    const { entry } = action.payload
-    targetTable = 'story_entries'
-    targetId = entry.id
-    op = 'create'
-    undoPayload = null
-    ops.push(ctx.db.insert(storyEntries).values(entry).toSQL())
-  } else if (action.kind === 'updateStoryEntryMetadata') {
-    const { branchId: bid, id, metadata } = action.payload
-    targetTable = 'story_entries'
-    targetId = id
-    op = 'update'
-    const [current] = await ctx.db
-      .select()
-      .from(storyEntries)
-      .where(and(eq(storyEntries.branchId, bid), eq(storyEntries.id, id)))
-    if (!current) {
-      return { status: 'rejected', reason: `update target story_entries ${bid}:${id} not found` }
-    }
-    const before = (current.metadata ?? {}) as Record<string, unknown>
-    // Column-keyed: reverse-replay iterates undo_payload's top-level keys as
-    // target columns. metadata is the column; the inner object is its partial.
-    undoPayload = {
-      metadata: computeUndoPayload(COLUMN_SCHEMAS.story_entries.metadata, before, metadata),
-    }
-    ops.push(
-      ctx.db
-        .update(storyEntries)
-        .set({ metadata })
+  switch (action.kind) {
+    case 'createStoryEntry':
+      const { entry } = action.payload
+      targetTable = 'story_entries'
+      targetId = entry.id
+      op = 'create'
+      undoPayload = null
+      ops.push(ctx.db.insert(storyEntries).values(entry).toSQL())
+      break
+    case 'updateStoryEntryMetadata':
+      const { branchId: bid, id, metadata } = action.payload
+      targetTable = 'story_entries'
+      targetId = id
+      op = 'update'
+      const [current] = await ctx.db
+        .select()
+        .from(storyEntries)
         .where(and(eq(storyEntries.branchId, bid), eq(storyEntries.id, id)))
-        .toSQL(),
-    )
-  } else {
-    return assertNever(action)
+      if (!current) {
+        return { status: 'rejected', reason: `update target story_entries ${bid}:${id} not found` }
+      }
+      const before = (current.metadata ?? {}) as Record<string, unknown>
+      // Column-keyed: reverse-replay iterates undo_payload's top-level keys as
+      // target columns. metadata is the column; the inner object is its partial.
+      undoPayload = {
+        metadata: computeUndoPayload(COLUMN_SCHEMAS.story_entries.metadata, before, metadata),
+      }
+      ops.push(
+        ctx.db
+          .update(storyEntries)
+          .set({ metadata })
+          .where(and(eq(storyEntries.branchId, bid), eq(storyEntries.id, id)))
+          .toSQL(),
+      )
+      break
+
+    default:
+      return assertNever(action)
   }
 
   const deltaId = generateId('delta')
@@ -87,7 +91,7 @@ export async function applyDeltaAction(args: Args, ctx: DbCtx): Promise<Mutation
 
   await ctx.runInTransaction(ops)
 
-  // Read back by this delta's own id (not actionId): a multi-delta action shares
+  // Read back by this delta's own id: a multi-delta action shares
   // one actionId, so an actionId lookup would return an arbitrary row's position.
   const [row] = await ctx.db
     .select({ lp: deltas.logPosition })

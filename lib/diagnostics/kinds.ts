@@ -1,5 +1,3 @@
-// Source of truth for the log-kind namespace. Adding a subsystem is a one-line
-// change here; the Logs-tab UI iterates this union directly (slice 1.4+).
 export type LogSubsystem =
   | 'pipeline'
   | 'action_layer'

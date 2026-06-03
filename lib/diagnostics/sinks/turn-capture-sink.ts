@@ -31,7 +31,7 @@ export const turnCaptureSink = {
       const evictIdx = state.turnCaptures.findIndex((t) => t.endedAt !== undefined)
       if (evictIdx === -1) {
         // All 100 slots are in-flight; dropping new turn is safer than evicting live runs.
-        // warn (not debug): the only signal for a dropped turn — debug is gated off by default.
+        // warn: the only signal for a dropped turn.
         loggerWithoutTurn.warn('pipeline.turn_capture_buffer_full', { cap: TURN_CAPTURES_CAP })
         return {}
       }

@@ -1,9 +1,10 @@
+import { ulid } from 'ulid'
+
+import { EVENT_NAME_REGEX, eventNameOf, type LogKind } from '../kinds'
+import type { LogEntry, LogLevel } from '../types'
 import { getCurrentActionId } from './ambient-action-id'
 import { isDiagnosticsDebugEnabled, isDiagnosticsEnabled } from './gate'
-import { EVENT_NAME_REGEX, eventNameOf, type LogKind } from '../kinds'
 import { diagnosticsStore } from './store'
-import type { LogEntry, LogLevel } from '../types'
-import { ulid } from './ulid'
 
 // Run dev-only drift checks unless this is explicitly a production build. Node
 // (vitest) leaves __DEV__ undefined, so the check runs there too.

@@ -5,10 +5,6 @@ import { type BootHydrateResult, rehydrateAppSettings } from '@/lib/stores'
 
 import type { SettingsActionCtx } from './types'
 
-// Boot-recovery action: overwrite the singleton's config + diagnostics columns
-// with defaults (the corrupt row already exists), then re-hydrate. Destructive
-// to providers/keys — only ever invoked from the recovery screen's explicit
-// Reset, never automatically.
 export async function resetAppSettings(ctx: SettingsActionCtx): Promise<BootHydrateResult> {
   await ctx.db
     .update(appSettings)

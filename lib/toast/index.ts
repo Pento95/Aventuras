@@ -1,10 +1,3 @@
-// Imperative toast API. Reachable from anywhere — no context
-// plumbing. Mount `<Toaster />` once at the app root for the
-// queue to render.
-//
-// See [`docs/ui/patterns/toast.md`](../../docs/ui/patterns/toast.md)
-// for severity / placement / dismiss / queue contract.
-
 import { toastStore, type ToastOptions } from './store'
 
 export const toast = {

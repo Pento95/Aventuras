@@ -48,6 +48,7 @@ export async function recoverInFlightRuns(ctx: DbCtx): Promise<RecoveryReport> {
     } catch (e) {
       // Boot must never be blocked: any per-orphan failure (a DeltaReplayError, or
       // a transient DB error on the marker write) is logged and left for next boot.
+      // TODO: consider a stronger resolution to not polute the data, ie. deletion of orphaned data
       failures.push({ runId: orphan.runId, kind: orphan.kind, error: e })
       logger.error('pipeline.recovery_failed', {
         runId: orphan.runId,
