@@ -2,7 +2,6 @@ import { ulid } from 'ulid'
 
 import { EVENT_NAME_REGEX, eventNameOf, type LogKind } from '../kinds'
 import type { LogEntry, LogLevel } from '../types'
-import { getCurrentActionId } from './ambient-action-id'
 import { isDiagnosticsDebugEnabled, isDiagnosticsEnabled } from './gate'
 import { diagnosticsStore } from './store'
 
@@ -12,7 +11,7 @@ const runDriftCheck = typeof __DEV__ === 'undefined' || __DEV__
 
 type LogOpts = { actionId?: string }
 type LogFn = (kind: LogKind, fields?: Record<string, unknown>, opts?: LogOpts) => void
-type Logger = { error: LogFn; warn: LogFn; debug: LogFn }
+export type Logger = { error: LogFn; warn: LogFn; debug: LogFn }
 
 function emit(
   level: LogLevel,
@@ -48,16 +47,12 @@ function emit(
   }
 }
 
-function makeLogger(resolveActionId: () => string | undefined): Logger {
+export function makeLogger(actionId?: string): Logger {
   return {
-    error: (kind, fields = {}, opts) =>
-      emit('error', kind, fields, opts?.actionId ?? resolveActionId()),
-    warn: (kind, fields = {}, opts) =>
-      emit('warn', kind, fields, opts?.actionId ?? resolveActionId()),
-    debug: (kind, fields = {}, opts) =>
-      emit('debug', kind, fields, opts?.actionId ?? resolveActionId()),
+    error: (kind, fields = {}, opts) => emit('error', kind, fields, opts?.actionId ?? actionId),
+    warn: (kind, fields = {}, opts) => emit('warn', kind, fields, opts?.actionId ?? actionId),
+    debug: (kind, fields = {}, opts) => emit('debug', kind, fields, opts?.actionId ?? actionId),
   }
 }
 
-export const logger = makeLogger(getCurrentActionId)
-export const loggerWithoutTurn = makeLogger(() => undefined)
+export const logger = makeLogger()

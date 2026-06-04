@@ -3,7 +3,7 @@ import { httpCallSink } from '@/lib/diagnostics'
 type FetchWithCaptureOptions = {
   source: string
   fetchImpl?: typeof fetch
-  getActionId?: () => string | undefined
+  actionId?: string
 }
 
 function headersToRecord(headers: HeadersInit | undefined): Record<string, string> {
@@ -25,7 +25,7 @@ export function createFetchWithCapture(options: FetchWithCaptureOptions): typeof
   return async (input, init) => {
     const request = new Request(input, init)
     const requestBody = await captureRequestBody(request.clone())
-    const actionId = options.getActionId?.()
+    const { actionId } = options
     const id = httpCallSink.beginCall({
       method: request.method,
       url: request.url,

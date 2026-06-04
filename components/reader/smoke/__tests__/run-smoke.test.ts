@@ -7,7 +7,6 @@ import { createTestDb } from '@/lib/db/__tests__/test-db'
 import {
   __resetDiagnosticsGate,
   clearBuffers,
-  clearCurrentActionId,
   configureDiagnosticsGate,
   getDiagnosticsSnapshot,
 } from '@/lib/diagnostics'
@@ -22,7 +21,6 @@ beforeEach(() => {
   __resetRegistry()
   __resetBus()
   domain.__reset()
-  clearCurrentActionId()
   clearBuffers()
   resetTemporaryProvidersForTests()
   toastStore.__reset()

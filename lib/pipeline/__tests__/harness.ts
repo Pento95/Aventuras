@@ -1,6 +1,6 @@
 import { branches, stories } from '@/lib/db'
 import { createTestDb } from '@/lib/db/__tests__/test-db'
-import { clearBuffers, clearCurrentActionId, configureDiagnosticsGate } from '@/lib/diagnostics'
+import { clearBuffers, configureDiagnosticsGate } from '@/lib/diagnostics'
 import {
   __resetBus,
   __resetRegistry,
@@ -31,7 +31,6 @@ export function resetSingletons(): void {
   __resetRegistry()
   __resetBus()
   domain.__reset()
-  clearCurrentActionId()
   clearBuffers()
   configureDiagnosticsGate({ isEnabled: () => true, isDebugEnabled: () => true })
 }

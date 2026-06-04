@@ -19,4 +19,15 @@ slice-planning gate forces its resolution before that slice is planned.
 
 ## Inbox
 
-_Empty — nothing awaiting triage._
+- **`turnCaptureSink` captures per run, not per user turn** (faulty spec —
+  the name is the intent, the keying is the defect). The sink keys every
+  capture on `actionId` (`lib/diagnostics/sinks/turn-capture-sink.ts`), so
+  one capture = one pipeline run. But a user turn spans several runs — the
+  per-turn run, a chained chapter-close successor, and any periodic-classifier
+  passes each hold their own `actionId` — so one user-visible turn fragments
+  into 2–3 captures. Design revisit: re-key / group captures on the
+  originating story entry (+ branch) rather than `actionId`, likely riding on
+  a story-entry ↔ run linking mechanism (today the only cross-run linkage is
+  delta-level, via the survival anchor `deltas.entry_id`). Spec home:
+  [`observability.md`](../observability.md); becomes user-visible in the M7
+  memory-probe surface, where the fragmentation shows.

@@ -81,7 +81,7 @@ probe's existing rule, unrelated to this slice).
   - **Public API in `index.ts`**: `logger` (with
     `error` / `warn` / `debug` methods; threads the ambient
     `actionId` per
-    [`observability.md → Ambient actionId mechanism`](../../../../observability.md#ambient-actionid-mechanism));
+    [`observability.md → actionId threading`](../../../../observability.md#actionid-threading));
     `loggerWithoutTurn` (same methods, explicit no-turn paths
     only — boot, hydration, background workers outside any
     run); `useDiagnosticsStore` selectors for read-only access

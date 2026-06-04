@@ -43,7 +43,7 @@ explicit.
   — the shape of the phase the `'smoke'` kind defines.
 - [`docs/observability.md` → `httpCallSink`](../../../../observability.md#httpcallsink)
   — the entry the stub's call produces.
-- [`docs/observability.md` → Ambient actionId mechanism](../../../../observability.md#ambient-actionid-mechanism)
+- [`docs/observability.md` → actionId threading](../../../../observability.md#actionid-threading)
   — the join key threaded from the fetch wrapper through the call.
 - [`patterns/toast.md`](../../../../ui/patterns/toast.md) — the
   success / failure toast that proves the queue → mount path.

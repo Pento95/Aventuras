@@ -9,11 +9,12 @@ import {
 } from '@/lib/ai/stub/temporary-registry'
 import { callWithRetry, type CallRetryError } from '@/lib/ai/transport/call-with-retry'
 import { ProviderTimeoutError } from '@/lib/ai/transport/classify-provider-error'
-import { getCurrentActionId, getDiagnosticsSnapshot } from '@/lib/diagnostics'
+import { getDiagnosticsSnapshot } from '@/lib/diagnostics'
 import {
   definePipeline,
   pipelineEventBus,
   runPipeline,
+  type PhaseContext,
   type PhaseEmittedEvent,
   type PhaseFn,
   type PhaseResult,
@@ -41,9 +42,11 @@ function toPipelineError(e: CallRetryError): PipelineError {
 type Parsed = { reply?: string; refusal?: boolean }
 
 function stubPhase(scenario: StubScenario): PhaseFn {
-  return async function* (): AsyncGenerator<PhaseEmittedEvent, PhaseResult> {
-    const { abortSignal } = domain.getPerTurnContext()
-    const model = getModel('stub-1', scenario)
+  return async function* ({
+    actionId,
+    abortSignal,
+  }: PhaseContext): AsyncGenerator<PhaseEmittedEvent, PhaseResult> {
+    const model = getModel('stub-1', scenario, actionId)
     const treatRejectionAsTimeout = scenario === 'mid-stream-timeout'
 
     const callFn = async (signal: AbortSignal): Promise<string> => {
@@ -173,7 +176,6 @@ describe('stub fault scenarios', () => {
     off()
 
     expect(result.outcome).toBe('aborted')
-    expect(getCurrentActionId()).toBeUndefined()
     expect(getDiagnosticsSnapshot().logEntries.some((e) => e.kind === 'pipeline.run_aborted')).toBe(
       true,
     )

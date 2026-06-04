@@ -1,4 +1,3 @@
-export { getCurrentActionId } from '@/lib/diagnostics'
 export { definePhase, definePipeline } from './authoring/define'
 export { __resetRegistry, getPipeline, registerPipeline } from './authoring/registry'
 export { __resetBus, pipelineEventBus } from './runtime/event-bus'
@@ -8,6 +7,7 @@ export { recoverInFlightRuns } from './runtime/recovery'
 export type { RecoveredRun, RecoveryFailure, RecoveryReport } from './runtime/recovery'
 export type {
   ConcurrencyPolicy,
+  PhaseContext,
   PhaseEmittedEvent,
   PhaseFn,
   PhaseNode,

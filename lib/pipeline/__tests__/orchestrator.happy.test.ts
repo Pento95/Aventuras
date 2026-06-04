@@ -3,8 +3,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { type PipelineAction } from '@/lib/actions'
 import { deltas, pipelineRuns, storyEntries } from '@/lib/db'
-import { getCurrentActionId, getDiagnosticsSnapshot } from '@/lib/diagnostics'
-import { definePipeline, pipelineEventBus, runPipeline, type PhaseResult } from '@/lib/pipeline'
+import { getDiagnosticsSnapshot } from '@/lib/diagnostics'
+import {
+  definePipeline,
+  pipelineEventBus,
+  runPipeline,
+  type PhaseContext,
+  type PhaseResult,
+} from '@/lib/pipeline'
 import { domain } from '@/lib/stores'
 
 import { expectRan, makeHarness, resetSingletons } from './harness'
@@ -82,6 +88,19 @@ describe('orchestrator happy path', () => {
       (e) => e.kind === 'pipeline.recoverable_error',
     )
     expect(warn?.actionId).toBe(result.actionId)
-    expect(getCurrentActionId()).toBeUndefined()
+  })
+
+  it('a phase logs via ctx.log, attributed to its run', async () => {
+    const { ctx } = await makeHarness()
+    async function* logPhase(c: PhaseContext): AsyncGenerator<never, PhaseResult> {
+      c.log.debug('pipeline.phase_log', { marker: 'from-phase' })
+      return { status: 'completed' }
+    }
+    definePipeline({ kind: 'logs', phases: [{ name: 'p', run: logPhase }], ...base })
+    const result = expectRan(await runPipeline('logs', ctx))
+
+    const entry = getDiagnosticsSnapshot().logEntries.find((e) => e.fields.marker === 'from-phase')
+    expect(entry).toBeDefined()
+    expect(entry?.actionId).toBe(result.actionId)
   })
 })

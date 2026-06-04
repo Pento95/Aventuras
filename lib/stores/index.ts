@@ -6,9 +6,6 @@ export const domain = {
   // generation
   useGeneration: generation.useGeneration,
   getTxState: generation.getTxState,
-  getPerTurnContext: generation.getPerTurnContext,
-  setActiveRun: generation.setActiveRun,
-  clearActiveRun: generation.clearActiveRun,
   startRun: generation.startRun,
   setCurrentPhase: generation.setCurrentPhase,
   recordPhaseResult: generation.recordPhaseResult,
@@ -37,5 +34,5 @@ export { hydrateAppSettings } from './domain/app-settings'
 export { readAppSettingsRow, rehydrateAppSettings } from './domain/app-settings-read'
 
 export type { AppSettingsSnapshot, BootHydrateResult } from './domain/app-settings'
-export type { PerTurnContext, RunState, TxState } from './domain/generation'
+export type { RunState, TxState } from './domain/generation'
 export type { NavigationSnapshot } from './domain/navigation'

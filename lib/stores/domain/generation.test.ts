@@ -36,20 +36,6 @@ describe('generation store', () => {
     expect(runs.size).toBe(1)
   })
 
-  it('getPerTurnContext resolves the active run; throws once cleared', () => {
-    const r = run('run_2')
-    generation.startRun(r)
-    generation.setActiveRun('run_2')
-    const ctx = generation.getPerTurnContext()
-    expect(ctx.actionId).toBe('act_run_2')
-    expect(ctx.abortSignal.aborted).toBe(false)
-    r.abortController.abort()
-    expect(ctx.abortSignal.aborted).toBe(true) // by-reference
-
-    generation.clearActiveRun()
-    expect(() => generation.getPerTurnContext()).toThrow('no active run')
-  })
-
   it('raw store handle is module-internal (sanity)', () => {
     expect(typeof generationStore.getState).toBe('function')
   })

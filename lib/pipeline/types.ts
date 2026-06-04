@@ -1,4 +1,5 @@
 import type { PipelineAction } from '@/lib/actions'
+import type { Logger } from '@/lib/diagnostics'
 import type { RunState } from '@/lib/stores'
 
 export type PipelineError =
@@ -37,7 +38,15 @@ export type PipelineEvent =
   | { type: 'phase_complete'; runId: string; name: string; result: PhaseResult }
   | PhaseEmittedEvent
 
-export type PhaseFn = () => AsyncGenerator<PhaseEmittedEvent, PhaseResult>
+export type PhaseContext = {
+  actionId: string
+  abortSignal: AbortSignal
+  intermediates: Record<string, unknown>
+  // Run-bound logger so a phase's logs are turn-attributed without a global.
+  log: Logger
+}
+
+export type PhaseFn = (ctx: PhaseContext) => AsyncGenerator<PhaseEmittedEvent, PhaseResult>
 
 export type PhaseNode =
   | { name: string; run: PhaseFn }

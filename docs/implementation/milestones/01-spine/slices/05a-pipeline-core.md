@@ -132,7 +132,7 @@ cross-branch concurrency is parked.
   `encoding_version` semantics.
 - [`docs/observability.md` → `turnCaptureSink`](../../../../observability.md#turncapturesink)
   — sink contract, `TurnCapture` record shape, eviction rules.
-- [`docs/observability.md` → Ambient actionId mechanism](../../../../observability.md#ambient-actionid-mechanism)
+- [`docs/observability.md` → actionId threading](../../../../observability.md#actionid-threading)
   — contract requirement, threading expectations,
   lint-guardrail note.
 

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { type PipelineAction } from '@/lib/actions'
 import { pipelineRuns, storyEntries } from '@/lib/db'
-import { getCurrentActionId, getDiagnosticsSnapshot } from '@/lib/diagnostics'
+import { getDiagnosticsSnapshot } from '@/lib/diagnostics'
 import { definePipeline, runPipeline, type PhaseResult } from '@/lib/pipeline'
 import { domain } from '@/lib/stores'
 
@@ -82,10 +82,9 @@ describe('orchestrator hardening', () => {
     const [pr] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.runId, result.runId))
     expect(pr.outcome).toBe('failed')
     expect(pr.finishedAt).not.toBeNull()
-    expect(getCurrentActionId()).toBeUndefined() // ambient cleared
     const turn = getDiagnosticsSnapshot().turnCaptures.find((t) => t.actionId === result.actionId)
     expect(turn?.endedAt).toBeDefined() // turn finalized
-    expect(() => domain.getPerTurnContext()).toThrow('no active run') // active run released
+    expect(domain.getTxState().runs.size).toBe(0) // active run released
   })
 
   it('a rejected MutationResult routes to abortRun as an action-layer error', async () => {
@@ -96,7 +95,6 @@ describe('orchestrator hardening', () => {
 
     expect(result.outcome).toBe('failed')
     expect(result.error?.kind).toBe('action-layer')
-    expect(getCurrentActionId()).toBeUndefined()
   })
 
   it('a non-action throw from a phase body maps to an orchestrator error', async () => {
@@ -126,8 +124,7 @@ describe('orchestrator hardening', () => {
     const result = expectRan(await runPipeline('commitfail', { ...ctx, db }))
 
     expect(result.outcome).toBe('completed') // run logically completed; marker failure swallowed
-    expect(getCurrentActionId()).toBeUndefined() // ambient cleared despite the throw
-    expect(() => domain.getPerTurnContext()).toThrow('no active run') // active run released
+    expect(domain.getTxState().runs.size).toBe(0) // active run released
     expect(
       getDiagnosticsSnapshot().logEntries.some((e) => e.kind === 'pipeline.marker_write_failed'),
     ).toBe(true)
@@ -150,7 +147,6 @@ describe('orchestrator hardening', () => {
     const result = expectRan(await runPipeline('abortfail', { ...ctx, db }))
 
     expect(result.outcome).toBe('failed')
-    expect(getCurrentActionId()).toBeUndefined()
-    expect(() => domain.getPerTurnContext()).toThrow('no active run')
+    expect(domain.getTxState().runs.size).toBe(0)
   })
 })

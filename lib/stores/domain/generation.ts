@@ -22,12 +22,6 @@ export type RunState = {
 // blocks a periodic-classifier start and forces isUserEditBlocked true.
 export type TxState = { runs: Map<string, RunState>; reversalInProgress: boolean }
 
-export type PerTurnContext = {
-  actionId: string
-  abortSignal: AbortSignal
-  intermediates: Record<string, unknown>
-}
-
 type GenerationState = {
   txState: TxState
   startRun: (run: RunState) => void
@@ -85,27 +79,6 @@ const generationStore = createStore<GenerationState>()((set) => ({
   __reset: () => set({ txState: { runs: new Map(), reversalInProgress: false } }),
 }))
 
-let activeRunId: string | null = null
-
-function setActiveRun(runId: string): void {
-  activeRunId = runId
-}
-
-function clearActiveRun(): void {
-  activeRunId = null
-}
-
-function getPerTurnContext(): PerTurnContext {
-  if (activeRunId === null) throw new Error('getPerTurnContext: no active run')
-  const run = generationStore.getState().txState.runs.get(activeRunId)
-  if (!run) throw new Error(`getPerTurnContext: no run ${activeRunId}`)
-  return {
-    actionId: run.actionId,
-    abortSignal: run.abortController.signal,
-    intermediates: run.intermediates,
-  }
-}
-
 function getTxState(): TxState {
   return generationStore.getState().txState
 }
@@ -119,19 +92,13 @@ const api = generationStore.getState()
 export const generation = {
   useGeneration,
   getTxState,
-  getPerTurnContext,
-  setActiveRun,
-  clearActiveRun,
   startRun: api.startRun,
   setCurrentPhase: api.setCurrentPhase,
   recordPhaseResult: api.recordPhaseResult,
   finishRun: api.finishRun,
   abortRun: api.abortRun,
   setReversalInProgress: api.setReversalInProgress,
-  __reset: () => {
-    clearActiveRun()
-    api.__reset()
-  },
+  __reset: api.__reset,
 }
 
 export { generationStore }

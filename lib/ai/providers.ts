@@ -1,8 +1,6 @@
 import { createAnthropic, type AnthropicProvider } from '@ai-sdk/anthropic'
 import type { LanguageModel } from 'ai'
 
-import { getCurrentActionId } from '@/lib/diagnostics'
-
 import { makeScenarioFetch, type StubScenario } from './stub/scenarios'
 import { createFetchWithCapture } from './transport/fetch'
 import { type ProviderInstanceWithStub } from './types'
@@ -12,6 +10,7 @@ type AnthropicModelId = Parameters<AnthropicProvider>[0]
 export function createProviderModel(
   provider: ProviderInstanceWithStub,
   modelId: string,
+  actionId?: string,
 ): LanguageModel {
   switch (provider.type) {
     case 'anthropic': {
@@ -20,7 +19,7 @@ export function createProviderModel(
         ...(provider.endpoint !== undefined ? { baseURL: provider.endpoint } : {}),
         fetch: createFetchWithCapture({
           source: `provider:${provider.id}`,
-          getActionId: getCurrentActionId,
+          actionId,
         }),
       })
 
@@ -34,7 +33,7 @@ export function createProviderModel(
         apiKey: provider.apiKey || 'stub-key',
         fetch: createFetchWithCapture({
           source: `provider:${provider.id}`,
-          getActionId: getCurrentActionId,
+          actionId,
           fetchImpl: makeScenarioFetch(modelId as StubScenario),
         }),
       })

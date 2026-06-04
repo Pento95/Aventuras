@@ -2,7 +2,7 @@ import { ulid } from 'ulid'
 
 import { redactHeaders, redactResponseHeaders, redactUrl } from './http-redaction'
 import { isDiagnosticsEnabled } from '../core/gate'
-import { loggerWithoutTurn } from '../core/logger'
+import { logger } from '../core/logger'
 import { diagnosticsStore } from '../core/store'
 import type { HttpCall } from '../types'
 
@@ -53,7 +53,7 @@ function appendHttpCall(row: HttpCall): void {
     )
 
     if (evictIdx === -1) {
-      loggerWithoutTurn.debug('provider.http_call_buffer_full', { cap: HTTP_CALLS_CAP })
+      logger.debug('provider.http_call_buffer_full', { cap: HTTP_CALLS_CAP })
       return {}
     }
 

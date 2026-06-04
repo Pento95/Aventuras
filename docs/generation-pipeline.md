@@ -44,7 +44,7 @@ for the wizard commit shape.
 ## Pipeline declaration
 
 ```ts
-type PhaseFn = () => AsyncGenerator<PhaseEmittedEvent, PhaseResult>
+type PhaseFn = (ctx: PhaseContext) => AsyncGenerator<PhaseEmittedEvent, PhaseResult>
 
 type PhaseNode =
   | { name: string; run: PhaseFn }
@@ -131,33 +131,36 @@ type PipelineEvent =
 
 ### Signature rules
 
-- **Zero parameters.** Phases read from Zustand. No deps bundle, no
-  inputs threaded through composition. Test overrides are the
-  documented rare exception.
+- **One parameter — the run's `PhaseContext`.** The orchestrator builds
+  each phase's context from its `RunState` and passes it in; phases do
+  NOT read a process-global active run. This is what lets concurrent runs
+  (per-turn ∥ periodic-classifier) coexist without reading each other's
+  `abortSignal` / intermediates. No other deps bundle is threaded through
+  composition.
 - **Returns a status, not a result.** The phase's real output lives
   in the generation-store scratchpad (intermediates); the return
   tells the orchestrator only what happened.
 
-### Reads — via a per-kind `generationContext` getter
+### Reads — via the passed-in `PhaseContext`
 
 ```ts
-async function* retrievalPhase() {
-  const ctx = useGenerationStore.getState().getPerTurnContext()
+async function* retrievalPhase(ctx: PerTurnContext) {
   const result = await generateRetrieval(ctx)
   yield { type: 'delta_emitted', action: { ... } }
   return { status: 'completed' }
 }
 ```
 
-One getter per pipeline kind. The phase reads ONCE at the start
-and threads `ctx` (or a slice) into `generate*` functions. Generate
-fns are the actual LLM-call wrappers — testable in isolation (no
-Zustand dependency), reusable across phases.
+The phase threads its `ctx` (or a slice) into `generate*` functions.
+Generate fns are the actual LLM-call wrappers — testable in isolation
+(no store dependency), reusable across phases. Attribution that must
+reach an outbound HTTP call (the diagnostics http-call sink) travels the
+same way — pass `ctx.actionId` into the provider, never a global.
 
-`generationContext` is a snapshot at call time, not a subscription.
-`abortSignal` is by-reference (a live signal object), so polling
-through the snapshot still sees abort transitions; other state
-changes between read and use are not seen.
+`ctx` is a snapshot of run-scoped fields at invocation, not a
+subscription. `abortSignal` is by-reference (a live signal object), so
+polling through it still sees abort transitions; other state changes
+between read and use are not seen.
 
 ### Run-scoped state — intermediates and per-kind contexts
 
@@ -206,11 +209,14 @@ type ClassifierContext = BaseContext & {
 }
 ```
 
-Per-kind getters on the store: `getPerTurnContext()`,
-`getClassifierContext()`. Reaching for the wrong getter is a type
-error. **Chained transactions (per-turn → chapter-close) do not
-inherit intermediates** — each chained pipeline has its own context
-and writes a fresh set.
+The orchestrator hands each phase its run's typed context —
+`PerTurnContext`, `ClassifierContext`, etc. — narrowing the generic
+`PhaseContext` base; a phase typed for the wrong kind is a type error.
+(M1 ships the minimal base `{ actionId, abortSignal, intermediates }`;
+the per-kind `inputs` / `story` / `settings` fields land with their
+milestones.) **Chained transactions (per-turn → chapter-close) do not
+inherit intermediates** — each chained pipeline has its own context and
+writes a fresh set.
 
 A given piece of phase output may be both an intermediate AND
 dispatched as deltas — they're orthogonal write paths.

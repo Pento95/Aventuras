@@ -124,7 +124,7 @@ type LogEntry = {
   level: 'debug' | 'warn' | 'error'
   kind: LogKind // template-literal-typed
   fields: Record<string, unknown>
-  actionId?: string // present when emission is turn-bound
+  actionId?: string // present when the emission is run-scoped (the run's actionId)
 }
 ```
 
@@ -258,14 +258,14 @@ holds it locally between begin and complete/fail. No correlation
 logic; the wrapper threads its own id through:
 
 ```ts
-const fetchWithCapture = async (url, opts) => {
+const fetchWithCapture = (source: string, actionId?: string) => async (url, opts) => {
   const id = httpCallSink.beginCall({
     method: opts.method ?? 'GET',
     url,
     requestHeaders: opts.headers,
     requestBody: opts.body,
-    source: opts.source,
-    actionId: getCurrentActionId(),
+    source,
+    actionId, // threaded from the run, not read from a global
   })
   try {
     const res = await fetch(url, opts)
@@ -400,37 +400,51 @@ are protected. Pathological "100 concurrent in-flight" → silent
 skip + debug log entry (essentially impossible given pipeline
 single-writer-per-branch).
 
-### Ambient `actionId` mechanism
+### `actionId` threading
 
-The cross-tab nav model depends on every HTTP call and log entry
-made during a turn carrying the turn's `actionId`. This is
-**contract-critical** but **implementation-defined**: the
-mechanism by which sinks read the "current actionId" is the
-implementation's choice (AsyncLocalStorage isn't usable in
-renderers; React's async render context isn't AsyncLocalStorage-
-friendly; a module-level mutable variable works under
-single-writer-per-branch but breaks under cross-branch
-concurrency).
+The cross-tab nav model depends on every HTTP call and log entry made
+during a **run** carrying that run's `actionId` — the correlation key the
+diagnostics UI groups by. This is **contract-critical**. A "run" is one
+pipeline run = one `actionId`; a user turn can span several runs
+(per-turn, a chained chapter-close, periodic-classifier passes), each with
+its own `actionId`, so attribution is **run-scoped, not user-turn-scoped**.
+Folding captures back into a user turn is a separate, unsolved concern —
+see [`triage.md`](./implementation/triage.md).
 
-**Contract requirement:** the orchestrator MUST set an ambient
-actionId at `beginRun` and clear at `commitRun` / `abortRun`.
-Sinks read from that ambient source. Implementations MUST
-guarantee threading through every async hop during a turn — if a
-subsystem fails to thread, correlations break silently (entries
-appear in the global log without a turn pointer; no error, no
-warning, just missing data).
+`actionId` is **threaded explicitly**, never read from a process-global.
+The orchestrator builds a run-bound logger from the run's `actionId`
+(`makeLogger(actionId)`) and hands it to each phase as `PhaseContext.log`,
+so phase logs are attributed with no ceremony. For HTTP it threads
+`actionId` into the provider (`getModel(providerId, modelId, actionId)`),
+which the captured fetch stamps onto each `httpCallSink` call. The default
+module-level `logger` attributes **nothing** — attribution is opt-in, via
+a run-bound logger or an explicit `opts.actionId`. Code outside a run
+(boot, hydration, background infra) therefore logs unattributed by
+construction.
 
-Enforcement is via module public-API discipline per
-[Slice 1.1](./implementation/milestones/01-spine/slices/01-code-conventions.md)'s
-`eslint-plugin-boundaries` rule. The `lib/diagnostics/` module's
-`index.ts` exposes only turn-threading wrappers (`logger`,
-`httpCallSink`, `turnCaptureSink`) and explicit-bypass variants
-(`loggerWithoutTurn`, etc., for paths that legitimately have no
-ambient turn — boot, hydration, background workers outside any
-run). The raw sink primitives stay internal and unreachable from
-outside the module. External code physically cannot bypass the
-ambient provider; the `WithoutTurn` naming distinction makes
-intentional bypass reviewable.
+**Why not a global ambient.** An earlier design set a module-level
+"current `actionId`" at `beginRun` and cleared it at `commitRun` /
+`abortRun`, with sinks reading from it. A single global slot breaks under
+**any two concurrent runs** — not just cross-branch ones. The concurrency
+model invites exactly that on a single branch (per-turn ∥
+periodic-classifier, the disjoint-write-set premise): the later run
+overwrites the slot, the other run's calls mis-attribute, then orphan when
+it clears to null. `AsyncLocalStorage` — the standard request-context fix
+— isn't available on Hermes or the Node-less Electron renderer, so
+explicit threading is the portable, concurrency-correct choice. It also
+removes the silent-correlation-loss failure mode: a subsystem that doesn't
+thread is simply unattributed, never _wrongly_ attributed.
+
+**Module discipline.** `lib/diagnostics/index.ts` exposes the run-bound
+logger factory (`makeLogger`), the default unattributed `logger`, and the
+sinks (`httpCallSink`, `turnCaptureSink`); raw store primitives stay
+internal, enforced by the `eslint-plugin-boundaries` rule per
+[Slice 1.1](./implementation/milestones/01-spine/slices/01-code-conventions.md).
+There is no global "current `actionId`" reader to bypass — code either
+holds a run-bound logger (a phase via `PhaseContext.log`, or its own
+`makeLogger(actionId)`) or it logs unattributed. The former
+`loggerWithoutTurn` bypass variant is gone: with no ambient default, plain
+`logger` already attributes nothing.
 
 ## Gating model
 

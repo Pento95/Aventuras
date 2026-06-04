@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { awaitRunTerminal, definePipeline, runPipeline, type PhaseResult } from '@/lib/pipeline'
+import {
+  awaitRunTerminal,
+  definePipeline,
+  runPipeline,
+  type PhaseContext,
+  type PhaseResult,
+} from '@/lib/pipeline'
 import { domain } from '@/lib/stores'
 
 import { expectRan, makeHarness, resetSingletons } from './harness'
@@ -38,8 +44,7 @@ describe('runPipeline concurrency entry + coordination', () => {
 
   it('awaitRunTerminal(cancel) aborts the in-flight run and resolves on its terminal', async () => {
     const { ctx } = await makeHarness()
-    async function* waits(): AsyncGenerator<never, PhaseResult> {
-      const { abortSignal } = domain.getPerTurnContext()
+    async function* waits({ abortSignal }: PhaseContext): AsyncGenerator<never, PhaseResult> {
       await new Promise<void>((resolve) => {
         if (abortSignal.aborted) resolve()
         else abortSignal.addEventListener('abort', () => resolve(), { once: true })
@@ -97,8 +102,7 @@ describe('runPipeline concurrency entry + coordination', () => {
     const { ctx } = await makeHarness()
     // bg only ends by abort; pre-check aborted so a yield that fires before the
     // phase registers its listener isn't missed.
-    async function* bgPhase(): AsyncGenerator<never, PhaseResult> {
-      const { abortSignal } = domain.getPerTurnContext()
+    async function* bgPhase({ abortSignal }: PhaseContext): AsyncGenerator<never, PhaseResult> {
       await new Promise<void>((resolve) => {
         if (abortSignal.aborted) resolve()
         else abortSignal.addEventListener('abort', () => resolve(), { once: true })
@@ -142,8 +146,7 @@ describe('runPipeline concurrency entry + coordination', () => {
     // While fg awaits bg's terminal (the yield), bg slips a 'blocker' run into
     // txState — a kind fg.blockedBy lists. A stale entry path reserves fg anyway;
     // a correct one re-checks after the wait and rejects it.
-    async function* bgPhase(): AsyncGenerator<never, PhaseResult> {
-      const { abortSignal } = domain.getPerTurnContext()
+    async function* bgPhase({ abortSignal }: PhaseContext): AsyncGenerator<never, PhaseResult> {
       await new Promise<void>((resolve) => {
         if (abortSignal.aborted) resolve()
         else abortSignal.addEventListener('abort', () => resolve(), { once: true })
@@ -180,5 +183,57 @@ describe('runPipeline concurrency entry + coordination', () => {
 
     releaseBlocker()
     await blockerInflight
+  })
+
+  it('two non-blocking runs keep isolated context across interleaving', async () => {
+    const { ctx } = await makeHarness()
+    let releaseA!: () => void
+    const aGate = new Promise<void>((r) => {
+      releaseA = r
+    })
+    const seen: { phase: string; actionId: string; who: unknown }[] = []
+
+    // A reads its context, parks, then re-reads after resume. Under the old global
+    // active-run, the second read would see B (which started and finished meanwhile);
+    // with run-scoped context it stays A's.
+    async function* aPhase(ac: PhaseContext): AsyncGenerator<never, PhaseResult> {
+      ac.intermediates.who = 'A'
+      seen.push({ phase: 'A:before', actionId: ac.actionId, who: ac.intermediates.who })
+      await aGate
+      seen.push({ phase: 'A:after', actionId: ac.actionId, who: ac.intermediates.who })
+      return { status: 'completed' }
+    }
+    async function* bPhase(bc: PhaseContext): AsyncGenerator<never, PhaseResult> {
+      bc.intermediates.who = 'B'
+      seen.push({ phase: 'B', actionId: bc.actionId, who: bc.intermediates.who })
+      return { status: 'completed' }
+    }
+    definePipeline({
+      kind: 'A',
+      phases: [{ name: 'p', run: aPhase }],
+      concurrencyPolicy: {},
+      ...base,
+    })
+    definePipeline({
+      kind: 'B',
+      phases: [{ name: 'p', run: bPhase }],
+      concurrencyPolicy: {},
+      ...base,
+    })
+
+    const aRun = runPipeline('A', ctx) // starts, parks on aGate
+    const bRun = expectRan(await runPipeline('B', ctx)) // runs to completion while A parks
+    releaseA()
+    const aResult = expectRan(await aRun)
+
+    const aBefore = seen.find((s) => s.phase === 'A:before')!
+    const aAfter = seen.find((s) => s.phase === 'A:after')!
+    const b = seen.find((s) => s.phase === 'B')!
+
+    expect(aResult.actionId).not.toBe(bRun.actionId)
+    expect(aBefore.actionId).toBe(aResult.actionId)
+    expect(aAfter.actionId).toBe(aResult.actionId) // not clobbered by B's interleaving
+    expect(aAfter.who).toBe('A') // intermediates isolated — B's write didn't bleed in
+    expect(b.actionId).toBe(bRun.actionId)
   })
 })

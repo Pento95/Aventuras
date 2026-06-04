@@ -1,9 +1,4 @@
 export {
-  clearCurrentActionId,
-  getCurrentActionId,
-  setCurrentActionId,
-} from './core/ambient-action-id'
-export {
   redactHeaderValue,
   redactHeaders,
   redactResponseHeaders,
@@ -11,7 +6,8 @@ export {
   setHttpCallKnownSecretValues,
 } from './sinks/http-redaction'
 export { httpCallSink } from './sinks/http-call-sink'
-export { logger, loggerWithoutTurn } from './core/logger'
+export { logger, makeLogger } from './core/logger'
+export type { Logger } from './core/logger'
 export { clearBuffers, getDiagnosticsSnapshot, useDiagnosticsStore } from './core/store'
 export {
   __resetDiagnosticsGate,

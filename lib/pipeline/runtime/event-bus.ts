@@ -1,4 +1,4 @@
-import { loggerWithoutTurn } from '@/lib/diagnostics'
+import { logger } from '@/lib/diagnostics'
 
 import type { PipelineEvent } from '../types'
 
@@ -11,7 +11,7 @@ function call(listener: AnyListener, event: PipelineEvent): void {
   try {
     listener(event)
   } catch (e) {
-    loggerWithoutTurn.error('pipeline.subscriber_error', {
+    logger.error('pipeline.subscriber_error', {
       error: e instanceof Error ? e.message : String(e),
     })
   }

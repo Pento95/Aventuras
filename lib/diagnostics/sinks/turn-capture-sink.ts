@@ -1,5 +1,5 @@
 import { isDiagnosticsEnabled } from '../core/gate'
-import { loggerWithoutTurn } from '../core/logger'
+import { logger } from '../core/logger'
 import { diagnosticsStore } from '../core/store'
 import type { PhaseEvent, TurnCapture } from '../types'
 
@@ -32,7 +32,7 @@ export const turnCaptureSink = {
       if (evictIdx === -1) {
         // All 100 slots are in-flight; dropping new turn is safer than evicting live runs.
         // warn: the only signal for a dropped turn.
-        loggerWithoutTurn.warn('pipeline.turn_capture_buffer_full', { cap: TURN_CAPTURES_CAP })
+        logger.warn('pipeline.turn_capture_buffer_full', { cap: TURN_CAPTURES_CAP })
         return {}
       }
       return {

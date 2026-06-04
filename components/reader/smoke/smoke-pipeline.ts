@@ -8,21 +8,20 @@ import {
   definePhase,
   definePipeline,
   getPipeline,
+  type PhaseContext,
   type PhaseEmittedEvent,
   type PhaseResult,
 } from '@/lib/pipeline'
-import { domain } from '@/lib/stores'
 
 export const SMOKE_KIND = 'smoke'
 export const SMOKE_STORY_ID = 'story_smoke'
 export const SMOKE_BRANCH_ID = 'branch_smoke'
 
-async function* smokePhase(): AsyncGenerator<PhaseEmittedEvent, PhaseResult> {
-  const { abortSignal } = domain.getPerTurnContext()
+async function* smokePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEvent, PhaseResult> {
   await generateText({
-    model: getModel(registerStubProvider(), 'happy'),
+    model: getModel(registerStubProvider(), 'happy', ctx.actionId),
     prompt: 'smoke',
-    abortSignal,
+    abortSignal: ctx.abortSignal,
   })
 
   // Benign warning so the run lands a logger.warn in diagnosticsStore: the happy

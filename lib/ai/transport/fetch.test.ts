@@ -27,7 +27,7 @@ describe('createFetchWithCapture', () => {
     const wrappedFetch = createFetchWithCapture({
       source: 'unit-test',
       fetchImpl,
-      getActionId: () => 'action-1',
+      actionId: 'action-1',
     })
 
     const response = await wrappedFetch('https://example.test/v1/chat', {

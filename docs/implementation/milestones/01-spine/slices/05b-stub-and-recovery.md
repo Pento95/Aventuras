@@ -86,7 +86,7 @@ modal that consumes it lands with the Diagnostics Hub later.
 - [`docs/observability.md` → `httpCallSink`](../../../../observability.md#httpcallsink)
   — the sink the stub's call routes through; the `actionId`
   join key threaded from the fetch wrapper.
-- [`docs/observability.md` → Ambient actionId mechanism](../../../../observability.md#ambient-actionid-mechanism)
+- [`docs/observability.md` → actionId threading](../../../../observability.md#actionid-threading)
   — the contract the `httpCallSink` threading verifies for a
   real call path.
 

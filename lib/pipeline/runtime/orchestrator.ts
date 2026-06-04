@@ -8,18 +8,15 @@ import {
   type MutationResult,
 } from '@/lib/actions'
 import { pipelineRuns } from '@/lib/db'
-import {
-  clearCurrentActionId,
-  logger,
-  setCurrentActionId,
-  turnCaptureSink,
-} from '@/lib/diagnostics'
+import { logger, makeLogger, turnCaptureSink } from '@/lib/diagnostics'
 import { generateId } from '@/lib/ids'
 import { domain, type RunState } from '@/lib/stores'
 
 import { getPipeline } from '../authoring/registry'
 import type {
+  PhaseContext,
   PhaseEmittedEvent,
+  PhaseFn,
   PhaseNode,
   PhaseResult,
   PipelineError,
@@ -72,8 +69,6 @@ function newRunState(kind: string, ctx: RunCtx): RunState {
 function reserveRun(kind: string, ctx: RunCtx): RunState {
   const run = newRunState(kind, ctx)
   domain.startRun(run)
-  domain.setActiveRun(run.runId)
-  setCurrentActionId(run.actionId)
   return run
 }
 
@@ -91,8 +86,6 @@ async function beginRun(run: RunState, ctx: RunCtx): Promise<void> {
     // run can't gate edits or hold the branch against a retry. Resolve terminal so a
     // waiter that grabbed it between reserve and failure isn't left hanging.
     domain.abortRun(run.runId)
-    clearCurrentActionId()
-    domain.clearActiveRun()
     run.resolveTerminal()
     throw e
   }
@@ -136,7 +129,11 @@ async function handleEvent(event: PhaseEmittedEvent, run: RunState, ctx: RunCtx)
     }
     if (result.status === 'rejected') throw new ActionRejectedError(result.reason)
   } else if (event.type === 'recoverable_error') {
-    logger.warn('pipeline.recoverable_error', { detail: event.error.detail ?? event.error.kind })
+    logger.warn(
+      'pipeline.recoverable_error',
+      { detail: event.error.detail ?? event.error.kind },
+      { actionId: run.actionId },
+    )
   }
   // stream_chunk: side-channel; no UI consumer in M1.
   pipelineEventBus.emit(event)
@@ -154,15 +151,24 @@ async function consumePhase(
   }
 }
 
+function phaseContextOf(run: RunState): PhaseContext {
+  return {
+    actionId: run.actionId,
+    abortSignal: run.abortController.signal,
+    intermediates: run.intermediates,
+    log: makeLogger(run.actionId),
+  }
+}
+
 async function runParallelGroup(
-  branches: readonly { name: string; run: () => AsyncGenerator<PhaseEmittedEvent, PhaseResult> }[],
+  branches: readonly { name: string; run: PhaseFn }[],
   run: RunState,
   ctx: RunCtx,
 ): Promise<PhaseResult> {
   const results = await Promise.all(
     branches.map(async (b) => {
       pipelineEventBus.emit({ type: 'phase_start', runId: run.runId, name: b.name })
-      const result = await consumePhase(b.run(), run, ctx)
+      const result = await consumePhase(b.run(phaseContextOf(run)), run, ctx)
       pipelineEventBus.emit({ type: 'phase_complete', runId: run.runId, name: b.name, result })
       if (result.status === 'failed') run.abortController.abort() // wind down siblings that poll
       return result
@@ -185,7 +191,7 @@ async function runNode(node: PhaseNode, run: RunState, ctx: RunCtx): Promise<Pha
   const result =
     'parallel' in node
       ? await runParallelGroup(node.parallel, run, ctx)
-      : await consumePhase(node.run(), run, ctx)
+      : await consumePhase(node.run(phaseContextOf(run)), run, ctx)
   turnCaptureSink.appendPhaseEvent(run.actionId, { phase: node.name, kind: 'exit', at: Date.now() })
   domain.recordPhaseResult(run.runId, node.name, result)
   pipelineEventBus.emit({ type: 'phase_complete', runId: run.runId, name: node.name, result })
@@ -200,8 +206,6 @@ async function startChainedSuccessor(run: RunState, ctx: RunCtx): Promise<void> 
     storyId: ctx.storyId,
     startedAt: Date.now(),
   })
-  domain.setActiveRun(run.runId)
-  setCurrentActionId(run.actionId)
   turnCaptureSink.beginTurn({ actionId: run.actionId, branchId: run.branchId })
   pipelineEventBus.emit({
     type: 'run_start',
@@ -227,16 +231,18 @@ async function commitRun(
   } catch (e) {
     // The run's writes already committed; a failed marker leaves an orphan that
     // boot recovery reconciles. Finish cleanly regardless.
-    logger.error('pipeline.marker_write_failed', {
-      runId: run.runId,
-      outcome: 'completed',
-      error: String(e),
-    })
+    logger.error(
+      'pipeline.marker_write_failed',
+      { runId: run.runId, outcome: 'completed', error: String(e) },
+      { actionId: run.actionId },
+    )
   }
   turnCaptureSink.endTurn(run.actionId, 'completed')
-  clearCurrentActionId()
-  domain.clearActiveRun()
-  logger.debug('pipeline.run_complete', { runId: run.runId, kind: run.kind, outcome: 'completed' })
+  logger.debug(
+    'pipeline.run_complete',
+    { runId: run.runId, kind: run.kind, outcome: 'completed' },
+    { actionId: run.actionId },
+  )
   pipelineEventBus.emit({
     type: 'run_complete',
     runId: run.runId,
@@ -272,16 +278,14 @@ async function abortRun(
   } catch (e) {
     // Deltas are already reversed; a failed marker leaves an orphan that boot
     // recovery re-reverses idempotently. Finish cleanly regardless.
-    logger.error('pipeline.marker_write_failed', {
-      runId: run.runId,
-      outcome,
-      error: String(e),
-    })
+    logger.error(
+      'pipeline.marker_write_failed',
+      { runId: run.runId, outcome, error: String(e) },
+      { actionId: run.actionId },
+    )
   }
   turnCaptureSink.endTurn(run.actionId, outcome, cause.reason)
-  clearCurrentActionId()
-  domain.clearActiveRun()
-  logger.error('pipeline.run_aborted', { runId: run.runId, outcome })
+  logger.error('pipeline.run_aborted', { runId: run.runId, outcome }, { actionId: run.actionId })
   pipelineEventBus.emit({
     type: 'run_complete',
     runId: run.runId,
@@ -318,9 +322,7 @@ async function runPhases(run: RunState, ctx: RunCtx): Promise<PhaseOutcome> {
 
 export async function runPipeline(kind: string, ctx: RunCtx): Promise<TxResult | RejectedStart> {
   // Loop so a yield-wait can't act on a stale decision: after aborting + awaiting the
-  // yielding runs, re-check — a blocking run may have started during the wait. The
-  // terminal 'start' breaks out and is immediately followed by the synchronous reserve
-  // (no await between), which is what closes the check-vs-register race.
+  // yielding runs, re-check; a blocking run may have started during the wait.
   for (;;) {
     const txState = domain.getTxState()
     const decision = checkConcurrencyContract(kind, txState.runs, txState.reversalInProgress)
