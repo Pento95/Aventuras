@@ -817,15 +817,22 @@ explicit.
     `turnCaptureSink`.
   - **M3 / M5** — Per-pipeline-kind turn-capture shape extends
     for memory + chapter-close pipelines (classifier / retrieval
-    / chapter-close phases each contribute capture content).
+    / chapter-close phases each contribute capture content). Each
+    capture carries the `kind` + `anchorEntryId` turn-grouping
+    stamp per
+    [`observability.md → turnCaptureSink`](../observability.md#turncapturesink),
+    set generically by the orchestrator.
   - **M7.1 / M7.3** — Settings-side controls land in M7.1's
     diagnostics tab (master + `debug_level_enabled` toggles,
     Actions-menu `Open Diagnostics Hub` entry) per
     [`observability.md → UI placement`](../observability.md#ui-placement);
     diagnostics screen consumes `logEntries`, `httpCallSink`
-    history, run timeline in M7.3.
-  - **M7.5** — Memory probe consumes `turnCaptureSink`
-    retrieval-score content for per-turn inspection.
+    history, run timeline in M7.3, and the per-turn inspector
+    consumes `turnCaptures` grouped by turn.
+  - **M7.5** — Memory probe consumes its own entry-keyed
+    `probe_captures` (per [`probe.md`](../memory/probe.md)), **not**
+    `turnCaptureSink` — the turn-grouped per-turn inspector that
+    consumes `turnCaptureSink` is the M7.3 Diagnostics Hub surface.
 - **Undo / rollback system**
   ([`data-model.md → Entry mutability & rollback`](../data-model.md#entry-mutability--rollback)).
   - **M2.5** — Rollback-confirm modal compound (single-entry

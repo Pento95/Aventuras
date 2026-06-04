@@ -31,6 +31,10 @@ Used by:
   host wires `onPress` to open the [Raw JSON viewer Sheet](./data.md#raw-json-viewer--shared-modal-pattern)
   with the row's `undo_payload`, diverging from World/Plot's
   open-in-detail-pane wiring.
+- [Diagnostics Hub · Per-turn inspector — Deltas section](../screens/diagnostics/diagnostics.md#deltas-per-turn-inspector)
+  — the deltas emitted during a turn (pipeline emissions +
+  user-edit deltas), turn- or run-scoped; `source`-labeled per row,
+  `onPress` routes to the Delta log tab focused on the row.
 
 ## Compound API
 

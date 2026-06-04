@@ -193,21 +193,31 @@
   .pt-list-filters { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; background: var(--bg); }
   .pt-list-filters .tb-secondary-label { font-size: 10px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
   .pt-list-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-  .pt-turn-row { display: grid; grid-template-columns: 12px 70px 50px 1fr 60px; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; cursor: pointer; }
+  /* Turn tree: parent header row (no own dot) + run child rows (per-run dot) */
+  .pt-turn-row { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 12px; cursor: pointer; }
   .pt-turn-row:hover { background: var(--bg-highlight); }
   .pt-turn-row.selected { background: var(--bg-raised); border-left: 2px solid var(--ink); padding-left: 10px; }
-  .pt-turn-dot { width: 8px; height: 8px; border-radius: 50%; }
-  .pt-turn-dot.ok { background: var(--ok); }
-  .pt-turn-dot.warn { background: var(--warn); }
-  .pt-turn-dot.danger { background: var(--danger); }
-  .pt-turn-dot.pulse { background: var(--ink-muted); animation: cr-pulse 1.5s ease-in-out infinite; }
-  .pt-turn-time { font-family: ui-monospace, monospace; color: var(--ink-muted); font-size: 11px; }
-  .pt-turn-dur { font-family: ui-monospace, monospace; color: var(--ink-muted); font-size: 11px; text-align: right; }
-  .pt-turn-dur.empty { color: var(--ink-faint); }
-  .pt-turn-summary { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-  .pt-turn-summary .pt-turn-summary-link { color: var(--info); }
-  .pt-turn-summary.muted { color: var(--ink-muted); font-style: italic; }
-  .pt-turn-aid { font-family: ui-monospace, monospace; color: var(--ink-faint); font-size: 10px; text-align: right; }
+  .pt-turn-chevron { color: var(--ink-faint); font-size: 10px; }
+  .pt-turn-id { font-family: ui-monospace, monospace; color: var(--ink); }
+  .pt-turn-id .pt-turn-time { color: var(--ink-muted); font-size: 11px; }
+  .pt-turn-count { font-family: ui-monospace, monospace; color: var(--ink-faint); font-size: 10px; }
+  .pt-dots-preview { display: inline-flex; gap: 3px; align-items: center; }
+  .pt-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pt-dot.ok { background: var(--ok); }
+  .pt-dot.warn { background: var(--warn); }
+  .pt-dot.danger { background: var(--danger); }
+  .pt-dot.pulse { background: var(--ink-muted); animation: cr-pulse 1.5s ease-in-out infinite; }
+  /* run child rows under an expanded turn */
+  .pt-run-row { display: grid; grid-template-columns: 12px 96px 44px 1fr 56px; gap: 8px; align-items: center; padding: 6px 12px 6px 24px; border-bottom: 1px solid var(--line-soft); font-size: 12px; cursor: pointer; background: var(--bg); }
+  .pt-run-row:hover { background: var(--bg-highlight); }
+  .pt-run-row.selected { background: var(--bg-raised); border-left: 2px solid var(--ink); padding-left: 22px; }
+  .pt-run-kind { font-family: ui-monospace, monospace; color: var(--ink); font-size: 11px; }
+  .pt-run-dur { font-family: ui-monospace, monospace; color: var(--ink-muted); font-size: 11px; text-align: right; }
+  .pt-run-dur.empty { color: var(--ink-faint); }
+  .pt-run-summary { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .pt-run-summary .pt-turn-summary-link { color: var(--info); }
+  .pt-run-summary.muted { color: var(--ink-muted); font-style: italic; }
+  .pt-run-aid { font-family: ui-monospace, monospace; color: var(--ink-faint); font-size: 10px; text-align: right; }
 
   /* Detail pane */
   .pt-detail { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-region); overflow: hidden; }
@@ -241,10 +251,20 @@
   .pt-gantt-row .pt-gantt-bar.in-flight::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 8px; background: linear-gradient(to right, transparent, var(--bg-region)); animation: cr-pulse 1.5s ease-in-out infinite; }
   .pt-gantt-row .pt-gantt-dur { font-family: ui-monospace, monospace; color: var(--ink-muted); text-align: right; font-size: 11px; }
 
-  /* Classifier section JSONBlock — compact collapsed state */
-  .pt-classifier-block { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg-raised); border: 1px solid var(--line-soft); border-radius: 3px; font-size: 12px; }
-  .pt-classifier-block .pt-cl-summary { color: var(--ink-muted); font-family: ui-monospace, monospace; font-size: 11px; flex: 1; }
-  .pt-classifier-block .pt-cl-expand { font-size: 11px; color: var(--ink); border: 1px solid var(--line); background: var(--bg-region); padding: 2px 8px; border-radius: 3px; cursor: pointer; }
+  /* Gantt run-group label (turn-scope: bars grouped by run) */
+  .pt-gantt-grouplabel { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-faint); padding: 4px 0 2px; }
+
+  /* Deltas section row — reuses the DeltaLogRow shape (op badge, target, source/entry meta) */
+  .pt-cross-delta-row { display: grid; grid-template-columns: 24px 64px 1fr 150px 28px; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 12px; cursor: pointer; }
+  .pt-cross-delta-row.last { border-bottom: none; }
+  .pt-cross-delta-row .dr-chevron { color: var(--ink-faint); font-size: 10px; transform: rotate(-90deg); }
+  .pt-cross-delta-row .dr-op { font-size: 10px; padding: 1px 6px; border-radius: 3px; text-align: center; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; border: 1px solid; }
+  .pt-cross-delta-row .dr-op.create { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+  .pt-cross-delta-row .dr-op.update { background: var(--bg-raised); color: var(--ink); border-color: var(--line); }
+  .pt-cross-delta-row .dr-op.delete { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+  .pt-cross-delta-row .dr-target { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pt-cross-delta-row .dr-meta { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-muted); text-align: right; }
+  .pt-cross-delta-row .pt-open-in-tab { width: 22px; height: 22px; border: 1px dashed var(--line); border-radius: 3px; display: flex; align-items: center; justify-content: center; color: var(--ink-muted); font-size: 12px; cursor: pointer; }
 
   /* Cross-cut row inside Calls/Logs section — reuse call-row/log-row visually, drop the actionId chip column, add the "↗ Open in tab" icon-action */
   .pt-cross-row { display: grid; grid-template-columns: 24px 80px 50px 1fr 70px 70px 28px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 12px; cursor: pointer; }
@@ -625,11 +645,11 @@
 
         </div><!-- end .tab-body-logs -->
 
-        <!-- Tab 2 (Per-turn inspector) body — two-pane: list left, detail right -->
+        <!-- Tab 2 (Per-turn inspector) body — two-pane: turn tree left, detail right -->
         <div class="tab-body tab-body-per-turn">
           <div class="pt-pane">
 
-            <!-- List pane: outcome chip filter row + scrolling turn list -->
+            <!-- List pane: outcome chip filter + turn tree (parents collapsed by default; one expanded+selected to demo) -->
             <div class="pt-list">
               <div class="pt-list-filters">
                 <span class="tb-secondary-label">Outcome</span>
@@ -638,114 +658,105 @@
                 <span class="chip danger active">failed</span>
               </div>
               <div class="pt-list-scroll">
-                <!-- In-flight turn (currently selected to demo) -->
-                <div class="pt-turn-row">
-                  <span class="pt-turn-dot pulse"></span>
-                  <span class="pt-turn-time">14:02:38</span>
-                  <span class="pt-turn-dur empty">——</span>
-                  <span class="pt-turn-summary muted">in flight…</span>
-                  <span class="pt-turn-aid">tr_b8nz</span>
-                </div>
-                <!-- Completed turn (NOT visible in current outcome-chip filter: only aborted+failed selected; shown anyway so the visual reads naturally) -->
-                <div class="pt-turn-row">
-                  <span class="pt-turn-dot ok"></span>
-                  <span class="pt-turn-time">14:02:18</span>
-                  <span class="pt-turn-dur">8.4s</span>
-                  <span class="pt-turn-summary"><span class="pt-turn-summary-link">→ entry #47</span></span>
-                  <span class="pt-turn-aid">tr_a3kf</span>
-                </div>
-                <!-- Failed turn — selected -->
+
+                <!-- Turn: entry #46 — expanded + selected (turn-scope). 2 runs: reply ok, classifier failed -->
                 <div class="pt-turn-row selected">
-                  <span class="pt-turn-dot danger"></span>
-                  <span class="pt-turn-time">14:01:34</span>
-                  <span class="pt-turn-dur">2.1s</span>
-                  <span class="pt-turn-summary">classifier timeout</span>
-                  <span class="pt-turn-aid">tr_92mp</span>
+                  <span class="pt-turn-chevron">▾</span>
+                  <span class="pt-turn-id">entry #46 <span class="pt-turn-time">· 14:01:34</span></span>
+                  <span class="pt-dots-preview"><span class="pt-dot ok"></span><span class="pt-dot danger"></span></span>
+                  <span class="pt-turn-count">2 runs</span>
                 </div>
-                <!-- Aborted turn -->
+                <div class="pt-run-row">
+                  <span class="pt-dot ok"></span>
+                  <span class="pt-run-kind">per-turn</span>
+                  <span class="pt-run-dur">2.0s</span>
+                  <span class="pt-run-summary"><span class="pt-turn-summary-link">→ entry #46</span></span>
+                  <span class="pt-run-aid">tr_a3kf</span>
+                </div>
+                <div class="pt-run-row">
+                  <span class="pt-dot danger"></span>
+                  <span class="pt-run-kind">classifier</span>
+                  <span class="pt-run-dur">2.1s</span>
+                  <span class="pt-run-summary muted">timeout</span>
+                  <span class="pt-run-aid">tr_92mp</span>
+                </div>
+
+                <!-- Turn: entry #47 — collapsed, dot preview (3 completed runs) -->
                 <div class="pt-turn-row">
-                  <span class="pt-turn-dot warn"></span>
-                  <span class="pt-turn-time">13:58:02</span>
-                  <span class="pt-turn-dur">1.8s</span>
-                  <span class="pt-turn-summary">aborted by user</span>
-                  <span class="pt-turn-aid">tr_xkl0</span>
+                  <span class="pt-turn-chevron">▸</span>
+                  <span class="pt-turn-id">entry #47 <span class="pt-turn-time">· 14:02:18</span></span>
+                  <span class="pt-dots-preview"><span class="pt-dot ok"></span><span class="pt-dot ok"></span><span class="pt-dot ok"></span></span>
+                  <span class="pt-turn-count">3 runs</span>
                 </div>
+
+                <!-- Turn: entry #45 — collapsed, one in-flight run -->
                 <div class="pt-turn-row">
-                  <span class="pt-turn-dot ok"></span>
-                  <span class="pt-turn-time">13:48:09</span>
-                  <span class="pt-turn-dur">5.2s</span>
-                  <span class="pt-turn-summary"><span class="pt-turn-summary-link">→ entry #46</span></span>
-                  <span class="pt-turn-aid">tr_h4pq</span>
+                  <span class="pt-turn-chevron">▸</span>
+                  <span class="pt-turn-id">entry #45 <span class="pt-turn-time">· 14:02:38</span></span>
+                  <span class="pt-dots-preview"><span class="pt-dot pulse"></span></span>
+                  <span class="pt-turn-count">1 run</span>
                 </div>
+
+                <!-- Turn: aborted-before-entry singleton (no anchor entry → keyed on actionId) -->
                 <div class="pt-turn-row">
-                  <span class="pt-turn-dot danger"></span>
-                  <span class="pt-turn-time">13:51:12</span>
-                  <span class="pt-turn-dur">12.0s</span>
-                  <span class="pt-turn-summary">provider rate-limited</span>
-                  <span class="pt-turn-aid">tr_m2rk</span>
+                  <span class="pt-turn-chevron">▸</span>
+                  <span class="pt-turn-id">tr_xkl0 <span class="pt-turn-time">· 13:58:02</span></span>
+                  <span class="pt-dots-preview"><span class="pt-dot warn"></span></span>
+                  <span class="pt-turn-count">1 run</span>
                 </div>
+
               </div>
             </div>
 
-            <!-- Detail pane: context header + four flat sections -->
+            <!-- Detail pane: context header + four flat sections (turn-scope: entry #46) -->
             <div class="pt-detail">
 
-              <!-- Detail-pane context header (always visible; load-bearing when list-pane row hidden by filter) -->
+              <!-- Context header — turn-scope identity (no own outcome; the runs carry it) -->
               <div class="pt-context-header">
-                <span class="pt-ch-label">Turn tr_92mp</span>
-                <span class="pt-ch-outcome danger">failed</span>
-                <span class="pt-ch-meta">14:01:34 · 2.1s</span>
+                <span class="pt-ch-label">entry #46</span>
+                <span class="pt-ch-meta">14:01:34 · 2 runs</span>
               </div>
 
               <!-- Default detail content (4 flat sections). Hidden in hub-no-selection / hub-aged-out modes. -->
               <div class="pt-detail-scroll pt-detail-default">
 
-                <!-- Section 1: Timeline (gantt) -->
+                <!-- Section 1: Timeline — turn-scope, bars grouped by run -->
                 <div class="pt-section">
                   <div class="pt-section-header">Timeline</div>
                   <div class="pt-section-body">
                     <div class="pt-gantt">
-                      <div class="pt-gantt-axis"><span>0ms</span><span>1.1s</span><span>2.1s (failed)</span></div>
+                      <div class="pt-gantt-axis"><span>0ms</span><span>2.0s</span><span>4.1s</span></div>
+                      <div class="pt-gantt-grouplabel">per-turn · tr_a3kf</div>
                       <div class="pt-gantt-row">
                         <span class="pt-gantt-label">pre</span>
-                        <span class="pt-gantt-track"><span class="pt-gantt-bar" style="left: 0; width: 4%;"></span></span>
+                        <span class="pt-gantt-track"><span class="pt-gantt-bar" style="left: 0; width: 3%;"></span></span>
                         <span class="pt-gantt-dur">88ms</span>
                       </div>
                       <div class="pt-gantt-row">
                         <span class="pt-gantt-label">retrieval</span>
-                        <span class="pt-gantt-track"><span class="pt-gantt-bar" style="left: 4%; width: 22%;"></span></span>
+                        <span class="pt-gantt-track"><span class="pt-gantt-bar" style="left: 3%; width: 11%;"></span></span>
                         <span class="pt-gantt-dur">462ms</span>
                       </div>
                       <div class="pt-gantt-row">
                         <span class="pt-gantt-label">narrative</span>
-                        <span class="pt-gantt-track"><span class="pt-gantt-bar" style="left: 26%; width: 38%;"></span></span>
-                        <span class="pt-gantt-dur">798ms</span>
+                        <span class="pt-gantt-track"><span class="pt-gantt-bar" style="left: 14%; width: 35%;"></span></span>
+                        <span class="pt-gantt-dur">1.4s</span>
                       </div>
+                      <div class="pt-gantt-grouplabel">classifier · tr_92mp</div>
                       <div class="pt-gantt-row">
-                        <span class="pt-gantt-label">classifier</span>
-                        <span class="pt-gantt-track"><span class="pt-gantt-bar danger" style="left: 64%; width: 36%;" title="exited via timeout"></span></span>
-                        <span class="pt-gantt-dur">752ms</span>
+                        <span class="pt-gantt-label">classify</span>
+                        <span class="pt-gantt-track"><span class="pt-gantt-bar danger" style="left: 49%; width: 51%;" title="exited via timeout"></span></span>
+                        <span class="pt-gantt-dur">2.1s</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Section 2: Classifier raw output -->
-                <div class="pt-section">
-                  <div class="pt-section-header">Classifier raw output</div>
-                  <div class="pt-section-body">
-                    <div class="pt-classifier-block">
-                      <span class="pt-cl-summary">{…} (partial — exited via timeout before validation)</span>
-                      <button class="pt-cl-expand">Expand JSON</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Section 3: Calls -->
+                <!-- Section 2: Calls (union across the turn's runs) -->
                 <div class="pt-section">
                   <div class="pt-section-header">Calls <span class="pt-section-count">(3)</span></div>
                   <!-- Aged-out note (visible only in hub-buffer-truth mode) -->
-                  <div class="pt-section-aged-note">(some may have aged out — turn predates the call buffer's oldest entry)</div>
+                  <div class="pt-section-aged-note">(some may have aged out — predates the call buffer's oldest entry)</div>
                   <div class="pt-section-body">
                     <div class="pt-cross-row">
                       <span class="cr-chevron">▾</span>
@@ -753,12 +764,12 @@
                       <span class="cr-method">POST</span>
                       <span class="cr-url">api.anthropic.com/v1/messages</span>
                       <span class="cr-status s-2xx">200</span>
-                      <span class="cr-duration">0.34s</span>
+                      <span class="cr-duration">1.40s</span>
                       <span class="pt-open-in-tab" title="Open in Call log">↗</span>
                     </div>
                     <div class="pt-cross-row">
                       <span class="cr-chevron">▾</span>
-                      <span class="cr-time">14:01:35</span>
+                      <span class="cr-time">14:01:34</span>
                       <span class="cr-method">POST</span>
                       <span class="cr-url">api.openai.com/v1/embeddings</span>
                       <span class="cr-status s-2xx">200</span>
@@ -767,19 +778,19 @@
                     </div>
                     <div class="pt-cross-row last">
                       <span class="cr-chevron">▾</span>
-                      <span class="cr-time">14:01:35</span>
+                      <span class="cr-time">14:01:36</span>
                       <span class="cr-method">POST</span>
                       <span class="cr-url">api.anthropic.com/v1/messages</span>
                       <span class="cr-status s-5xx">504</span>
-                      <span class="cr-duration">0.78s</span>
+                      <span class="cr-duration">2.10s</span>
                       <span class="pt-open-in-tab" title="Open in Call log">↗</span>
                     </div>
                   </div>
                 </div>
 
-                <!-- Section 4: Logs -->
-                <div class="pt-section" style="border-bottom: none;">
-                  <div class="pt-section-header">Logs <span class="pt-section-count">(4)</span></div>
+                <!-- Section 3: Logs -->
+                <div class="pt-section">
+                  <div class="pt-section-header">Logs <span class="pt-section-count">(3)</span></div>
                   <div class="pt-section-body">
                     <div class="pt-cross-log-row">
                       <span class="lr-chevron">▾</span>
@@ -795,19 +806,47 @@
                       <span class="lr-kind"><span class="kind-sub">classifier.</span>delta_clamped</span>
                       <span class="pt-open-in-tab" title="Open in Logs">↗</span>
                     </div>
-                    <div class="pt-cross-log-row">
-                      <span class="lr-chevron">▾</span>
-                      <span class="lr-time">14:01:35</span>
-                      <span class="lr-level error">error</span>
-                      <span class="lr-kind"><span class="kind-sub">classifier.</span>timeout</span>
-                      <span class="pt-open-in-tab" title="Open in Logs">↗</span>
-                    </div>
                     <div class="pt-cross-log-row last">
                       <span class="lr-chevron">▾</span>
                       <span class="lr-time">14:01:36</span>
                       <span class="lr-level error">error</span>
-                      <span class="lr-kind"><span class="kind-sub">orchestrator.</span>turn_failed</span>
+                      <span class="lr-kind"><span class="kind-sub">classifier.</span>timeout</span>
                       <span class="pt-open-in-tab" title="Open in Logs">↗</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section 4: Deltas (NEW) — pipeline emissions + user-edit deltas; rows route to Tab 5 -->
+                <div class="pt-section" style="border-bottom: none;">
+                  <div class="pt-section-header">Deltas <span class="pt-section-count">(4)</span></div>
+                  <div class="pt-section-body">
+                    <div class="pt-cross-delta-row">
+                      <span class="dr-chevron">▾</span>
+                      <span class="dr-op create">create</span>
+                      <span class="dr-target">story_entries · #46</span>
+                      <span class="dr-meta">per-turn · entry #46</span>
+                      <span class="pt-open-in-tab" title="Open in Delta log">↗</span>
+                    </div>
+                    <div class="pt-cross-delta-row">
+                      <span class="dr-chevron">▾</span>
+                      <span class="dr-op update">update</span>
+                      <span class="dr-target">Kael · state.visual</span>
+                      <span class="dr-meta">piggyback · entry #46</span>
+                      <span class="pt-open-in-tab" title="Open in Delta log">↗</span>
+                    </div>
+                    <div class="pt-cross-delta-row">
+                      <span class="dr-chevron">▾</span>
+                      <span class="dr-op update">update</span>
+                      <span class="dr-target">Mira · description</span>
+                      <span class="dr-meta">user · entry #44</span>
+                      <span class="pt-open-in-tab" title="Open in Delta log">↗</span>
+                    </div>
+                    <div class="pt-cross-delta-row last">
+                      <span class="dr-chevron">▾</span>
+                      <span class="dr-op create">create</span>
+                      <span class="dr-target">happening · ambush</span>
+                      <span class="dr-meta">background classifier · entry #45</span>
+                      <span class="pt-open-in-tab" title="Open in Delta log">↗</span>
                     </div>
                   </div>
                 </div>
@@ -817,16 +856,17 @@
               <!-- Aged-out arrival pane (hub-aged-out mode) -->
               <div class="pt-aged-out-pane">
                 <p>Turn <strong>tr_92mp</strong> aged out — its in-memory diagnostic capture is no longer in the buffer.</p>
-                <p style="font-size: 11px; color: var(--ink-faint); font-style: normal; max-width: 360px;">Cross-cut HTTP calls and log entries for this actionId may still exist in their own buffers. Open the source tab to inspect them.</p>
+                <p style="font-size: 11px; color: var(--ink-faint); font-style: normal; max-width: 360px;">Cross-cut HTTP calls, log entries, and deltas for this actionId may still exist. Open the source tab to inspect them.</p>
                 <div class="pt-aged-actions">
-                  <button class="pt-aged-action">Open Call log for this turn</button>
-                  <button class="pt-aged-action">Open Logs for this turn</button>
+                  <button class="pt-aged-action">Open Call log</button>
+                  <button class="pt-aged-action">Open Logs</button>
+                  <button class="pt-aged-action">Open Delta log</button>
                 </div>
               </div>
 
               <!-- No-selection pane (hub-no-selection mode) -->
               <div class="pt-no-selection-pane">
-                <p>Select a turn from the list to inspect.</p>
+                <p>Select a turn or run from the list to inspect.</p>
                 <p class="pt-no-sel-sub">Selected turn aged out · transient note when the previously-selected turn was just evicted.</p>
               </div>
 

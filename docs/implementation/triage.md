@@ -19,15 +19,21 @@ slice-planning gate forces its resolution before that slice is planned.
 
 ## Inbox
 
-- **`turnCaptureSink` captures per run, not per user turn** (faulty spec —
-  the name is the intent, the keying is the defect). The sink keys every
-  capture on `actionId` (`lib/diagnostics/sinks/turn-capture-sink.ts`), so
-  one capture = one pipeline run. But a user turn spans several runs — the
-  per-turn run, a chained chapter-close successor, and any periodic-classifier
-  passes each hold their own `actionId` — so one user-visible turn fragments
-  into 2–3 captures. Design revisit: re-key / group captures on the
-  originating story entry (+ branch) rather than `actionId`, likely riding on
-  a story-entry ↔ run linking mechanism (today the only cross-run linkage is
-  delta-level, via the survival anchor `deltas.entry_id`). Spec home:
-  [`observability.md`](../observability.md); becomes user-visible in the M7
-  memory-probe surface, where the fragmentation shows.
+- **`turnCaptureSink` code lags the revised turn-grouping contract**
+  (sooner rather than later). The capture contract was revised to group
+  captures into turns —
+  [`observability.md → turnCaptureSink`](../observability.md#turncapturesink):
+  `TurnCapture` gains `kind` + `anchorEntryId`, `beginTurn` takes
+  `{ actionId; kind; branchId; anchorEntryId? }`, a `recordTargetEntry`
+  setter lands the (currently never-set) `targetEntryId` + the per-turn
+  anchor, and `recordClassifierOutput` / `classifierOutputRaw` are
+  dropped (the classifier's output is read from its LLM call's response
+  body in the inspector's Calls section). The shipped M1 code
+  (`lib/diagnostics/sinks/turn-capture-sink.ts`) and its only consumer
+  (the `__DEV__` smoke producer) still implement the pre-revision
+  shape, and the M1 slice doc
+  [`05a-pipeline-core.md`](./milestones/01-spine/slices/05a-pipeline-core.md)
+  restates it. Align the sink shape (+ its smoke consumer + the 05a
+  restatement) to the revised contract now; orchestrator-side stamping
+  of `kind` / `anchorEntryId` lands with the real capture producers in
+  M2 / M3 per [`roadmap.md`](./roadmap.md).

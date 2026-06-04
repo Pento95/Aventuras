@@ -20,11 +20,6 @@ Used by:
   (import counterparts: Clone built-in / From JSON / From scratch)
 - [Story list · Story import](../screens/story-list/story-list.md#story-import)
   (import counterparts for stories)
-- [Diagnostics Hub · Per-turn inspector — Classifier raw output](../screens/diagnostics/diagnostics.md#classifier-raw-output-per-turn-inspector)
-  (JSONBlock inline-use, collapsed-by-default with an `Expand JSON`
-  action; classifier output is `unknown`-typed and may be large.
-  Tab 2's Calls / Logs cross-cut sections inherit Tab 3 / Tab 4
-  JSONBlock usage — see the entries below)
 - [Diagnostics Hub · Logs tab — row expansion](../screens/diagnostics/diagnostics.md#row-expansion--tablet)
   (JSONBlock inline-use on tablet+ for expanded row payloads;
   Raw JSON viewer Sheet on phone tap-to-open)

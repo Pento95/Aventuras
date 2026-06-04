@@ -44,10 +44,11 @@ Three storage modes coexist:
   [memory probe design](./memory/probe.md). Genuine persistence is
   justified by the simulator workflow (capture today, return
   tomorrow with edited params).
-- **In-memory, story-anchored** — per-turn diagnostic data keyed
-  by `actionId`. Classifier raw output, event-bus trace,
+- **In-memory, story-anchored** — per-run diagnostic data keyed
+  by `actionId`, grouped into turns by `anchorEntryId` (see
+  [`turnCaptureSink`](#turncapturesink)). Phase-event trace and
   cross-references to HTTP call IDs and log entry IDs from the
-  same actionId. Cap ~100 turns most-recent, FIFO.
+  same actionId. Cap ~100 captures most-recent, FIFO.
 - **In-memory, app-anchored** — HTTP call log (~200 cap) and
   structured log entries (~500 cap). No story dimension; ring
   buffers ordered by time-of-emission.
@@ -355,20 +356,26 @@ short-key scenarios.
 
 ### `turnCaptureSink`
 
-One `TurnCapture` per turn, anchored to `actionId`, accumulated
-across the turn's lifecycle.
+One `TurnCapture` per **run** (one `actionId`), accumulated across
+the run's lifecycle. A user turn spans several runs (per-turn, a
+chained chapter-close, periodic-classifier passes); captures group
+into turns by `anchorEntryId`. The run is the irreducible unit of
+detail; the turn is a grouping over captures, consumed by the
+per-turn inspector at
+[`diagnostics.md`](./ui/screens/diagnostics/diagnostics.md#tab-2--per-turn-inspector).
 
 ```ts
 type TurnCapture = {
   actionId: string
+  kind: string                     // pipeline kind: 'per-turn' | 'chapter-close' | 'periodic-classifier' | 'suggestion-refresh' | 'translation-retry'
   branchId: string
-  targetEntryId?: string           // set when AI entry lands; undefined for aborted-before-write
+  anchorEntryId?: string           // the turn this run is attributed to; undefined for an aborted per-turn run that never produced an entry (singleton turn keyed on actionId)
+  targetEntryId?: string           // the entry THIS run produced (per-turn: its reply entry; background runs: undefined). For a per-turn run, === anchorEntryId
   startedAt: number
   endedAt?: number                 // undefined while in-flight
   outcome?: 'completed' | 'aborted' | 'failed'
   outcomeReason?: string
   phaseEvents: PhaseEvent[]
-  classifierOutputRaw?: unknown    // pre-action-layer-validation structured output
 }
 
 type PhaseEvent = {
@@ -378,11 +385,35 @@ type PhaseEvent = {
   durationMs?: number              // present on 'exit'
 }
 
-turnCaptureSink.beginTurn(args: { actionId; branchId }): void
+turnCaptureSink.beginTurn(args: { actionId; kind; branchId; anchorEntryId? }): void
 turnCaptureSink.appendPhaseEvent(actionId: string, event: PhaseEvent): void
-turnCaptureSink.recordClassifierOutput(actionId: string, raw: unknown): void
+turnCaptureSink.recordTargetEntry(actionId: string, entryId: string): void  // per-turn run: sets targetEntryId AND anchorEntryId when the AI entry lands
 turnCaptureSink.endTurn(actionId: string, outcome: TurnOutcome, reason?: string): void
 ```
+
+#### Anchor attribution
+
+`anchorEntryId` is the grouping key. The orchestrator sets it in two
+cases, stamped generically so every pipeline kind groups for free
+(no per-kind capture wiring in M3 / M5 / M8):
+
+- **Per-turn run** → its own reply entry, via `recordTargetEntry`
+  when the AI entry lands.
+- **Every other run** (periodic-classifier, chapter-close whether
+  chained or manual, suggestion-refresh, translation-retry) → the
+  branch's **head reply/opening entry at run start**, passed to
+  `beginTurn`.
+
+A chained chapter-close fires at the per-turn's commit, so at its
+run start the head _is_ that per-turn's reply entry — it inherits the
+right turn with no chain-threading. **The head is read once at run
+start and frozen** on the capture, never recomputed: a classifier
+triggered at turn N that runs concurrently into N+1 keeps anchor N; a
+scheduler-delayed classifier that begins after N+1 landed anchors to
+N+1, correctly, because its `(processedThrough, head]` window then
+covers through N+1. The wizard is exempt — it is not a pipeline, so
+it produces no captures (see
+[`generation-pipeline.md → Wizard exemption`](./generation-pipeline.md#wizard-exemption)).
 
 #### No explicit cross-slice linking
 
@@ -394,11 +425,16 @@ append-coordination across sinks.
 
 #### Eviction
 
-Cap ~100 turns. When `beginTurn` pushes over cap, oldest
-**finalized** turn evicts. In-flight turns (`endedAt` undefined)
-are protected. Pathological "100 concurrent in-flight" → silent
-skip + debug log entry (essentially impossible given pipeline
+Cap ~100 captures. When `beginTurn` pushes over cap, the oldest
+**finalized** capture evicts. In-flight captures (`endedAt`
+undefined) are protected. Pathological "100 concurrent in-flight" →
+silent skip + debug log entry (essentially impossible given pipeline
 single-writer-per-branch).
+
+Eviction is **per capture**, not per turn group. A turn (grouped on
+`(branchId, anchorEntryId)`) reflects only its buffer-resident
+captures; as captures evict the group shrinks, and when its last
+capture evicts the turn leaves the inspector.
 
 ### `actionId` threading
 
@@ -408,8 +444,9 @@ diagnostics UI groups by. This is **contract-critical**. A "run" is one
 pipeline run = one `actionId`; a user turn can span several runs
 (per-turn, a chained chapter-close, periodic-classifier passes), each with
 its own `actionId`, so attribution is **run-scoped, not user-turn-scoped**.
-Folding captures back into a user turn is a separate, unsolved concern —
-see [`triage.md`](./implementation/triage.md).
+Folding the run-captures back into a user turn is the per-turn inspector's
+job, via the capture's `anchorEntryId` grouping key (see
+[Anchor attribution](#anchor-attribution)).
 
 `actionId` is **threaded explicitly**, never read from a process-global.
 The orchestrator builds a run-bound logger from the run's `actionId`
