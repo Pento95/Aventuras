@@ -13,18 +13,19 @@ import {
 } from 'drizzle-orm/sqlite-core'
 
 import type {
+  Appearance,
   AppSettingsDiagnostics,
   ModelProfile,
   ProviderInstance,
 } from './app-settings/app-settings-schema'
 import type { EntityState } from './entities-types'
 import type { EntryMetadata } from './entry-metadata'
+import { INJECTION_MODES } from './enums'
 import type {
-  Appearance,
   StoryDefinition,
   StorySettings,
   SuggestionCategory,
-} from './story-config/story-settings-types'
+} from './story-config/story-config-schema'
 import type { ClassifierStatus } from './world-json-types'
 
 export const stories = sqliteTable('stories', {
@@ -93,7 +94,7 @@ export const entities = sqliteTable(
     description: text('description'),
     status: text('status', { enum: ['staged', 'active', 'retired'] }).notNull(),
     retiredReason: text('retired_reason'),
-    injectionMode: text('injection_mode', { enum: ['always', 'auto', 'disabled'] }).notNull(),
+    injectionMode: text('injection_mode', { enum: INJECTION_MODES }).notNull(),
     nameCollisionFlag: integer('name_collision_flag').notNull().default(0),
     state: text('state', { mode: 'json' }).$type<EntityState>(),
     tags: text('tags', { mode: 'json' })
@@ -125,7 +126,7 @@ export const lore = sqliteTable(
       .$type<string[]>()
       .notNull()
       .default(sql`'[]'`),
-    injectionMode: text('injection_mode', { enum: ['always', 'auto', 'disabled'] }).notNull(),
+    injectionMode: text('injection_mode', { enum: INJECTION_MODES }).notNull(),
     priority: integer('priority').notNull().default(0),
     embeddingStale: integer('embedding_stale').notNull().default(0),
     createdAt: integer('created_at').notNull(),
@@ -146,7 +147,7 @@ export const threads = sqliteTable(
     category: text('category'),
     icon: text('icon'),
     status: text('status', { enum: ['pending', 'active', 'resolved', 'failed'] }).notNull(),
-    injectionMode: text('injection_mode', { enum: ['always', 'auto', 'disabled'] }).notNull(),
+    injectionMode: text('injection_mode', { enum: INJECTION_MODES }).notNull(),
     triggeredAtEntryId: text('triggered_at_entry_id'),
     resolvedAtEntryId: text('resolved_at_entry_id'),
     embeddingStale: integer('embedding_stale').notNull().default(0),

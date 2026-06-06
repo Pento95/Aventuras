@@ -1,17 +1,13 @@
+import { createInsertSchema } from 'drizzle-zod'
 import { z } from 'zod'
 
-const injectionMode = z.enum(['always', 'auto', 'disabled'])
+import { lore } from './schema'
 
-// Writable (delta-logged) lore columns. Operational (embedding_stale, timestamps)
-// and immutable (id, branch_id) columns are validated by Drizzle types, not here.
-export const loreWriteSchema = z.object({
-  title: z.string(),
-  body: z.string().nullable().default(null),
-  category: z.string().nullable().default(null),
-  tags: z.array(z.string()).default([]),
-  keywords: z.array(z.string()).default([]),
-  injectionMode,
-  priority: z.number().int().min(0).max(100).default(0),
-})
+// Writable (delta-logged) lore columns, derived from the Drizzle table
+export const loreWriteSchema = createInsertSchema(lore, {
+  tags: z.array(z.string()).optional(),
+  keywords: z.array(z.string()).optional(),
+  priority: (schema) => schema.min(0).max(100),
+}).omit({ id: true, branchId: true, embeddingStale: true, createdAt: true, updatedAt: true })
 
 export type LoreWrite = z.infer<typeof loreWriteSchema>

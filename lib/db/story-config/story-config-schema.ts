@@ -1,7 +1,5 @@
 import { z } from 'zod'
 
-import type { StoryDefinition, StorySettings } from './story-settings-types'
-
 const tierTupleSchema = z.record(z.string(), z.number())
 
 const labeledPromptSchema = z.object({
@@ -97,10 +95,7 @@ export const storySettingsSchema = z.object({
   packVariables: z.record(z.string(), z.unknown()),
 })
 
-// Compile-time guard: Zod output must extend the gate-owned TS types (never → compile error); voids silence unused-var lint.
-type _DefOk = z.infer<typeof storyDefinitionSchema> extends StoryDefinition ? true : never
-type _SetOk = z.infer<typeof storySettingsSchema> extends StorySettings ? true : never
-const _defOk: _DefOk = true
-const _setOk: _SetOk = true
-void _defOk
-void _setOk
+export type SuggestionCategory = z.infer<typeof suggestionCategorySchema>
+export type StoryDefinition = z.infer<typeof storyDefinitionSchema>
+export type StorySettings = z.infer<typeof storySettingsSchema>
+export type TierTuple = z.infer<typeof tierTupleSchema>

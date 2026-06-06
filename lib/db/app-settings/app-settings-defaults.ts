@@ -1,12 +1,8 @@
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 
-import type { ModelProfile, ProviderInstance } from './app-settings-schema'
+import type { Appearance, ModelProfile, ProviderInstance } from './app-settings-schema'
 import { appSettings } from '../schema'
-import type {
-  Appearance,
-  StorySettings,
-  SuggestionCategory,
-} from '../story-config/story-settings-types'
+import type { StorySettings, SuggestionCategory } from '../story-config/story-config-schema'
 
 export const APP_SETTINGS_SINGLETON_ID = 'singleton'
 

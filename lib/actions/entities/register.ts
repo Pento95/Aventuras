@@ -6,6 +6,7 @@ import {
   entities,
   entityStateColumnSchema,
   entityStateSchemaForKind,
+  entityWriteSchema,
 } from '@/lib/db'
 import { entitiesStore } from '@/lib/stores'
 
@@ -75,6 +76,9 @@ const createHandler: ActionHandler = (action, branchId, ctx) => {
       reason: `branch mismatch: delta ${branchId} vs entry ${entry.branchId}`,
     }
   const row = fullRow(entry)
+  const scalars = entityWriteSchema.safeParse(row)
+  if (!scalars.success)
+    return { status: 'rejected', reason: `invalid entity: ${scalars.error.message}` }
   const parsed = entityStateSchemaForKind(row.kind).safeParse(row.state)
   if (!parsed.success)
     return { status: 'rejected', reason: `invalid ${row.kind} state: ${parsed.error.message}` }
@@ -101,6 +105,10 @@ const updateHandler: ActionHandler = async (action, branchId, ctx) => {
     .where(and(eq(entities.branchId, bid), eq(entities.id, id)))
   if (!current)
     return { status: 'rejected', reason: `update target entities ${bid}:${id} not found` }
+
+  const scalars = entityWriteSchema.partial().safeParse(patch)
+  if (!scalars.success)
+    return { status: 'rejected', reason: `invalid entity patch: ${scalars.error.message}` }
 
   if (patch.state !== undefined) {
     const parsed = entityStateSchemaForKind(current.kind).safeParse(patch.state)

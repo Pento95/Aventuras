@@ -21,6 +21,8 @@ export {
   locationStateSchema,
 } from './entity-state-schema'
 export type { EntityKind } from './entity-state-schema'
+export { entityWriteSchema } from './entity-schema'
+export type { EntityWrite } from './entity-schema'
 export { loreWriteSchema } from './lore-schema'
 export type { LoreWrite } from './lore-schema'
 export { threadWriteSchema } from './thread-schema'
@@ -31,12 +33,11 @@ export type {
   ProbeCapturePayload,
 } from './world-json-types'
 export type {
-  Appearance,
   StoryDefinition,
   StorySettings,
   SuggestionCategory,
   TierTuple,
-} from './story-config/story-settings-types'
+} from './story-config/story-config-schema'
 export {
   storyDefinitionSchema,
   storySettingsSchema,
@@ -50,6 +51,7 @@ export {
   providerInstanceSchema,
 } from './app-settings/app-settings-schema'
 export type {
+  Appearance,
   AppSettingsConfig,
   AppSettingsDiagnostics,
   ModelProfile,

@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 import { storySettingsSchema, suggestionCategorySchema } from '../story-config/story-config-schema'
-import type { Appearance } from '../story-config/story-settings-types'
 
 export const appearanceSchema = z.object({
   themeId: z.string().default('system'),
@@ -84,12 +83,8 @@ export const appSettingsConfigSchema = z.object({
   onboardingCompletedAt: z.number().nullable().default(null),
 })
 
+export type Appearance = z.infer<typeof appearanceSchema>
 export type ProviderInstance = z.infer<typeof providerInstanceSchema>
 export type ModelProfile = z.infer<typeof modelProfileSchema>
 export type AppSettingsDiagnostics = z.infer<typeof appSettingsDiagnosticsSchema>
 export type AppSettingsConfig = z.infer<typeof appSettingsConfigSchema>
-
-// Compile-time guard: appearanceSchema output must extend the gate-owned Appearance type (never → compile error); void silences unused-var lint.
-type _AppearanceOk = z.infer<typeof appearanceSchema> extends Appearance ? true : never
-const _appearanceOk: _AppearanceOk = true
-void _appearanceOk
