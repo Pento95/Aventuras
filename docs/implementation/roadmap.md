@@ -260,6 +260,12 @@ to render against (the tables + stores exist from M1.5; M3 fills them).
     and the reversal predicate that refines M2.5's naive suffix sweep
     so a lagging fact about a surviving turn isn't over-reversed, per
     [`data-model.md → Survival anchor`](../data-model.md#survival-anchor).
+  - Happening reconcile cascades to the FK-less link tables: deleting
+    or merging a happening must also drop / reattach its
+    `happening_involvements` and `happening_awareness` rows. The M1.5
+    `deleteHappening` arm removes only the `happenings` row, orphaning
+    them — cascade lands with whichever consumes it first (this
+    reconcile or the M4 Plot delete-flow).
 - M3.4 — Retrieval: embedding queries; ranker; budgets;
   context-bundle assembly into the per-turn prompt. Memory pack
   templates extend the Liquid engine to inject retrieved bundles.
@@ -548,7 +554,14 @@ the underlying configuration surfaces.
   Era-flip reader affordances (time-chip popover, per-entry
   icon, Actions menu entry, flip-era modal) land here paired
   with the calendar tab's era-flips list (the `branch_era_flips`
-  table + CRUD landed in M1.5). Memory tab adds the classifier panel
+  table + CRUD landed in M1.5). Any flow here that batches multiple
+  `at_worldtime` updates into one action must handle the
+  non-`DEFERRABLE` `uniqueIndex(branch_id, at_worldtime)` (migration
+  `0003`): batched reverse-replay can transiently violate uniqueness
+  mid-undo even when the final state is valid, so it needs
+  deferred-constraint handling or per-row sequencing (single-action
+  writes today are collision-free). Memory tab adds the classifier
+  panel
   (cadence in-place
   edit, buffer-aware cadence indicator, status block,
   `[Run classifier now]`, top-bar error pill routed back) per
@@ -566,6 +579,10 @@ the underlying configuration surfaces.
   and unpopulated).
 - M7.4 — Onboarding flow per
   [`docs/ui/screens/onboarding/onboarding.md`](../ui/screens/onboarding/onboarding.md).
+  Seeds `app_settings.ui_language` from the OS locale on first launch:
+  the config schema ships a static `'en'` fallback, and the
+  data-model's "OS locale on first launch" behavior is this
+  boot/onboarding seed (not a schema default).
 - M7.5 — Memory probe (rich, user-facing) per
   [`docs/ui/screens/memory-probe/memory-probe.md`](../ui/screens/memory-probe/memory-probe.md).
   Pairs with diagnostics as the transparency / tuning surface
@@ -803,7 +820,9 @@ explicit.
     renderer to show how dates will format.
   - **M5.3** — Chapter timeline time column consumes the renderer.
   - **M7.1** — App settings calendar tab (`default_calendar_id`
-    picker into the registry).
+    picker into the registry). The pointer ships nullable (null at
+    first init); whether to seed a built-in default here versus
+    require an explicit pick is an open M7.1 decision.
   - **M7.2** — Story settings calendar tab deep: picker + summary
     - era-flips list + swap-warning UX (the `branch_era_flips` table +
       CRUD landed in M1.5).

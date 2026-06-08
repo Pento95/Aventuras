@@ -19,30 +19,4 @@ slice-planning gate forces its resolution before that slice is planned.
 
 ## Inbox
 
-- **M1.5-gate config defaults vs data-model prose.** Two `app_settings`
-  defaults the gate shipped diverge from the data-model's prose and
-  need reconciling (a prose fix, or a seeded value): (a)
-  `default_calendar_id` is nullable — no calendar exists at first init
-  (`vault_calendars` is unseeded) — but `data-model.md`'s App-settings
-  storage types it `string`; (b) `ui_language` defaults to `'en'` in the
-  config schema, but the data-model says "defaults to OS locale on first
-  launch" — the OS-locale seed belongs in the boot / onboarding path,
-  not a static schema default. Routes to the calendar domain (M8.3) and
-  an onboarding / boot slice respectively.
-- **Happening delete orphans its link rows** (M3/M4). `deleteHappening`
-  (slice M01b/04) removes only the `happenings` row — `happening_involvements`
-  and `happening_awareness` are FK-less link tables, so their rows are left
-  orphaned. Cascade/reconcile is a Tier-2 composition deferred to its
-  consumers: the M3 classifier reconcile and the M4 Plot delete-flow. Route to
-  whichever of those slices is authored first.
-- **Era-flip worldtime reorders vs the non-deferrable unique index**
-  (M5/M7). `branch_era_flips` carries `uniqueIndex(branch_id, at_worldtime)`
-  (migration `0003`, slice M01b/05). Each `applyDeltaAction` writes one
-  delta, so single-action reverse-replay is collision-free. But if a future
-  orchestrator batches multiple `at_worldtime` updates into **one** action,
-  the batched undo statements run in a single transaction against a
-  non-`DEFERRABLE` index — an intermediate undo state could transiently
-  violate uniqueness and throw even when the final state is valid. Needs
-  deferred-constraint handling or per-row sequencing in the batching layer.
-  Zero callers today (the slice ships primitives only). Route to whichever
-  of M5 (chapter-close) / M7.2 (era-flip UX) first batches era-flip writes.
+_Empty — no untriaged items._

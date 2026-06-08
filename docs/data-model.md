@@ -1472,11 +1472,15 @@ shape — they're wizard-authored per story with no global default.
 **Default calendar pointer.**
 
 ```ts
-app_settings.default_calendar_id: string      // seeds new stories' calendarSystemId
+app_settings.default_calendar_id: string | null // seeds new stories' calendarSystemId
 ```
 
-A single-id pointer into the merged calendar registry. Calendar
-definitions themselves live in [`vault_calendars`](#vault-content-storage)
+A single-id pointer into the merged calendar registry. It is `null`
+at first init — no calendar is seeded (`vault_calendars` starts
+empty); whether to seed a built-in default or require an explicit
+pick is a calendar-domain decision deferred to the calendar slices.
+Calendar definitions themselves live in
+[`vault_calendars`](#vault-content-storage)
 (user-authored) + code (built-ins) — Vault content storage is
 documented in its own decision section below.
 
