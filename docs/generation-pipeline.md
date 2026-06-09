@@ -469,8 +469,14 @@ type RunState = {
   runId: string // generated per run start (UUID / nanoid)
   kind: string
   actionId: string // globally unique; never reused
+  storyId: string | null // read by chainsTo + config resolution
+  branchId: string
   abortController: AbortController
   currentPhase: string // name of declared phase or parallel group
+  intermediates: Record<string, unknown> // phase outputs threaded through the run
+  lastResult?: { status: 'completed' | 'aborted' | 'failed' }
+  terminal: Promise<void> // resolves at commit/abort; awaited by chainsTo / drain / reversal
+  resolveTerminal: () => void
 }
 ```
 
