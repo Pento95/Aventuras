@@ -21,8 +21,13 @@ The split heuristic + when-to-add rules live in
 - [`lists.md`](./lists.md) — large-list rendering rules
   (virtualization vs load-older), search bar scope, empty list /
   table state + no-results state.
-- [`forms.md`](./forms.md) — Select primitive (segment / dropdown /
-  radio render-mode rule).
+- [`forms.md`](./forms.md) — form-control patterns: form-row
+  layout, Select, Input, Textarea, SwitchRow, Switch, Checkbox,
+  Autocomplete-with-create, TagInput.
+- [`multi-select.md`](./multi-select.md) — dropdown-style
+  multi-select for bounded enumerable filter dimensions; the
+  trigger surfaces a selected-state summary rather than visible
+  chips. Single-value sibling of the Select primitive.
 - [`searchable-overlay-list.md`](./searchable-overlay-list.md) —
   shared substrate for searchable overlays: per-tier Popover/Sheet
   dispatch, substrate-owned search input, virtualized sectioned

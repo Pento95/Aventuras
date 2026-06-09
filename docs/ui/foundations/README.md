@@ -47,10 +47,10 @@ status + exploration-record link.
   default font stacks (system-only at v1), Tailwind-aligned
   type scale at 16 px base, four weights, per-font leading
   multiplier, reader font-size user setting.
-- [`spacing.md`](./spacing.md) — spatial contract: base unit +
-  Tailwind utility-first spacing, six component-internal padding
-  tokens, four radii tokens, pure-flat depth metaphor with fixed
-  scrim.
+- [`spacing.md`](./spacing.md) — spatial contract: base unit and
+  Tailwind utility-first spacing, density-aware component-internal
+  sizing tokens, four radii tokens, pure-flat depth metaphor with
+  fixed scrim.
 - [`iconography.md`](./iconography.md) — iconography contract:
   Lucide icon set, 2 px stroke + three sizing tokens, full
   glyph vocabulary across top-bar / directional / disclosure /

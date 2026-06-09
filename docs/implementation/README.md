@@ -13,6 +13,10 @@ ordered to build it.
 - **[milestones/](./milestones/README.md)** — per-milestone work.
   Each milestone has its own directory with a `milestone.md`
   definition and a `slices/` subdirectory holding per-slice docs.
+- **[roadmap.md](./roadmap.md)** — provisional milestone arc from
+  M2 through the v1 ship gate: working hypotheses (titles and
+  goals, no contracts) until an entry is promoted to a defined
+  `milestone.md`.
 - **[lessons-learned/](./lessons-learned/README.md)** —
   implementation pitfalls and runtime gotchas discovered while
   building. Indexed by topic; read before touching the substrate

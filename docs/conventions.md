@@ -84,8 +84,11 @@ promoting under duress.
 ### Principles + patterns when a domain fans out
 
 Domains with one file (currently `architecture.md`, `data-model.md`)
-interleave principles + reference content in that file. Domains with
-multiple files (currently `ui/`) get a dedicated `principles.md`.
+interleave principles and reference content in that file. A
+surface-/UI-shaped domain that fans out across multiple files
+(currently `ui/`) gets a dedicated `principles.md`. Other multi-file
+domains (`memory/`, `calendar-systems/`) organize by sub-topic
+instead and carry no `principles.md`.
 
 When the cross-cutting material itself fans out — and especially
 when component-spec content starts crowding the philosophy — split

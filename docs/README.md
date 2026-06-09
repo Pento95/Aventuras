@@ -33,8 +33,8 @@ implementation, and the open questions tracked across the project.
 - **[tech-stack.md](./tech-stack.md)** — tech choices and rationale.
 - **[followups.md](./followups.md)** — active outstanding items the
   current milestone (v1) needs answered or that block v1 work.
-- **[parked.md](./parked.md)** — deferred items: post-v1 confirmed
-  - parked-until-signal.
+- **[parked.md](./parked.md)** — deferred items: post-v1 confirmed,
+  plus parked-until-signal.
 - **[implementation/](./implementation/README.md)** — how
   implementation work is decomposed and tracked. Authoring
   conventions for milestones and slices live in
