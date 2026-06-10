@@ -8,8 +8,10 @@ import { fileURLToPath } from 'node:url'
 // checksummed, so auto-formatting would desync them at app startup. Tabs are
 // intentionally NOT flagged — drizzle-kit indents generated SQL with tabs.
 
-const MIGRATIONS_DIR = fileURLToPath(new URL('../lib/db/migrations', import.meta.url))
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+// Pass .href (string), not the URL object: this project's lib includes DOM, so
+// the global URL type isn't assignable to fileURLToPath's Node URL parameter.
+const MIGRATIONS_DIR = fileURLToPath(new URL('../lib/db/migrations', import.meta.url).href)
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url).href)
 
 type Violation = { file: string; line: number; reason: string }
 
