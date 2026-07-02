@@ -16,4 +16,12 @@ export {
   upsertProfile,
 } from './settings'
 export type { SettingsActionCtx } from './settings'
+export {
+  getRollbackCounts,
+  rollbackToEntry,
+  updateStoryEntryContent,
+  type RollbackCounts,
+  type StoryEntryRejection,
+} from './story-entries/operational'
+export { STORY_ENTRY_REJECTION, type StoryEntryRejectionCode } from './story-entries/register'
 export type { DbCtx, DeltaSource, MutationResult, PipelineAction } from './types'
