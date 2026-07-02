@@ -12,6 +12,7 @@ import { happeningsStore } from './happenings/happenings'
 import { happeningInvolvementsStore } from './happenings/involvements'
 import { loreStore } from './lore/lore'
 import { navigationStore } from './navigation/navigation'
+import { rehydrateStories, storiesStore } from './stories/stories'
 import { threadsStore } from './threads/threads'
 import { translationsStore } from './translations/translations'
 
@@ -28,6 +29,7 @@ export function resetAllStores(): void {
   happeningInvolvementsStore.__reset()
   happeningsStore.__reset()
   loreStore.__reset()
+  storiesStore.__reset()
   threadsStore.__reset()
   translationsStore.__reset()
   navigationStore.__reset()
@@ -51,6 +53,8 @@ export {
   navigationStore,
   readAppSettingsRow,
   rehydrateAppSettings,
+  rehydrateStories,
+  storiesStore,
   threadsStore,
   translationsStore,
 }
@@ -63,3 +67,9 @@ export type { WorkingSetStore } from './factory/working-set-store'
 export { isUserEditBlocked } from './generation/generation'
 export type { RunState, TxState } from './generation/generation'
 export type { NavigationSnapshot } from './navigation/navigation'
+export type { OpenFailure, OpenFailureKind, StoriesSnapshot } from './stories/stories'
+export type { StoryCardData } from './stories/view-model'
+export type { StoryFilter, StoryListQuery, StorySort } from './stories/selectors'
+export { selectStoryCards } from './stories/selectors'
+export { formatRelativeTime } from './stories/relative-time'
+export { toStoryCardData } from './stories/view-model'
