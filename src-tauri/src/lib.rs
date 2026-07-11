@@ -1,9 +1,13 @@
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+mod backup;
 mod migration_patch;
 mod sync;
 
+use backup::{
+    backup_database, export_images_zip, export_single_image, restore_database,
+};
 use sync::commands::{
     clear_received_stories, get_received_stories, start_sync_server, stop_sync_server,
     sync_connect, sync_pull_story, sync_push_story,
@@ -226,6 +230,7 @@ pub fn run() {
         }
     ];
 
+    #[cfg_attr(not(all(debug_assertions, feature = "devtools")), allow(unused_mut))]
     let mut builder = tauri::Builder::default();
 
     #[cfg(all(debug_assertions, feature = "devtools"))]
@@ -269,6 +274,10 @@ pub fn run() {
             sync_connect,
             sync_pull_story,
             sync_push_story,
+            backup_database,
+            restore_database,
+            export_images_zip,
+            export_single_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

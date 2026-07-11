@@ -270,9 +270,9 @@
       <Label class="text-sm font-medium">Data Safety</Label>
     </div>
     <p class="text-muted-foreground text-xs">
-      Download a full backup of your database and all stories as a ZIP archive. Includes the raw
-      SQLite database and individual story exports (.avt) for maximum safety. You can restore from a
-      backup to revert to a previous state.
+      Download a full backup of your database as a ZIP archive. It contains the raw SQLite database,
+      which holds every story, lorebook entry and image. You can restore from a backup to revert to
+      a previous state.
     </p>
     <div class="flex items-center gap-3">
       <Button
