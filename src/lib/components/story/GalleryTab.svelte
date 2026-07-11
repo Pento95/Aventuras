@@ -4,7 +4,7 @@
   import { database } from '$lib/services/database'
   import { imageExportService } from '$lib/services/imageExport'
   import { retryImageGeneration } from '$lib/services/ai/image'
-  import type { EmbeddedImage } from '$lib/types'
+  import type { EmbeddedImageMeta } from '$lib/types'
   import {
     Download,
     ImageIcon,
@@ -19,11 +19,16 @@
   import { Checkbox } from '$lib/components/ui/checkbox'
   import { Textarea } from '$lib/components/ui/textarea'
   import * as ResponsiveModal from '$lib/components/ui/responsive-modal'
-  import { SvelteSet } from 'svelte/reactivity'
+  import { SvelteSet, SvelteMap } from 'svelte/reactivity'
 
   const SWIPE_THRESHOLD = 50
 
-  let images = $state<EmbeddedImage[]>([])
+  let images = $state<EmbeddedImageMeta[]>([])
+  // Lazy-loaded base64 payloads, keyed by image id. The grid/lightbox only loads the
+  // pixels that are actually visible, so a story with many images never pulls all of
+  // them through the SQL/IPC bridge at once (which caused Android OOM crashes).
+  const imageDataCache = new SvelteMap<string, string>()
+  const loadingImageIds = new SvelteSet<string>()
   let isLoading = $state(false)
   let isSaving = $state(false)
   let isRegenerating = $state(false)
@@ -50,13 +55,50 @@
     if (!storyId) return
 
     ui.clearGalleryImages(storyId)
+    imageDataCache.clear()
+    loadingImageIds.clear()
     await loadImagesForStory(storyId)
+  }
+
+  /** Lazily fetch (and cache) the base64 payload for a single image. */
+  async function ensureImageData(id: string | undefined) {
+    if (!id || imageDataCache.has(id) || loadingImageIds.has(id)) return
+    loadingImageIds.add(id)
+    try {
+      const full = await database.getEmbeddedImage(id)
+      if (full?.imageData) imageDataCache.set(id, full.imageData)
+    } catch (error) {
+      console.error('[Gallery] Failed to load image data:', error)
+    } finally {
+      loadingImageIds.delete(id)
+    }
+  }
+
+  /** Svelte action: load an image's pixels once its grid cell scrolls near the viewport. */
+  function lazyImage(node: HTMLElement, id: string) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            ensureImageData(id)
+            observer.unobserve(node)
+          }
+        }
+      },
+      { rootMargin: '300px' },
+    )
+    observer.observe(node)
+    return {
+      destroy() {
+        observer.disconnect()
+      },
+    }
   }
 
   async function loadImagesForStory(storyId: string) {
     isLoading = true
     try {
-      const loaded = await database.getEmbeddedImagesForStory(storyId)
+      const loaded = await database.getEmbeddedImageMetaForStory(storyId)
       ui.setGalleryImages(storyId, loaded)
       images = loaded
     } catch (error) {
@@ -212,13 +254,16 @@
     lightboxOpen && images.length > 0 ? images[lightboxImageIndex] : null,
   )
 
-  // Update prompt when navigating between images in lightbox
+  // Update prompt and lazily load pixels (current + neighbors) when navigating the lightbox
   $effect(() => {
     if (lightboxOpen && images.length > 0) {
       const image = images[lightboxImageIndex]
       if (image) {
         editingImagePrompt = image.prompt
       }
+      ensureImageData(images[lightboxImageIndex]?.id)
+      ensureImageData(images[lightboxImageIndex - 1]?.id)
+      ensureImageData(images[lightboxImageIndex + 1]?.id)
     }
   })
 
@@ -388,13 +433,22 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="bg-surface-700 relative aspect-video cursor-pointer"
+              use:lazyImage={image.id}
               onclick={() => openLightbox(index)}
             >
-              <img
-                src={getImagePreview(image.imageData)}
-                alt={`Generated image ${index + 1}`}
-                class="h-full w-full object-contain"
-              />
+              {#if imageDataCache.has(image.id)}
+                <img
+                  src={getImagePreview(imageDataCache.get(image.id)!)}
+                  alt={`Generated image ${index + 1}`}
+                  class="h-full w-full object-contain"
+                />
+              {:else}
+                <div class="flex h-full w-full items-center justify-center">
+                  <div
+                    class="border-surface-600 border-t-accent-400 h-6 w-6 animate-spin rounded-full border-2"
+                  ></div>
+                </div>
+              {/if}
               <!-- Hover overlay - desktop only -->
               <div
                 class="absolute inset-0 hidden items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:flex"
@@ -478,12 +532,20 @@
       <!-- Image with loading overlay -->
       {#if images.length > 0}
         <div class="relative">
-          <img
-            src={getImagePreview(images[lightboxImageIndex].imageData)}
-            alt={`Generated image ${lightboxImageIndex + 1}`}
-            class="max-h-[40vh] max-w-full rounded object-contain sm:max-h-[50vh]"
-            class:opacity-50={isRegenerating}
-          />
+          {#if imageDataCache.has(images[lightboxImageIndex].id)}
+            <img
+              src={getImagePreview(imageDataCache.get(images[lightboxImageIndex].id)!)}
+              alt={`Generated image ${lightboxImageIndex + 1}`}
+              class="max-h-[40vh] max-w-full rounded object-contain sm:max-h-[50vh]"
+              class:opacity-50={isRegenerating}
+            />
+          {:else}
+            <div class="flex h-[40vh] w-full items-center justify-center sm:h-[50vh]">
+              <div
+                class="border-surface-600 border-t-accent-400 h-8 w-8 animate-spin rounded-full border-2"
+              ></div>
+            </div>
+          {/if}
           {#if isRegenerating}
             <div class="absolute inset-0 flex items-center justify-center">
               <div class="bg-surface-900/80 flex flex-col items-center gap-2 rounded-lg px-4 py-3">

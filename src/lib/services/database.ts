@@ -16,6 +16,7 @@ import type {
   PersistentStyleReviewState,
   TimeTracker,
   EmbeddedImage,
+  EmbeddedImageMeta,
   EmbeddedImageStatus,
   VaultCharacter,
   VaultLorebook,
@@ -325,6 +326,13 @@ class DatabaseService {
     const db = await this.getDb()
     const results = await db.select<any[]>('SELECT * FROM stories ORDER BY updated_at DESC')
     return results.map(this.mapStory)
+  }
+
+  /** Number of stories, without loading any row data (cheap COUNT query). */
+  async countStories(): Promise<number> {
+    const db = await this.getDb()
+    const results = await db.select<{ n: number }[]>('SELECT COUNT(*) as n FROM stories')
+    return results[0]?.n ?? 0
   }
 
   async getStory(id: string): Promise<Story | null> {
@@ -1653,23 +1661,8 @@ class DatabaseService {
       await this.addStoryBeat(beat)
     }
 
-    // Restore embedded images
-    /*     for (const image of embeddedImages) {
-      await this.createEmbeddedImage({
-        id: image.id,
-        storyId: image.storyId,
-        entryId: image.entryId,
-        sourceText: image.sourceText,
-        prompt: image.prompt,
-        styleId: image.styleId,
-        model: image.model,
-        imageData: image.imageData,
-        width: image.width,
-        height: image.height,
-        status: image.status,
-        errorMessage: image.errorMessage,
-      })
-    } */
+    // Embedded images are intentionally not restored here: they are cascade-deleted with
+    // their story_entries and re-created by generation, so there is nothing to re-insert.
   }
 
   // ===== Branch Operations (for story branching/alternate timelines) =====
@@ -2321,7 +2314,7 @@ class DatabaseService {
       'SELECT * FROM embedded_images WHERE entry_id = ? ORDER BY created_at ASC',
       [entryId],
     )
-    return results.map(this.mapEmbeddedImage)
+    return results.map((row) => this.mapEmbeddedImage(row))
   }
 
   async getEmbeddedImagesForStory(storyId: string): Promise<EmbeddedImage[]> {
@@ -2330,7 +2323,36 @@ class DatabaseService {
       'SELECT * FROM embedded_images WHERE story_id = ? ORDER BY created_at ASC',
       [storyId],
     )
-    return results.map(this.mapEmbeddedImage)
+    return results.map((row) => this.mapEmbeddedImage(row))
+  }
+
+  /** Just the ids of a story's embedded images (no row data) — for retry bookkeeping. */
+  async getEmbeddedImageIdsForStory(storyId: string): Promise<string[]> {
+    const db = await this.getDb()
+    const results = await db.select<{ id: string }[]>(
+      'SELECT id FROM embedded_images WHERE story_id = ?',
+      [storyId],
+    )
+    return results.map((r) => r.id)
+  }
+
+  /**
+   * Like getEmbeddedImagesForStory but WITHOUT the base64 `image_data` column.
+   *
+   * Used on hot paths (message send, retry backup) that only need metadata. Avoids
+   * pushing the base64 of every story image through the Tauri SQL/IPC bridge in a
+   * single buffer, which caused Android OOM crashes. Read the pixels per-id with
+   * getEmbeddedImage() only when actually needed.
+   */
+  async getEmbeddedImageMetaForStory(storyId: string): Promise<EmbeddedImageMeta[]> {
+    const db = await this.getDb()
+    const results = await db.select<any[]>(
+      `SELECT id, story_id, entry_id, source_text, prompt, style_id, model,
+              width, height, status, error_message, created_at
+       FROM embedded_images WHERE story_id = ? ORDER BY created_at ASC`,
+      [storyId],
+    )
+    return results.map((row) => this.mapEmbeddedImageMeta(row))
   }
 
   async createEmbeddedImage(image: Omit<EmbeddedImage, 'createdAt'>): Promise<EmbeddedImage> {
@@ -2421,6 +2443,49 @@ class DatabaseService {
   async deleteEmbeddedImagesForEntry(entryId: string): Promise<void> {
     const db = await this.getDb()
     await db.execute('DELETE FROM embedded_images WHERE entry_id = ?', [entryId])
+  }
+
+  /**
+   * Delete rows by id in a single query (chunked to stay under SQLite's variable limit),
+   * instead of one round-trip per id. `column`/`table` are internal literals, never user input.
+   */
+  private async deleteByIds(table: string, ids: string[], column = 'id'): Promise<void> {
+    if (ids.length === 0) return
+    const db = await this.getDb()
+    const CHUNK = 500 // well under SQLite's 999 bound-parameter limit
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK)
+      const placeholders = slice.map(() => '?').join(',')
+      await db.execute(`DELETE FROM ${table} WHERE ${column} IN (${placeholders})`, slice)
+    }
+  }
+
+  async deleteCharacters(ids: string[]): Promise<void> {
+    await this.deleteByIds('characters', ids)
+  }
+
+  async deleteLocations(ids: string[]): Promise<void> {
+    await this.deleteByIds('locations', ids)
+  }
+
+  async deleteItems(ids: string[]): Promise<void> {
+    await this.deleteByIds('items', ids)
+  }
+
+  async deleteStoryBeats(ids: string[]): Promise<void> {
+    await this.deleteByIds('story_beats', ids)
+  }
+
+  async deleteEmbeddedImages(ids: string[]): Promise<void> {
+    await this.deleteByIds('embedded_images', ids)
+  }
+
+  async deleteChapters(ids: string[]): Promise<void> {
+    await this.deleteByIds('chapters', ids)
+  }
+
+  async deleteEmbeddedImagesForEntries(entryIds: string[]): Promise<void> {
+    await this.deleteByIds('embedded_images', entryIds, 'entry_id')
   }
 
   /**
@@ -2520,7 +2585,7 @@ class DatabaseService {
     return deleted
   }
 
-  private mapEmbeddedImage(row: any): EmbeddedImage {
+  private mapEmbeddedImageMeta(row: any): EmbeddedImageMeta {
     const sourceText = row.source_text
     // Detect inline images by checking if sourceText is a <pic> tag
     const isInline = sourceText && sourceText.trim().startsWith('<pic ')
@@ -2533,13 +2598,19 @@ class DatabaseService {
       prompt: row.prompt,
       styleId: row.style_id,
       model: row.model,
-      imageData: row.image_data,
       width: row.width ?? undefined,
       height: row.height ?? undefined,
       status: row.status as EmbeddedImageStatus,
       errorMessage: row.error_message ?? undefined,
       generationMode: isInline ? 'inline' : 'analyzed',
       createdAt: row.created_at,
+    }
+  }
+
+  private mapEmbeddedImage(row: any): EmbeddedImage {
+    return {
+      ...this.mapEmbeddedImageMeta(row),
+      imageData: row.image_data,
     }
   }
 

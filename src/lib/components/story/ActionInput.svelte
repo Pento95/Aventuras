@@ -490,7 +490,6 @@
 
       const storyPosition = story.entries.length
       const activationTracker = ui.getActivationTracker(storyPosition) as SimpleActivationTracker
-      const embeddedImages = await database.getEmbeddedImagesForStory(currentStoryRef.id)
       const protagonist = story.characters.find((c) => c.relationship === 'self')
 
       const ctx: GenerationContext = {
@@ -508,7 +507,6 @@
       }
 
       const cfg: PipelineConfig = {
-        embeddedImages,
         rawInput: userActionContent,
         actionType,
         wasRawActionChoice: false,
@@ -971,7 +969,7 @@
     inputValue = ''
     if (textareaRef) textareaRef.scrollTop = 0
 
-    const embeddedImages = await database.getEmbeddedImagesForStory(story.currentStory.id)
+    const embeddedImageIds = await database.getEmbeddedImageIdsForStory(story.currentStory.id)
     ui.createRetryBackup(
       story.currentStory.id,
       story.entries,
@@ -979,7 +977,7 @@
       story.locations,
       story.items,
       story.storyBeats,
-      embeddedImages,
+      embeddedImageIds,
       content,
       rawInput,
       actionType,

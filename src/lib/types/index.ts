@@ -798,6 +798,16 @@ export interface EmbeddedImage {
   generationMode?: 'analyzed' | 'inline' // How image was triggered (analyzed = LLM scene analysis, inline = <pic> tag)
 }
 
+/**
+ * EmbeddedImage without the heavy base64 `imageData` payload.
+ *
+ * Used on hot paths (message send, retry backup) that only need metadata and never
+ * read the pixels. Loading the full base64 of every story image in one shot pushed a
+ * huge buffer through the Tauri IPC/SQL bridge and caused Android OOM crashes
+ * (RustWebViewClient.shouldInterceptRequest). Keep these paths metadata-only.
+ */
+export type EmbeddedImageMeta = Omit<EmbeddedImage, 'imageData'>
+
 // ===== Inline Image Generation System =====
 
 /**
