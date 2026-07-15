@@ -37,6 +37,7 @@
     hiddenModels: string[]
     favoriteModels: string[]
     pingEnabled: boolean
+    includePaidModels?: boolean
 
     // UI state (from parent)
     isFetchingModels: boolean
@@ -65,6 +66,7 @@
     hiddenModels = $bindable(),
     favoriteModels = $bindable(),
     pingEnabled = $bindable(),
+    includePaidModels = $bindable(false),
     isFetchingModels,
     fetchError,
     onFetchModels,
@@ -262,6 +264,21 @@
         </Button>
       </div>
     </div>
+
+    {#if providerType === 'pollinations'}
+      <div class="bg-muted/30 flex items-center gap-3 rounded-md border p-2">
+        <Switch id="include-paid-{providerType}" bind:checked={includePaidModels} />
+        <Label
+          for="include-paid-{providerType}"
+          class="cursor-pointer text-xs leading-snug font-normal"
+        >
+          <span class="font-medium">Include paid models</span>
+          <span class="text-muted-foreground block">
+            Also list models marked as paid-only. Re-fetch models after changing.
+          </span>
+        </Label>
+      </div>
+    {/if}
 
     {#if canPing}
       <div class="bg-muted/30 flex items-center gap-3 rounded-md border p-2">

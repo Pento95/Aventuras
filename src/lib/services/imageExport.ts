@@ -1,14 +1,15 @@
 import { invoke } from '@tauri-apps/api/core'
-import { save } from '@tauri-apps/plugin-dialog'
+import { resolveSaveTarget } from './exportTarget'
 import type { EmbeddedImageMeta } from '$lib/types'
 
 /**
  * ImageExportService — exports embedded images to disk.
  *
  * All decoding/writing runs natively (`export_images_zip` / `export_single_image`): Rust reads
- * each image's base64 from SQLite and writes the decoded PNG straight to disk, so no image
- * bytes cross the IPC bridge or accumulate in the JS heap (which caused Android OOM crashes).
- * The multi-image path streams one row at a time, so peak memory is a single image.
+ * each image's base64 from SQLite and writes the file directly to a REAL destination path, so no
+ * image bytes cross the IPC bridge or accumulate in the JS heap (which caused Android OOM
+ * crashes). The destination is resolved per platform (save dialog on desktop, app external dir
+ * on Android) — see resolveSaveTarget.
  */
 class ImageExportService {
   private filterImages(
@@ -20,16 +21,16 @@ class ImageExportService {
 
   async exportSingleImage(storyTitle: string, image: EmbeddedImageMeta): Promise<boolean> {
     try {
-      const selectedPath = await save({
-        defaultPath: `${storyTitle}-image.png`,
-        filters: [{ name: 'PNG Image', extensions: ['png'] }],
+      const target = await resolveSaveTarget(`${storyTitle}-image.png`, [
+        { name: 'PNG Image', extensions: ['png'] },
+      ])
+      if (!target) return false
+
+      const written = await invoke<string>('export_single_image', {
+        imageId: image.id,
+        destPath: target.destPath,
       })
-
-      if (!selectedPath) return false
-
-      await invoke('export_single_image', { imageId: image.id, destPath: selectedPath })
-
-      console.log(`[ImageExport] Exported to ${selectedPath}`)
+      console.log(`[ImageExport] Exported to ${written}`)
       return true
     } catch (error) {
       console.error('[ImageExport] Single image export failed:', error)
@@ -49,23 +50,21 @@ class ImageExportService {
     }
 
     try {
-      const selectedPath = await save({
-        defaultPath: `${storyTitle}-images.zip`,
-        filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
-      })
+      const target = await resolveSaveTarget(`${storyTitle}-images.zip`, [
+        { name: 'ZIP Archive', extensions: ['zip'] },
+      ])
+      if (!target) return false
 
-      if (!selectedPath) return false
-
-      // Rust reads the base64 from SQLite and streams PNGs into the ZIP; only ids cross IPC.
+      // Rust reads the base64 from SQLite and writes the ZIP directly; only ids cross IPC.
       const storyId = imagesToExport[0].storyId
       const ids = imagesToExport.map((img) => img.id)
-      const written = await invoke<number>('export_images_zip', {
+      await invoke<string>('export_images_zip', {
         storyId,
-        destPath: selectedPath,
+        destPath: target.destPath,
         selectedIds: ids,
       })
 
-      console.log(`[ImageExport] Exported ${written}/${imagesToExport.length} images`)
+      console.log(`[ImageExport] Exported ${imagesToExport.length} images`)
       return true
     } catch (error) {
       console.error('[ImageExport] ZIP export failed:', error)

@@ -17,11 +17,11 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import { save } from '@tauri-apps/plugin-dialog'
 import { remove, exists, stat } from '@tauri-apps/plugin-fs'
 import * as path from '@tauri-apps/api/path'
 import { getVersion } from '@tauri-apps/api/app'
 import { database } from './database'
+import { resolveSaveTarget } from './exportTarget'
 
 interface BackupMetadata {
   version: number
@@ -35,18 +35,17 @@ interface BackupMetadata {
 class BackupService {
   /**
    * Create a full backup ZIP containing the database and metadata.
-   * @returns true if backup was saved, false if user cancelled the dialog
+   * @returns the saved location on success, null if the user cancelled the save dialog
    */
-  async createFullBackup(): Promise<boolean> {
-    // 1. Prompt user for save location first (fail fast if they cancel)
+  async createFullBackup(): Promise<string | null> {
+    // 1. Resolve the destination (save dialog: a real path on desktop, a SAF content:// URI on
+    //    Android). The native step writes the archive straight to it.
     const datestamp = new Date().toISOString().slice(0, 10)
-    const savePath = await save({
-      title: 'Save Aventura Backup',
-      defaultPath: `aventura-backup-${datestamp}.zip`,
-      filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
-    })
-
-    if (!savePath) return false
+    const target = await resolveSaveTarget(`aventura-backup-${datestamp}.zip`, [
+      { name: 'ZIP Archive', extensions: ['zip'] },
+    ])
+    if (!target) return null
+    const savePath = target.destPath
 
     console.log('[Backup] Starting full backup...')
 
@@ -110,9 +109,12 @@ class BackupService {
         databaseSizeBytes,
       }
 
-      // 4. Zip the DB straight to disk in native code (no JS/IPC buffer of the DB bytes)
+      // 4. Zip the DB straight to destPath in native code. destPath is the chosen destination (a
+      //    real path on desktop, a SAF content:// URI on Android), written natively via the app's
+      //    content-URI fd — so no DB bytes cross the JS/IPC bridge, the sole robust approach for
+      //    multi-hundred-MB backups.
       console.log('[Backup] Writing archive...')
-      await invoke('backup_database', {
+      await invoke<string>('backup_database', {
         dbPath: dbSourcePath,
         destPath: savePath,
         metadataJson: JSON.stringify(metadata),
@@ -130,7 +132,7 @@ class BackupService {
       }
     }
 
-    return true
+    return savePath
   }
 
   /**
@@ -143,6 +145,8 @@ class BackupService {
     console.log('[Restore] Loading backup from', zipPath)
 
     // 1. Close the current DB connection so the file can be replaced underneath it.
+    //    zipPath is already a real path (app external dir on Android, open dialog on desktop),
+    //    so the native restore reads it directly — no bytes cross the JS/IPC bridge.
     console.log('[Restore] Closing database connection...')
     await database.close()
 

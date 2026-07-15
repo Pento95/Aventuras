@@ -60,7 +60,7 @@ export interface ImageProvider {
   readonly id: ImageProviderType
   readonly name: string
   generate(options: ImageGenerateOptions): Promise<ImageGenerateResult>
-  listModels(apiKey?: string): Promise<ImageModelInfo[]>
+  listModels(apiKey?: string, includePaid?: boolean): Promise<ImageModelInfo[]>
   // ComfyUI specific
   getSamplerInfo?(): Promise<ComfySamplerInfo>
   listLoras?(): Promise<string[]>

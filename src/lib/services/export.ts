@@ -1,6 +1,9 @@
-import { save, open } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { database } from './database'
+import { resolveSaveTarget } from './exportTarget'
+import { errMessage } from '$lib/utils/error'
 import type {
   Story,
   StoryEntry,
@@ -14,6 +17,7 @@ import type {
   Branch,
   PersistentStyleReviewState,
   EmbeddedImage,
+  EmbeddedImageMeta,
 } from '$lib/types'
 
 export interface AventuraExport {
@@ -120,13 +124,18 @@ class ExportService {
     items: Item[],
     storyBeats: StoryBeat[],
     lorebookEntries: Entry[] = [],
-    embeddedImages: EmbeddedImage[] = [],
+    embeddedImages: EmbeddedImageMeta[] = [],
     checkpoints: Checkpoint[] = [],
     branches: Branch[] = [],
     chapters: Chapter[] = [],
     currentBgImage: string | null = null,
   ): Promise<boolean> {
-    const exportData: AventuraExport = {
+    // embeddedImages is metadata only (no base64). The native exporter fills in each image's
+    // imageData from SQLite, so the heavy bytes never sit in the JS heap (their only home would
+    // otherwise be a giant JSON.stringify string → Android OOM).
+    const exportData: Omit<AventuraExport, 'embeddedImages'> & {
+      embeddedImages: EmbeddedImageMeta[]
+    } = {
       version: this.VERSION,
       exportedAt: Date.now(),
       story,
@@ -144,17 +153,21 @@ class ExportService {
       currentBgImage,
     }
 
-    const filePath = await save({
-      defaultPath: `${this.sanitizeFilename(story.title)}.avt`,
-      filters: [
-        { name: 'Aventura Story', extensions: ['avt'] },
-        { name: 'JSON', extensions: ['json'] },
-      ],
+    const target = await resolveSaveTarget(`${this.sanitizeFilename(story.title)}.avt`, [
+      { name: 'Aventura Story', extensions: ['avt'] },
+      { name: 'JSON', extensions: ['json'] },
+    ])
+    if (!target) return false
+
+    // Build the .avt natively: Rust injects each image's base64 from SQLite and writes the JSON
+    // straight to the real destination path — no image bytes cross the JS/IPC bridge.
+    // Build the .avt natively: Rust injects each image's base64 from SQLite and writes the JSON
+    // straight to the chosen destination (a SAF content:// URI on Android) — no image bytes cross
+    // the JS/IPC bridge.
+    await invoke<string>('export_story_avt', {
+      storyJson: JSON.stringify(exportData),
+      destPath: target.destPath,
     })
-
-    if (!filePath) return false
-
-    await writeTextFile(filePath, JSON.stringify(exportData, null, 2))
     return true
   }
 
@@ -225,17 +238,13 @@ class ExportService {
     markdown += `---\n\n`
     markdown += `*Exported from Aventura on ${new Date().toLocaleDateString()}*\n`
 
-    const filePath = await save({
-      defaultPath: `${this.sanitizeFilename(story.title)}.md`,
-      filters: [
-        { name: 'Markdown', extensions: ['md'] },
-        { name: 'Text', extensions: ['txt'] },
-      ],
-    })
+    const target = await resolveSaveTarget(`${this.sanitizeFilename(story.title)}.md`, [
+      { name: 'Markdown', extensions: ['md'] },
+      { name: 'Text', extensions: ['txt'] },
+    ])
+    if (!target) return false
 
-    if (!filePath) return false
-
-    await writeTextFile(filePath, markdown)
+    await writeTextFile(target.destPath, markdown)
     return true
   }
 
@@ -262,14 +271,12 @@ class ExportService {
       }
     }
 
-    const filePath = await save({
-      defaultPath: `${this.sanitizeFilename(story.title)}.txt`,
-      filters: [{ name: 'Text', extensions: ['txt'] }],
-    })
+    const target = await resolveSaveTarget(`${this.sanitizeFilename(story.title)}.txt`, [
+      { name: 'Text', extensions: ['txt'] },
+    ])
+    if (!target) return false
 
-    if (!filePath) return false
-
-    await writeTextFile(filePath, text)
+    await writeTextFile(target.destPath, text)
     return true
   }
 
@@ -294,7 +301,7 @@ class ExportService {
       console.error('Import failed:', error)
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to import file',
+        error: errMessage(error),
       }
     }
   }
@@ -790,7 +797,7 @@ class ExportService {
       console.error('Import failed:', error)
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to import file',
+        error: errMessage(error),
       }
     }
   }

@@ -2,25 +2,21 @@
  * File writing and export orchestration
  */
 
-import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { resolveSaveTarget } from '$lib/services/exportTarget'
 import type { LorebookExportOptions } from '../types'
 import { exportToAventura, exportToSillyTavern, exportToText } from './formats'
 import { getFormatInfo } from './metadata'
 
 async function saveFile(content: string, defaultPath: string): Promise<boolean> {
   try {
-    const filePath = await save({
-      defaultPath,
-      filters: [
-        { name: 'Aventura Lorebook', extensions: ['json'] },
-        { name: 'Text', extensions: ['txt'] },
-      ],
-    })
+    const target = await resolveSaveTarget(defaultPath, [
+      { name: 'Aventura Lorebook', extensions: ['json'] },
+      { name: 'Text', extensions: ['txt'] },
+    ])
+    if (!target) return false
 
-    if (!filePath) return false
-
-    await writeTextFile(filePath, content)
+    await writeTextFile(target.destPath, content)
     return true
   } catch (error) {
     console.error('[LorebookExporter] Failed to save file:', error)

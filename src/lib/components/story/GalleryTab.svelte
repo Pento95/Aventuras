@@ -4,6 +4,7 @@
   import { database } from '$lib/services/database'
   import { imageExportService } from '$lib/services/imageExport'
   import { retryImageGeneration } from '$lib/services/ai/image'
+  import { errMessage } from '$lib/utils/error'
   import type { EmbeddedImageMeta } from '$lib/types'
   import {
     Download,
@@ -169,10 +170,7 @@
       }
     } catch (error) {
       console.error('[Gallery] Save failed:', error)
-      ui.showToast(
-        `Failed to save images: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error',
-      )
+      ui.showToast(`Failed to save images: ${errMessage(error)}`, 'error')
     } finally {
       isSaving = false
     }

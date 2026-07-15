@@ -13,6 +13,18 @@
   let localThreshold = $state(story.memoryConfig.tokenThreshold)
   let localBuffer = $state(story.memoryConfig.chapterBuffer)
 
+  const detailOptions = [
+    { value: 'concise', label: 'Concise' },
+    { value: 'auto', label: 'Auto' },
+    { value: 'precise', label: 'Precise' },
+  ] as const
+
+  function saveDetail(val: string) {
+    if (val === 'concise' || val === 'auto' || val === 'precise') {
+      story.updateMemoryConfig({ summaryDetail: val })
+    }
+  }
+
   // Single debounced save: flushes both values in one call
   const { trigger, flush } = createDebouncedSave(() =>
     story.updateMemoryConfig({ tokenThreshold: localThreshold, chapterBuffer: localBuffer }),
@@ -82,6 +94,29 @@
 
           <p class="text-muted-foreground text-xs">
             Auto-summarization triggers when token count exceeds this threshold.
+          </p>
+        </div>
+
+        <!-- Summary Detail -->
+        <div class="space-y-4">
+          <Label class="text-muted-foreground">Summary Detail</Label>
+
+          <ToggleGroup
+            type="single"
+            value={story.memoryConfig.summaryDetail ?? 'auto'}
+            onValueChange={saveDetail}
+            class="justify-start"
+          >
+            {#each detailOptions as option (option.value)}
+              <ToggleGroupItem value={option.value} size="sm" class="h-7 px-3 text-xs">
+                {option.label}
+              </ToggleGroupItem>
+            {/each}
+          </ToggleGroup>
+
+          <p class="text-muted-foreground text-xs">
+            How much detail chapter summaries capture. Higher detail helps long chapters keep every
+            plot point.
           </p>
         </div>
 

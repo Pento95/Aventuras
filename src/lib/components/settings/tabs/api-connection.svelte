@@ -31,6 +31,7 @@
   let formHiddenModels = $state<string[]>([])
   let formFavoriteModels = $state<string[]>([])
   let formPingEnabled = $state(false)
+  let formIncludePaid = $state(false)
 
   // Auto-save debounce state
   let mounted = true
@@ -58,6 +59,7 @@
     formHiddenModels = [...(profile.hiddenModels ?? [])]
     formFavoriteModels = [...(profile.favoriteModels ?? [])]
     formPingEnabled = profile.pingEnabled ?? false
+    formIncludePaid = profile.includePaidModels ?? false
     prevPingEnabled = formPingEnabled
     fetchError = null
     openCollapsibles = new SvelteSet([...openCollapsibles, profile.id])
@@ -75,6 +77,7 @@
     formHiddenModels = []
     formFavoriteModels = []
     formPingEnabled = false
+    formIncludePaid = false
     prevPingEnabled = false
     fetchError = null
   }
@@ -100,6 +103,7 @@
       hiddenModels: formHiddenModels,
       favoriteModels: formFavoriteModels,
       pingEnabled: formPingEnabled,
+      includePaidModels: formIncludePaid,
       createdAt: isNewProfile
         ? Date.now()
         : settings.apiSettings.profiles.find((p) => p.id === editingProfileId)?.createdAt ||
@@ -126,7 +130,12 @@
     formFetchedModels = []
 
     try {
-      formFetchedModels = await fetchModelsFromProvider(formProviderType, formBaseUrl, formApiKey)
+      formFetchedModels = await fetchModelsFromProvider(
+        formProviderType,
+        formBaseUrl,
+        formApiKey,
+        formIncludePaid,
+      )
       if (formPingEnabled && editingProfileId && !isNewProfile) {
         const existing = settings.getProfile(editingProfileId)
         if (existing) {
@@ -228,6 +237,7 @@
       hiddenModels: formHiddenModels,
       favoriteModels: formFavoriteModels,
       pingEnabled: formPingEnabled,
+      includePaidModels: formIncludePaid,
       createdAt: existingProfile.createdAt,
     }
 
@@ -261,6 +271,7 @@
         formHiddenModels,
         formFavoriteModels,
         formPingEnabled,
+        formIncludePaid,
       ]
       triggerAutoSave()
     }
@@ -336,6 +347,7 @@
           bind:hiddenModels={formHiddenModels}
           bind:favoriteModels={formFavoriteModels}
           bind:pingEnabled={formPingEnabled}
+          bind:includePaidModels={formIncludePaid}
           {isFetchingModels}
           {fetchError}
           onFetchModels={handleFetchModels}
@@ -449,6 +461,7 @@
                 bind:hiddenModels={formHiddenModels}
                 bind:favoriteModels={formFavoriteModels}
                 bind:pingEnabled={formPingEnabled}
+                bind:includePaidModels={formIncludePaid}
                 {isFetchingModels}
                 {fetchError}
                 onFetchModels={handleFetchModels}

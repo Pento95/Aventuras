@@ -6,7 +6,8 @@ mod migration_patch;
 mod sync;
 
 use backup::{
-    backup_database, export_images_zip, export_single_image, restore_database,
+    backup_database, export_images_zip, export_single_image, export_story_avt, import_saf_to_temp,
+    restore_database,
 };
 use sync::commands::{
     clear_received_stories, get_received_stories, start_sync_server, stop_sync_server,
@@ -278,6 +279,8 @@ pub fn run() {
             restore_database,
             export_images_zip,
             export_single_image,
+            export_story_avt,
+            import_saf_to_temp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -32,6 +32,7 @@ export async function fetchModelsFromProvider(
   providerType: ProviderType,
   baseUrl?: string,
   apiKey?: string,
+  includePaid = false,
 ): Promise<TextModel[]> {
   // Provider-specific fetch logic
   if (providerType === 'nanogpt') return fetchNanogptModels(baseUrl)
@@ -42,7 +43,7 @@ export async function fetchModelsFromProvider(
   if (providerType === 'ollama') return wrap(fetchOllamaModels(baseUrl))
   if (providerType === 'zhipu') return wrap(fetchZhipuModels(baseUrl, apiKey))
   if (providerType === 'mistral') return wrap(fetchMistralModels(baseUrl, apiKey))
-  if (providerType === 'pollinations') return fetchPollinationsTextModels()
+  if (providerType === 'pollinations') return fetchPollinationsTextModels(includePaid)
 
   if (providerType === 'nvidia-nim') return fetchNimModels(baseUrl, apiKey)
 
@@ -468,7 +469,7 @@ interface PollinationsTextModelResponse {
   output_modalities?: string[]
 }
 
-async function fetchPollinationsTextModels(): Promise<TextModel[]> {
+async function fetchPollinationsTextModels(includePaid = false): Promise<TextModel[]> {
   const url = 'https://gen.pollinations.ai/text/models'
   const fetchFn = createTimeoutFetch(30000, 'model-fetch')
 
@@ -483,7 +484,7 @@ async function fetchPollinationsTextModels(): Promise<TextModel[]> {
       .filter(
         (m) =>
           !m.is_specialized &&
-          !m.paid_only &&
+          (includePaid || !m.paid_only) &&
           (m.input_modalities?.includes('text') ?? true) &&
           (m.output_modalities?.includes('text') ?? true),
       )

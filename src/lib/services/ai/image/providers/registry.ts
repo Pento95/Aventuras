@@ -59,10 +59,15 @@ interface ModelCache {
 const CACHE_TTL = 15 * 60 * 1000 // 15 minutes
 const modelCaches = new Map<string, ModelCache>()
 
-function getCacheKey(providerType: ImageProviderType, apiKey?: string, baseUrl?: string): string {
+function getCacheKey(
+  providerType: ImageProviderType,
+  apiKey?: string,
+  baseUrl?: string,
+  includePaid?: boolean,
+): string {
   const keyHash = apiKey ? apiKey.slice(-8) : 'nokey'
   const urlKey = baseUrl ? baseUrl.trim().replace(/\/+$/, '') : 'nourl'
-  return `${providerType}:${keyHash}:${urlKey}`
+  return `${providerType}:${keyHash}:${urlKey}:${includePaid ? 'paid' : 'free'}`
 }
 
 export function clearModelsCache(): void {
@@ -141,7 +146,8 @@ export async function listImageModels(profileId: string): Promise<ImageModelInfo
   const profile = settings.getImageProfile(profileId)
   if (!profile) return []
 
-  const cacheKey = getCacheKey(profile.providerType, profile.apiKey, profile.baseUrl)
+  const includePaid = profile.providerOptions?.includePaidModels === true
+  const cacheKey = getCacheKey(profile.providerType, profile.apiKey, profile.baseUrl, includePaid)
   const cached = modelCaches.get(cacheKey)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.models
@@ -154,7 +160,7 @@ export async function listImageModels(profileId: string): Promise<ImageModelInfo
       timeoutMs: settings.apiSettings.llmTimeoutMs,
     }
     const provider = PROVIDER_FACTORIES[profile.providerType](config)
-    const models = await provider.listModels(profile.apiKey)
+    const models = await provider.listModels(profile.apiKey, includePaid)
     modelCaches.set(cacheKey, { models, timestamp: Date.now() })
     return models
   } catch (error) {
@@ -172,8 +178,9 @@ export async function listImageModelsByProvider(
   apiKey: string,
   forceReload: boolean,
   baseUrl?: string,
+  includePaid = false,
 ): Promise<ImageModelInfo[]> {
-  const cacheKey = getCacheKey(providerType, apiKey, baseUrl)
+  const cacheKey = getCacheKey(providerType, apiKey, baseUrl, includePaid)
   if (!forceReload) {
     const cached = modelCaches.get(cacheKey)
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -188,7 +195,7 @@ export async function listImageModelsByProvider(
       timeoutMs: settings.apiSettings.llmTimeoutMs,
     }
     const provider = PROVIDER_FACTORIES[providerType](config)
-    const models = await provider.listModels(apiKey)
+    const models = await provider.listModels(apiKey, includePaid)
     modelCaches.set(cacheKey, { models, timestamp: Date.now() })
     return models
   } catch (error) {

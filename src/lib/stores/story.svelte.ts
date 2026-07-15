@@ -3073,6 +3073,7 @@ class StoryStore {
       this.currentStory?.mode ?? 'adventure',
       this.pov,
       this.tense,
+      this.memoryConfig.summaryDetail,
     )
 
     // Get the next chapter number

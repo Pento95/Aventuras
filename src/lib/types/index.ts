@@ -97,12 +97,16 @@ export interface PersistentStyleReviewState {
   lastReview: PersistentStyleReviewResult | null
 }
 
+/** Level of detail requested for chapter summaries. */
+export type SummaryDetail = 'concise' | 'auto' | 'precise'
+
 export interface MemoryConfig {
   tokenThreshold: number // Token count before triggering summarization (default: 16000)
   chapterBuffer: number // Recent messages protected from chapter end (default: 10)
   autoSummarize: boolean // Enable auto-summarization
   enableRetrieval: boolean // Enable memory retrieval
   maxChaptersPerRetrieval: number // Max chapters to retrieve per query
+  summaryDetail?: SummaryDetail // Detail level for chapter summaries (default: 'auto')
 }
 
 export interface StorySettings {
@@ -143,8 +147,12 @@ export interface StoryEntry {
 
 export interface EntryMetadata {
   tokenCount?: number
-  model?: string
-  generationTime?: number
+  model?: string // Model that generated this entry (narration only)
+  profileId?: string // API profile id used for generation
+  profileName?: string // API profile name at generation time (for display)
+  reasoningEffort?: ReasoningEffort // Thinking effort used for generation
+  temperature?: number // Sampling temperature used for generation
+  generationTime?: number // Wall-clock generation duration in ms (narration only)
   source?: string
   // Story time tracking - captures in-story time at entry creation and after classification
   timeStart?: TimeTracker // Story time when this entry began
@@ -697,6 +705,7 @@ export interface APIProfile {
   hiddenModels: string[] // Models hidden from selection lists
   favoriteModels: string[] // Models shown at the top of selection lists
   pingEnabled?: boolean // Opt-in: enable pings to show model availability status (OR free / NIM only)
+  includePaidModels?: boolean // Opt-in: include paid-only models when fetching (Pollinations only)
   createdAt: number // Timestamp
 }
 
