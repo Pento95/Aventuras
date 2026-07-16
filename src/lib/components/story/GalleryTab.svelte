@@ -28,8 +28,18 @@
   // Lazy-loaded base64 payloads, keyed by image id. The grid/lightbox only loads the
   // pixels that are actually visible, so a story with many images never pulls all of
   // them through the SQL/IPC bridge at once (which caused Android OOM crashes).
+  //
+  // Lazy loading alone only bounds the peak at open, not the total: scrolling a large
+  // gallery would still end up retaining every image. So the cache is an LRU with a byte
+  // budget — base64 length is a good proxy for the heap it costs — and is dropped wholesale
+  // when the story changes.
   const imageDataCache = new SvelteMap<string, string>()
   const loadingImageIds = new SvelteSet<string>()
+  // Ids whose load failed; rendered as a retry affordance rather than an endless spinner.
+  const failedImageIds = new SvelteSet<string>()
+  const MAX_CACHE_BYTES = 96 * 1024 * 1024
+  let cacheBytes = 0
+
   let isLoading = $state(false)
   let isSaving = $state(false)
   let isRegenerating = $state(false)
@@ -41,6 +51,50 @@
   let lightboxImageIndex = $state(0)
   let touchStartX = $state(0)
   let touchEndX = $state(0)
+
+  /** Ids that must survive eviction: whatever the lightbox is showing or about to show. */
+  function visibleImageIds(): Set<string> {
+    if (!lightboxOpen) return new Set()
+    return new Set(
+      [
+        images[lightboxImageIndex - 1]?.id,
+        images[lightboxImageIndex]?.id,
+        images[lightboxImageIndex + 1]?.id,
+      ].filter((id): id is string => !!id),
+    )
+  }
+
+  /** Drop least-recently-used payloads until the cache is back inside its budget. */
+  function evictOverBudget(protectedIds: Set<string>) {
+    if (cacheBytes <= MAX_CACHE_BYTES) return
+    // SvelteMap iterates in insertion order, and cacheImageData re-inserts on every hit,
+    // so the oldest entries here are the least recently used.
+    for (const [id, data] of imageDataCache) {
+      if (cacheBytes <= MAX_CACHE_BYTES) break
+      if (protectedIds.has(id)) continue
+      imageDataCache.delete(id)
+      cacheBytes -= data.length
+    }
+  }
+
+  /** Insert (or refresh) a payload, then evict whatever no longer fits. */
+  function cacheImageData(id: string, data: string) {
+    const existing = imageDataCache.get(id)
+    if (existing !== undefined) {
+      cacheBytes -= existing.length
+      imageDataCache.delete(id)
+    }
+    imageDataCache.set(id, data)
+    cacheBytes += data.length
+    evictOverBudget(visibleImageIds())
+  }
+
+  function clearImageCache() {
+    imageDataCache.clear()
+    loadingImageIds.clear()
+    failedImageIds.clear()
+    cacheBytes = 0
+  }
 
   function resetSelection() {
     selectedImageIds = new Set()
@@ -56,8 +110,7 @@
     if (!storyId) return
 
     ui.clearGalleryImages(storyId)
-    imageDataCache.clear()
-    loadingImageIds.clear()
+    clearImageCache()
     await loadImagesForStory(storyId)
   }
 
@@ -65,11 +118,17 @@
   async function ensureImageData(id: string | undefined) {
     if (!id || imageDataCache.has(id) || loadingImageIds.has(id)) return
     loadingImageIds.add(id)
+    failedImageIds.delete(id)
     try {
       const full = await database.getEmbeddedImage(id)
-      if (full?.imageData) imageDataCache.set(id, full.imageData)
+      if (full?.imageData) {
+        cacheImageData(id, full.imageData)
+      } else {
+        failedImageIds.add(id)
+      }
     } catch (error) {
       console.error('[Gallery] Failed to load image data:', error)
+      failedImageIds.add(id)
     } finally {
       loadingImageIds.delete(id)
     }
@@ -77,13 +136,13 @@
 
   /** Svelte action: load an image's pixels once its grid cell scrolls near the viewport. */
   function lazyImage(node: HTMLElement, id: string) {
+    // Deliberately keeps observing instead of unobserving after the first hit: a payload can be
+    // evicted by the LRU once it scrolls away, and scrolling back must fetch it again.
+    // ensureImageData is itself a no-op when the data is already cached or in flight.
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            ensureImageData(id)
-            observer.unobserve(node)
-          }
+          if (entry.isIntersecting) ensureImageData(id)
         }
       },
       { rootMargin: '300px' },
@@ -111,9 +170,19 @@
     }
   }
 
+  // Tracks which story the cache holds pixels for. Plain `let`: it must not make this effect
+  // re-run, and the effect can fire again for the same story when currentStory is replaced.
+  let cachedStoryId: string | null = null
+
   $effect(() => {
     const storyId = story.currentStory?.id
     resetSelection() // Always reset selection on story change
+
+    // Drop the previous story's payloads — otherwise they stay in the heap for the whole session.
+    if (storyId !== cachedStoryId) {
+      clearImageCache()
+      cachedStoryId = storyId ?? null
+    }
 
     if (storyId) {
       const cached = ui.getGalleryImages(storyId)
@@ -440,6 +509,17 @@
                   alt={`Generated image ${index + 1}`}
                   class="h-full w-full object-contain"
                 />
+              {:else if failedImageIds.has(image.id)}
+                <button
+                  class="text-surface-400 hover:text-surface-200 flex h-full w-full flex-col items-center justify-center gap-1 text-xs"
+                  onclick={(e) => {
+                    e.stopPropagation()
+                    ensureImageData(image.id)
+                  }}
+                >
+                  <RefreshCw class="h-4 w-4" />
+                  Retry
+                </button>
               {:else}
                 <div class="flex h-full w-full items-center justify-center">
                   <div
@@ -537,6 +617,17 @@
               class="max-h-[40vh] max-w-full rounded object-contain sm:max-h-[50vh]"
               class:opacity-50={isRegenerating}
             />
+          {:else if failedImageIds.has(images[lightboxImageIndex].id)}
+            <div class="flex h-[40vh] w-full items-center justify-center sm:h-[50vh]">
+              <Button
+                variant="outline"
+                size="sm"
+                onclick={() => ensureImageData(images[lightboxImageIndex].id)}
+              >
+                <RefreshCw class="h-4 w-4" />
+                Retry
+              </Button>
+            </div>
           {:else}
             <div class="flex h-[40vh] w-full items-center justify-center sm:h-[50vh]">
               <div

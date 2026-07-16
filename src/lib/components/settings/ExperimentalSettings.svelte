@@ -36,7 +36,8 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { database } from '$lib/services/database'
   import { isAndroid } from '$lib/utils/platform'
-  import { ask } from '@tauri-apps/plugin-dialog'
+  import { ask, open } from '@tauri-apps/plugin-dialog'
+  import { openFilters } from '$lib/utils/dialogFilters'
   import { invoke } from '@tauri-apps/api/core'
   import { errMessage } from '$lib/utils/error'
 
@@ -146,15 +147,15 @@
     restoreError = null
 
     // Pick the backup file. On Android this returns a SAF content:// URI; on desktop a real path.
-    const { open } = await import('@tauri-apps/plugin-dialog')
     const selected = await open({
       title: 'Select Aventura Backup to Restore',
-      filters: [
+      // openFilters drops these on Android. It matters here: SAF appends " (1)" AFTER ".zip" for
+      // duplicate names, and Android cannot resolve a MIME type for "backup.zip (1)", so a
+      // zip-filtered picker would grey out the very backup the user is trying to restore.
+      filters: openFilters([
         { name: 'ZIP Archive', extensions: ['zip'] },
-        // Fallback: Android SAF may append " (1)" AFTER ".zip" for duplicate names, so the file no
-        // longer matches a strict .zip filter and would be unselectable without this.
         { name: 'All Files', extensions: ['*'] },
-      ],
+      ]),
       multiple: false,
       directory: false,
     })

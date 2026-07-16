@@ -705,7 +705,6 @@ export interface APIProfile {
   hiddenModels: string[] // Models hidden from selection lists
   favoriteModels: string[] // Models shown at the top of selection lists
   pingEnabled?: boolean // Opt-in: enable pings to show model availability status (OR free / NIM only)
-  includePaidModels?: boolean // Opt-in: include paid-only models when fetching (Pollinations only)
   createdAt: number // Timestamp
 }
 

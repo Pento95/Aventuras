@@ -32,7 +32,6 @@ export async function fetchModelsFromProvider(
   providerType: ProviderType,
   baseUrl?: string,
   apiKey?: string,
-  includePaid = false,
 ): Promise<TextModel[]> {
   // Provider-specific fetch logic
   if (providerType === 'nanogpt') return fetchNanogptModels(baseUrl)
@@ -43,7 +42,7 @@ export async function fetchModelsFromProvider(
   if (providerType === 'ollama') return wrap(fetchOllamaModels(baseUrl))
   if (providerType === 'zhipu') return wrap(fetchZhipuModels(baseUrl, apiKey))
   if (providerType === 'mistral') return wrap(fetchMistralModels(baseUrl, apiKey))
-  if (providerType === 'pollinations') return fetchPollinationsTextModels(includePaid)
+  if (providerType === 'pollinations') return fetchPollinationsTextModels(apiKey)
 
   if (providerType === 'nvidia-nim') return fetchNimModels(baseUrl, apiKey)
 
@@ -463,18 +462,22 @@ async function fetchMistralModels(baseUrl?: string, apiKey?: string): Promise<st
 interface PollinationsTextModelResponse {
   name: string
   is_specialized?: boolean
-  paid_only?: boolean
   reasoning?: boolean
   input_modalities?: string[]
   output_modalities?: string[]
 }
 
-async function fetchPollinationsTextModels(includePaid = false): Promise<TextModel[]> {
+async function fetchPollinationsTextModels(apiKey?: string): Promise<TextModel[]> {
   const url = 'https://gen.pollinations.ai/text/models'
   const fetchFn = createTimeoutFetch(30000, 'model-fetch')
 
   try {
-    const response = await fetchFn(url, { method: 'GET' })
+    // The API filters models by tier server-side based on the key, so the list
+    // already reflects what this key can actually generate.
+    const response = await fetchFn(url, {
+      method: 'GET',
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    })
     if (!response.ok) return getPollinationsTextFallback()
 
     const data = await response.json()
@@ -484,7 +487,6 @@ async function fetchPollinationsTextModels(includePaid = false): Promise<TextMod
       .filter(
         (m) =>
           !m.is_specialized &&
-          (includePaid || !m.paid_only) &&
           (m.input_modalities?.includes('text') ?? true) &&
           (m.output_modalities?.includes('text') ?? true),
       )

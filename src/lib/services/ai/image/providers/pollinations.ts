@@ -29,7 +29,6 @@ interface PollinationsImageModelResponse {
   description?: string
   input_modalities?: string[]
   output_modalities?: string[]
-  paid_only?: boolean
   pricing?: {
     completionImageTokens?: string | number
     promptTextTokens?: string | number
@@ -94,7 +93,7 @@ export function createPollinationsProvider(config: ImageProviderConfig): ImagePr
       return { base64 }
     },
 
-    async listModels(apiKey?: string, includePaid = false): Promise<ImageModelInfo[]> {
+    async listModels(apiKey?: string): Promise<ImageModelInfo[]> {
       try {
         const headers: Record<string, string> = { Accept: 'application/json' }
         if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
@@ -106,11 +105,7 @@ export function createPollinationsProvider(config: ImageProviderConfig): ImagePr
         if (!Array.isArray(data) || data.length === 0) return getFallbackModels()
 
         return (data as PollinationsImageModelResponse[])
-          .filter((model) => {
-            if (!(model.output_modalities?.includes('image') ?? false)) return false
-            if (!includePaid && model.paid_only) return false
-            return true
-          })
+          .filter((model) => model.output_modalities?.includes('image') ?? false)
           .map((model) => ({
             id: model.name,
             name: model.name,

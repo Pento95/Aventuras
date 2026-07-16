@@ -7,7 +7,6 @@
   import { Input } from '$lib/components/ui/input'
   import { Autocomplete } from '$lib/components/ui/autocomplete'
   import { Slider } from '$lib/components/ui/slider'
-  import { Switch } from '$lib/components/ui/switch'
   import { RotateCcw, Info, Plus, Copy, Eye, EyeOff, ChevronRight, Check } from 'lucide-svelte'
   import { Textarea } from '$lib/components/ui/textarea'
   import {
@@ -147,7 +146,6 @@
   // Profile form model state
   let profileModel = $state('')
   let profileModels = $state<ImageModelInfo[]>([])
-  let profileIncludePaid = $state(false)
   const referenceProfileImg2ImgWarning = $derived(
     isEditingReferenceProfile &&
       !!profileModel &&
@@ -344,7 +342,6 @@
     apiKey: string,
     baseUrl: string,
     forceReload: boolean,
-    includePaid = false,
   ) {
     const effectiveBaseUrl = baseUrl || undefined
     const reqId = ++profileModelsReqId
@@ -356,7 +353,6 @@
         apiKey,
         forceReload,
         effectiveBaseUrl,
-        includePaid,
       )
       // Discard stale results if a newer request has already started.
       if (reqId !== profileModelsReqId) return
@@ -378,10 +374,9 @@
       const providerType = profileProviderType
       const apiKey = profileApiKey
       const baseUrl = profileBaseUrl
-      const includePaid = profileIncludePaid
 
       untrack(() => {
-        loadProfileFormModels(providerType, apiKey, baseUrl, false, includePaid)
+        loadProfileFormModels(providerType, apiKey, baseUrl, false)
         if (providerType === 'comfyui') {
           loadSamplerInfo(baseUrl || undefined, 'comfyui')
           loadLoras(baseUrl || undefined)
@@ -447,9 +442,6 @@
 
   // Builds the provider-specific options object from current form state
   function buildProviderOptions(): Record<string, any> {
-    if (profileProviderType === 'pollinations') {
-      return { includePaidModels: profileIncludePaid }
-    }
     if (profileProviderType === 'a1111') {
       return {
         steps: profileSteps,
@@ -511,7 +503,6 @@
         profileApiKey,
         profileBaseUrl,
         profileModel,
-        profileIncludePaid,
         profileSampler,
         profileScheduler,
         profileMode,
@@ -555,7 +546,6 @@
     profileBaseUrl = ''
     profileModel = ''
     profileModels = []
-    profileIncludePaid = false
     profileSampler = 'dpmpp_2m_sde_gpu'
     profileScheduler = 'sgm_uniform'
     profileMode = ComfyMode.BasicTxt2Img
@@ -595,7 +585,6 @@
     profileBaseUrl = profile.baseUrl || ''
     profileModel = profile.model || ''
     profileModels = []
-    profileIncludePaid = (profile.providerOptions || {}).includePaidModels === true
 
     if (profile.providerType === 'a1111') {
       const opts = profile.providerOptions || {}
@@ -1421,16 +1410,6 @@
       </div>
     {/if}
 
-    {#if profileProviderType === 'pollinations'}
-      <div class="bg-muted/30 flex items-center gap-3 rounded-md border p-2">
-        <Switch id="image-include-paid" bind:checked={profileIncludePaid} />
-        <Label for="image-include-paid" class="cursor-pointer text-xs leading-snug font-normal">
-          <span class="font-medium">Include paid models</span>
-          <span class="text-muted-foreground block"> Also list models marked as paid-only. </span>
-        </Label>
-      </div>
-    {/if}
-
     {#snippet modelSelectContent()}
       <Label>Model</Label>
       <ImageModelSelect
@@ -1447,13 +1426,7 @@
         errorMessage={profileModelsError}
         showRefreshButton={true}
         onRefresh={() =>
-          loadProfileFormModels(
-            profileProviderType,
-            profileApiKey,
-            profileBaseUrl,
-            true,
-            profileIncludePaid,
-          )}
+          loadProfileFormModels(profileProviderType, profileApiKey, profileBaseUrl, true)}
       />
       {#if referenceProfileImg2ImgWarning}
         <p class="text-warning mt-1 text-xs">

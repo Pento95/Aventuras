@@ -3063,9 +3063,6 @@ class StoryStore {
     // Get previous chapters for context (branch-filtered)
     const previousChapters = [...this.currentBranchChapters].sort((a, b) => a.number - b.number)
 
-    // Import aiService dynamically to avoid circular dependency
-    const { aiService } = await import('$lib/services/ai')
-
     // Generate summary with previous chapters as context
     const chapterData = await aiService.summarizeChapter(
       chapterEntries,

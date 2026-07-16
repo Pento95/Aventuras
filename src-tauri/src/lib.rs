@@ -1,6 +1,7 @@
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+mod avt_import;
 mod backup;
 mod migration_patch;
 mod sync;
@@ -228,7 +229,7 @@ pub fn run() {
             description: "entry_versions",
             sql: include_str!("../migrations/035_entry_versions.sql"),
             kind: MigrationKind::Up,
-        }
+        },
     ];
 
     #[cfg_attr(not(all(debug_assertions, feature = "devtools")), allow(unused_mut))]
@@ -281,6 +282,8 @@ pub fn run() {
             export_single_image,
             export_story_avt,
             import_saf_to_temp,
+            avt_import::avt_read_light,
+            avt_import::avt_import_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

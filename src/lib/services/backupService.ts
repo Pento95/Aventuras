@@ -22,6 +22,7 @@ import * as path from '@tauri-apps/api/path'
 import { getVersion } from '@tauri-apps/api/app'
 import { database } from './database'
 import { resolveSaveTarget } from './exportTarget'
+import { errMessage } from '$lib/utils/error'
 
 interface BackupMetadata {
   version: number
@@ -57,7 +58,10 @@ class BackupService {
     }
 
     // 2. Create a consistent DB snapshot via VACUUM INTO (writes to disk, no large buffer).
-    //    Fall back to the live DB file if VACUUM is unavailable.
+    //    There is deliberately no fallback to the live aventura.db file: the database runs in
+    //    WAL mode, so recent commits can still live in aventura.db-wal. Archiving the bare .db
+    //    would silently produce a backup that is missing the newest data — the worst possible
+    //    failure for a backup, since it only surfaces when the user tries to restore it.
     const tempDir = await path.tempDir()
     const tempDbPath = await path.join(tempDir, `aventura-backup-${Date.now()}.db`)
     let dbSourcePath: string | null = null
@@ -70,13 +74,8 @@ class BackupService {
         cleanupTemp = true
       }
     } catch (error) {
-      console.warn('[Backup] VACUUM INTO failed, falling back to live DB file:', error)
-    }
-
-    if (!dbSourcePath) {
-      const appDataDir = await path.appDataDir()
-      const livePath = await path.join(appDataDir, 'aventura.db')
-      if (await exists(livePath)) dbSourcePath = livePath
+      console.error('[Backup] VACUUM INTO failed:', error)
+      throw new Error(`Could not create a database snapshot to back up: ${errMessage(error)}`)
     }
 
     if (!dbSourcePath) {

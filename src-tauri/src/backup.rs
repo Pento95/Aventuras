@@ -82,7 +82,8 @@ pub async fn backup_database(
         .compression_level(Some(1));
     zip.start_file("aventura.db", deflated)
         .map_err(|e| format!("failed to add db to archive: {e}"))?;
-    io::copy(&mut db_file, &mut zip).map_err(|e| format!("failed to stream db into archive: {e}"))?;
+    io::copy(&mut db_file, &mut zip)
+        .map_err(|e| format!("failed to stream db into archive: {e}"))?;
 
     zip.start_file("metadata.json", SimpleFileOptions::default())
         .map_err(|e| format!("failed to add metadata to archive: {e}"))?;
@@ -97,46 +98,107 @@ pub async fn backup_database(
 /// Restore the database from a backup ZIP.
 ///
 /// Extracts only the `aventura.db` entry (older backups may also contain `stories/*.avt`,
-/// which are ignored), streaming it directly over the live DB file. A safety copy of the
-/// current DB is written first. The caller is expected to restart the app immediately after,
-/// since the sql plugin still holds the old file open.
+/// which are ignored). The extracted DB is staged in a temp file alongside the target and
+/// validated BEFORE the live DB is touched, so a truncated archive, a CRC mismatch or a full
+/// disk leaves the existing database completely untouched. The swap itself is two renames
+/// within the same directory (atomic, and free in disk space): the live DB becomes the
+/// pre-restore safety copy, then the staged DB takes its place.
+///
+/// The caller is expected to restart the app immediately after, since the sql plugin still
+/// holds the old file open.
 #[tauri::command]
 pub async fn restore_database(app: AppHandle, zip_path: String) -> Result<(), String> {
     let target = db_path(&app)?;
+    restore_db_from_zip(&zip_path, &target)
+}
+
+/// The restore itself, in terms of plain paths so it can be exercised without an `AppHandle`.
+fn restore_db_from_zip(zip_path: &str, target: &Path) -> Result<(), String> {
     let app_dir = target
         .parent()
         .ok_or_else(|| "invalid db path".to_string())?
         .to_path_buf();
 
-    let file = File::open(&zip_path).map_err(|e| format!("failed to open backup {zip_path}: {e}"))?;
+    let file =
+        File::open(zip_path).map_err(|e| format!("failed to open backup {zip_path}: {e}"))?;
     let mut archive = ZipArchive::new(file).map_err(|e| format!("invalid backup archive: {e}"))?;
 
-    // Safety copy of the current DB (native copy, no buffer through JS/IPC).
-    if target.exists() {
-        let safety = app_dir.join("aventura-pre-restore.db");
-        if let Err(e) = std::fs::copy(&target, &safety) {
-            // Non-fatal: log-style warning surfaced to the caller-friendly console via Err? No —
-            // keep going, the restore itself is the important part.
-            eprintln!("[restore] could not write safety copy: {e}");
-        }
-    }
-
-    {
+    // 1. Stage the extracted DB next to the target (same filesystem, so the swap below can be a
+    //    rename). Nothing here touches the live DB, so any failure is a clean no-op.
+    let staged = with_suffix(target, ".restore-staged");
+    let _ = std::fs::remove_file(&staged);
+    let staged_result = (|| -> Result<(), String> {
         let mut entry = archive
             .by_name("aventura.db")
             .map_err(|_| "backup does not contain aventura.db".to_string())?;
-        let mut out =
-            File::create(&target).map_err(|e| format!("failed to open db for writing: {e}"))?;
+        let mut out = File::create(&staged)
+            .map_err(|e| format!("failed to open staged db for writing: {e}"))?;
+        // Reading the entry to completion also verifies the zip CRC, so a corrupted or truncated
+        // archive fails here rather than after the live DB is gone.
         io::copy(&mut entry, &mut out)
             .map_err(|e| format!("failed to stream db from archive: {e}"))?;
+        out.flush()
+            .map_err(|e| format!("failed to flush staged db: {e}"))?;
+        Ok(())
+    })();
+    if let Err(e) = staged_result {
+        let _ = std::fs::remove_file(&staged);
+        return Err(e);
+    }
+
+    // 2. Validate the staged file before it can replace anything.
+    if let Err(e) = validate_sqlite_file(&staged) {
+        let _ = std::fs::remove_file(&staged);
+        return Err(e);
+    }
+
+    // 3. Swap. Renaming (rather than copying) the live DB aside costs no extra disk space, which
+    //    matters on Android where the DB can be hundreds of MB.
+    let safety = app_dir.join("aventura-pre-restore.db");
+    let had_target = target.exists();
+    if had_target {
+        let _ = std::fs::remove_file(&safety);
+        std::fs::rename(target, &safety).map_err(|e| {
+            let _ = std::fs::remove_file(&staged);
+            format!("failed to set aside the current database: {e}")
+        })?;
+    }
+
+    if let Err(e) = std::fs::rename(&staged, target) {
+        // Put the original back so the app is left exactly as it was.
+        if had_target {
+            let _ = std::fs::rename(&safety, target);
+        }
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!("failed to replace database file: {e}"));
     }
 
     // Remove WAL/SHM side files that could otherwise conflict with the restored DB.
     for suffix in ["-wal", "-shm"] {
-        let side = with_suffix(&target, suffix);
+        let side = with_suffix(target, suffix);
         let _ = std::fs::remove_file(side);
     }
 
+    Ok(())
+}
+
+/// Sanity-check that a file really is a SQLite database before it replaces the live one.
+///
+/// The zip CRC already guarantees the bytes survived extraction intact, so this only has to
+/// catch a backup whose `aventura.db` entry is empty or isn't a database at all.
+fn validate_sqlite_file(path: &Path) -> Result<(), String> {
+    use std::io::Read;
+
+    const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
+
+    let mut file =
+        File::open(path).map_err(|e| format!("failed to reopen the restored database: {e}"))?;
+    let mut header = [0u8; 16];
+    file.read_exact(&mut header)
+        .map_err(|_| "the backup's database is empty or truncated".to_string())?;
+    if header != SQLITE_MAGIC {
+        return Err("the backup's database is not a valid SQLite file".to_string());
+    }
     Ok(())
 }
 
@@ -265,7 +327,8 @@ pub async fn export_single_image(
     let mut out = open_dest(&app, &dest_path)?;
     out.write_all(&bytes)
         .map_err(|e| format!("failed to write image: {e}"))?;
-    out.flush().map_err(|e| format!("failed to flush image: {e}"))?;
+    out.flush()
+        .map_err(|e| format!("failed to flush image: {e}"))?;
     Ok(dest_path)
 }
 
@@ -293,7 +356,8 @@ pub async fn export_story_avt(
         .map(|s| s.to_string());
 
     // Map each image id to its slot in the array (metadata only — cheap).
-    let mut index_by_id: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut index_by_id: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     if let Some(images) = root.get("embeddedImages").and_then(|v| v.as_array()) {
         for (i, img) in images.iter().enumerate() {
             if let Some(id) = img.get("id").and_then(|v| v.as_str()) {
@@ -337,16 +401,21 @@ pub async fn export_story_avt(
     let mut writer = BufWriter::new(file);
     serde_json::to_writer(&mut writer, &root).map_err(|e| format!("failed to write avt: {e}"))?;
     // Flush the buffer to the fd explicitly before it closes, so nothing is lost on a SAF fd.
-    writer.flush().map_err(|e| format!("failed to flush avt: {e}"))?;
+    writer
+        .flush()
+        .map_err(|e| format!("failed to flush avt: {e}"))?;
     Ok(dest_path)
 }
-
 
 /// Copy a user-picked SAF `content://` source (the backup chosen via the open dialog on Android)
 /// into a real temp file in the app dir, and return its path. Restore needs a real, seekable file:
 /// the picked URI cannot be `std::fs::open`ed, so we stream it in natively via the fs plugin's
-/// content-URI file descriptor (no bytes cross the JS bridge). The caller restores from the temp
-/// path; the temp is best-effort cleaned up by the restore, and the app exits right after anyway.
+/// content-URI file descriptor (no bytes cross the JS bridge).
+///
+/// These temps are full copies of the user's backup (hundreds of MB), so stale ones are swept
+/// here, on the way in. Cleaning up after a restore instead would not work: the app calls
+/// `exit(0)` on success, so a post-restore cleanup would never run in the normal case — and it
+/// would still leak if the OS killed the app mid-restore.
 #[tauri::command]
 pub fn import_saf_to_temp(app: AppHandle, src_uri: String) -> Result<String, String> {
     use std::str::FromStr;
@@ -361,6 +430,21 @@ pub fn import_saf_to_temp(app: AppHandle, src_uri: String) -> Result<String, Str
         .app_cache_dir()
         .map_err(|e| format!("no cache dir: {e}"))?;
     std::fs::create_dir_all(&dir).ok();
+
+    // Sweep temps left behind by earlier restores (see the note above on why cleanup lives here).
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_stale_temp = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with(".tmp-restore-") && n.ends_with(".zip"));
+            if is_stale_temp && path.is_file() {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+
     let millis = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
@@ -377,6 +461,173 @@ pub fn import_saf_to_temp(app: AppHandle, src_uri: String) -> Result<String, Str
     let mut out =
         File::create(&dest_path).map_err(|e| format!("failed to create temp restore file: {e}"))?;
     io::copy(&mut src, &mut out).map_err(|e| format!("failed to copy source: {e}"))?;
-    out.flush().map_err(|e| format!("failed to flush temp: {e}"))?;
+    out.flush()
+        .map_err(|e| format!("failed to flush temp: {e}"))?;
     Ok(dest_path.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+
+    const SQLITE_HEADER: &[u8] = b"SQLite format 3\0";
+
+    /// Minimal stand-in for a real database file: enough bytes to look like SQLite.
+    fn fake_db_bytes(marker: &str) -> Vec<u8> {
+        let mut v = SQLITE_HEADER.to_vec();
+        v.extend_from_slice(marker.as_bytes());
+        v
+    }
+
+    /// A stand-in big enough that the zip's entry data dominates the archive, so a byte flipped
+    /// in the middle lands in the compressed payload (and trips the CRC on read) rather than in
+    /// the local header or central directory (which would fail before extraction even starts).
+    fn big_fake_db_bytes(marker: &str) -> Vec<u8> {
+        let mut v = fake_db_bytes(marker);
+        // Incompressible filler, so the stored entry stays large after deflate.
+        let mut seed = 0x5eed_u32;
+        v.resize(256 * 1024, 0);
+        for byte in v.iter_mut().skip(SQLITE_HEADER.len() + marker.len()) {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            *byte = (seed >> 24) as u8;
+        }
+        v
+    }
+
+    fn write_zip(path: &Path, entries: &[(&str, &[u8])]) {
+        let mut zip = ZipWriter::new(File::create(path).unwrap());
+        for (name, data) in entries {
+            zip.start_file(*name, SimpleFileOptions::default()).unwrap();
+            zip.write_all(data).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    fn read(path: &Path) -> Vec<u8> {
+        let mut buf = Vec::new();
+        File::open(path).unwrap().read_to_end(&mut buf).unwrap();
+        buf
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("aventura-restore-test-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn restores_and_keeps_the_previous_db_as_safety_copy() {
+        let dir = temp_dir("happy");
+        let target = dir.join("aventura.db");
+        let zip = dir.join("backup.zip");
+        std::fs::write(&target, fake_db_bytes("old")).unwrap();
+        write_zip(&zip, &[("aventura.db", &fake_db_bytes("new"))]);
+
+        restore_db_from_zip(zip.to_str().unwrap(), &target).unwrap();
+
+        assert_eq!(read(&target), fake_db_bytes("new"));
+        assert_eq!(
+            read(&dir.join("aventura-pre-restore.db")),
+            fake_db_bytes("old")
+        );
+        assert!(!target.with_extension("db.restore-staged").exists());
+    }
+
+    /// The regression this whole staging dance exists for: extraction that dies PART WAY THROUGH,
+    /// which is exactly when the old code had already truncated the live DB via File::create.
+    #[test]
+    fn leaves_the_live_db_untouched_when_the_archive_is_corrupt() {
+        let dir = temp_dir("corrupt");
+        let target = dir.join("aventura.db");
+        let zip = dir.join("backup.zip");
+        let precious = big_fake_db_bytes("precious");
+        std::fs::write(&target, &precious).unwrap();
+        write_zip(&zip, &[("aventura.db", &big_fake_db_bytes("new"))]);
+
+        // Flip a byte inside the entry's compressed data so the CRC fails only once the reader has
+        // streamed through it — i.e. after the point of no return in the old implementation.
+        let mut bytes = read(&zip);
+        let len = bytes.len();
+        bytes[len / 2] ^= 0xFF;
+        std::fs::write(&zip, &bytes).unwrap();
+
+        let err = restore_db_from_zip(zip.to_str().unwrap(), &target).unwrap_err();
+
+        // The whole point: a failed restore must not cost the user their database.
+        assert_eq!(read(&target), precious, "live DB was damaged: {err}");
+        assert!(
+            !dir.join("aventura.db.restore-staged").exists(),
+            "staged temp leaked"
+        );
+    }
+
+    /// A truncated archive (download cut short, SAF copy interrupted) must be equally harmless.
+    #[test]
+    fn leaves_the_live_db_untouched_when_the_archive_is_truncated() {
+        let dir = temp_dir("truncated");
+        let target = dir.join("aventura.db");
+        let zip = dir.join("backup.zip");
+        let precious = big_fake_db_bytes("precious");
+        std::fs::write(&target, &precious).unwrap();
+        write_zip(&zip, &[("aventura.db", &big_fake_db_bytes("new"))]);
+
+        let bytes = read(&zip);
+        std::fs::write(&zip, &bytes[..bytes.len() / 2]).unwrap();
+
+        let err = restore_db_from_zip(zip.to_str().unwrap(), &target).unwrap_err();
+        assert_eq!(read(&target), precious, "live DB was damaged: {err}");
+    }
+
+    #[test]
+    fn leaves_the_live_db_untouched_when_the_entry_is_not_a_database() {
+        let dir = temp_dir("notadb");
+        let target = dir.join("aventura.db");
+        let zip = dir.join("backup.zip");
+        std::fs::write(&target, fake_db_bytes("precious")).unwrap();
+        write_zip(&zip, &[("aventura.db", b"this is not a database")]);
+
+        let err = restore_db_from_zip(zip.to_str().unwrap(), &target).unwrap_err();
+
+        assert!(
+            err.contains("not a valid SQLite file"),
+            "unexpected error: {err}"
+        );
+        assert_eq!(read(&target), fake_db_bytes("precious"));
+    }
+
+    #[test]
+    fn leaves_the_live_db_untouched_when_the_archive_has_no_db_entry() {
+        let dir = temp_dir("noentry");
+        let target = dir.join("aventura.db");
+        let zip = dir.join("backup.zip");
+        std::fs::write(&target, fake_db_bytes("precious")).unwrap();
+        write_zip(&zip, &[("metadata.json", b"{}")]);
+
+        let err = restore_db_from_zip(zip.to_str().unwrap(), &target).unwrap_err();
+
+        assert!(
+            err.contains("does not contain aventura.db"),
+            "unexpected error: {err}"
+        );
+        assert_eq!(read(&target), fake_db_bytes("precious"));
+        assert!(!dir.join("aventura.db.restore-staged").exists());
+    }
+
+    #[test]
+    fn removes_stale_wal_and_shm_side_files() {
+        let dir = temp_dir("wal");
+        let target = dir.join("aventura.db");
+        let zip = dir.join("backup.zip");
+        std::fs::write(&target, fake_db_bytes("old")).unwrap();
+        std::fs::write(dir.join("aventura.db-wal"), b"stale wal").unwrap();
+        std::fs::write(dir.join("aventura.db-shm"), b"stale shm").unwrap();
+        write_zip(&zip, &[("aventura.db", &fake_db_bytes("new"))]);
+
+        restore_db_from_zip(zip.to_str().unwrap(), &target).unwrap();
+
+        assert!(!dir.join("aventura.db-wal").exists());
+        assert!(!dir.join("aventura.db-shm").exists());
+    }
 }

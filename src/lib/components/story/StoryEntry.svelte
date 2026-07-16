@@ -83,11 +83,13 @@
   function formatStoryTime(time: TimeTracker | null | undefined): string {
     if (!time) return ''
     const parts: string[] = []
-    if (time.years > 0) parts.push(`Y${time.years}`)
-    if (time.days > 0) parts.push(`D${time.days}`)
-    parts.push(
-      `${time.hours.toString().padStart(2, '0')}:${time.minutes.toString().padStart(2, '0')}`,
-    )
+    // TimeTracker's fields are all required, but this data is persisted JSON: a story imported
+    // from an older .avt can carry a partial tracker that the type system never sees.
+    if (time.years && time.years > 0) parts.push(`Y${time.years}`)
+    if (time.days && time.days > 0) parts.push(`D${time.days}`)
+    const hours = time.hours ?? 0
+    const minutes = time.minutes ?? 0
+    parts.push(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
     return parts.join(' ')
   }
 
