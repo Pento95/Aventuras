@@ -1101,14 +1101,18 @@ lifecycle:
 - **`definition`** — definitional content (what the story IS).
   Wizard-authored at story creation; no global default. Edits propagate
   to all branches of the story (definition is story-level, not
-  branch-level).
+  branch-level). It is strictly parsed at story open; corruption has no
+  automatic reset path because no valid default can preserve the
+  story's defining intent.
 - **`settings`** — operational config (how it generates). Copy-at-
   creation from `app_settings.default_story_settings`; story owns its
   values thereafter. Some fields use override-at-render instead
-  (models only).
+  (models only). An explicit corruption reset repeats the same
+  copy-on-create path using the current app-level defaults.
 
-Both are parsed with defaults applied at load time (parse mechanics
-in architecture.md → "Settings: strict types, defaults at load").
+Both are Zod-parsed at load time, but only `settings` has defaults
+applied; `definition` is strict and has no fallback (see
+[Settings: strict types, defaults at load](./architecture.md#settings-strict-types-defaults-at-load)).
 The split mirrors the two-section left rail of the
 [Story Settings screen](./ui/screens/story-settings/story-settings.md):
 `definition` ↔ Story section, `settings` ↔ Settings section.

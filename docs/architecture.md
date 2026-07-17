@@ -342,12 +342,13 @@ Several shapes feed into it:
 2. **Story-level definition** (`stories.definition` JSON on the
    loaded story) — definitional content (`mode`, `leadEntityId`,
    `narration`, `genre`, `tone`, `setting`, calendar fields). Zod-
-   parsed at story open via the `StoryDefinition` schema with
-   defaults applied. Full shape in data-model.md → "Story settings
-   shape."
+   parsed strictly at story open via the `StoryDefinition` schema.
+   Definition is wizard-authored and has no defaults. See
+   [Story settings shape](./data-model.md#story-settings-shape).
 3. **Story-level settings** (`stories.settings` JSON on the loaded
    story) — operational config (memory knobs, translation, models,
-   pack). Zod-parsed at story open via the `StorySettings` schema.
+   pack). Zod-parsed at story open via the `StorySettings` schema,
+   with defaults applied.
 4. **Story identity fields** (`stories` columns — title, tags,
    cover, accent, etc.) — not LLM-consumed directly; these are
    library-shaped metadata.
@@ -378,17 +379,28 @@ fail: `app_settings` (master config), `stories.definition`,
 
 - **`app_settings` parse failure.** App blocks at a recovery screen —
   _"Couldn't load settings. Open the corrupted file?"_ with two
-  actions: `Open file` (deep-links the SQLite file in the OS file
-  manager) and `Reset settings` (writes a fresh default
-  `app_settings` row, preserving everything else). No silent crash;
-  no automatic reset because losing user-configured providers + keys
-  is destructive.
-- **`stories.definition` or `stories.settings` parse failure.** The
-  affected story fails to open; user sees a per-story error badge in
-  the story list (_"Couldn't open — settings corrupted"_). Other
-  stories unaffected. Same `Open file` + `Reset to defaults for this
-story` actions. Reset destroys per-story knobs but preserves all
-  delta-replayable narrative content.
+  desktop actions: `Open file` (deep-links the SQLite file in the OS
+  file manager) and `Reset settings` (writes a fresh default
+  `app_settings` row, preserving everything else). Android omits
+  `Open file` and offers reset only; the mobile database-repair path
+  is not designed. No silent crash; no automatic reset because losing
+  user-configured providers + keys is destructive.
+- **`stories.definition` parse failure.** The affected story fails to
+  open; the story-list badge reads _"Couldn't open — story definition
+  corrupted"_. Other stories are unaffected. Desktop provides the
+  open-file action for manual repair; Android has no repair action in
+  v1. No reset action is offered on either platform: definition is
+  wizard-authored content with no default, so replacing it
+  automatically would destroy the story's defining intent.
+- **`stories.settings` parse failure.** The affected story fails to
+  open; the story-list badge reads _"Couldn't open — settings
+  corrupted"_. Other stories are unaffected. Desktop actions are
+  `Open file` and `Reset settings for this story`; Android offers reset
+  only. Reset rebuilds `StorySettings` from the current app-level
+  defaults through the same copy-on-create path used for a new story.
+  It replaces per-story operational knobs but preserves definition and
+  all delta-replayable narrative content. The mobile database-repair
+  path is not designed.
 
 Zod is a v1 dependency. `app_settings` config is zod-parsed at
 hydrate via `appSettingsConfigSchema`. An absent row hydrates

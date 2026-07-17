@@ -9,30 +9,37 @@
   (2.7's story-open path writes the C1 open-failure state, and
   the kill-mid-turn criterion needs the real per-turn pipeline;
   the badge UI itself develops against a fixture-written state).
-  The recovery-modal half is day-one (the
-  `pendingRecoveryReport` slot shipped in 1.7a)
+  The recovery-modal half is day-one: 1.7a shipped the recovery
+  pass, but its bootstrap currently discards the returned
+  `RecoveryReport`, so this slice also owns the missing UI-state
+  handoff.
 - **Blocks:** none
 
 ## Goal
 
-The two user-facing recovery surfaces M1 left as slots: the
-**crash-recovery modal** (AlertDialog draining
-`pendingRecoveryReport` with kind-aware copy naming the affected
-story) and the **per-story settings parse-failure badge** on the
-story list (`"Couldn't open — settings corrupted"` with
-`Open file` and `Reset settings for this story` actions). The
-boot ordering, loading-until-render, and the boot-blocking
-`app_settings` recovery screen all shipped in 1.7a; only these
-two surfaces remain from the canonical recovery contracts.
+The missing recovery-report UI handoff and the two user-facing
+recovery surfaces: publish bootstrap's reversed-run report into a
+`pendingRecoveryReport` UI-state slot; drain it into a
+kind-aware **crash-recovery modal** naming the affected story; and
+render the **per-story config parse-failure badge** on the story
+list. Desktop offers `Open file` for both failure kinds; Android
+omits it because the mobile database-repair path is not designed.
+Only corrupted `settings` offers `Reset settings for this story`,
+because wizard-authored `definition` has no recoverable default. The
+boot ordering, loading-until-render, recovery pass, and boot-blocking
+`app_settings` recovery screen shipped in 1.7a; this slice completes
+the canonical user-facing recovery contracts.
 
 ## Background
 
 Startup recovery reverse-replays orphaned runs and produces a
-`RecoveryReport`; when any orphan actually reversed deltas, the
-report lands in the `pendingRecoveryReport` UI slot and the first
-user-facing surface after boot drains it into a modal.
-Zero-reverse orphans and recovery failures stay observability-
-only. Separately, the per-story Zod parse of
+`RecoveryReport`. The current bootstrap awaits that pass but
+discards its return value; this slice restores the missing
+handoff by publishing reports with at least one reversed orphan
+to a `pendingRecoveryReport` UI slot. The first user-facing
+surface after boot drains that slot into a modal. Zero-reverse
+orphans and recovery failures stay observability-only and never
+enter the slot. Separately, the per-story Zod parse of
 `stories.definition` / `settings` can fail at story-open; the
 affected story must fail to open with a badge on its card while
 other stories stay usable — the app-settings half of this
@@ -51,31 +58,40 @@ the failure state slot lives in the stories store (C1).
   these).
 - [`architecture.md → Settings: strict types, defaults at load`](../../../../architecture.md#settings-strict-types-defaults-at-load)
   — the three parse-failure sites and the per-story recovery
-  contract (`Open file` + reset preserving narrative content).
+  contracts (manual repair only for `definition`; reset preserving
+  narrative content for `settings`).
 - [`ui/patterns/alert-dialog.md → Rich content via composition`](../../../../ui/patterns/alert-dialog.md#rich-content-via-composition)
   — the primitive both surfaces compose.
 - [`data-model.md → Story settings shape`](../../../../data-model.md#story-settings-shape)
-  — the `definition` / `settings` shapes whose parsed defaults
-  the reset action rewrites.
+  — the strict, non-recoverable `definition` shape and the
+  copy-on-create defaults the `settings` reset action reapplies.
 
 ## Scope: in
 
-- **Recovery modal:** `useEffect` drain of the slot on the first
-  user-facing surface; AlertDialog with single `OK`; kind-aware
-  copy — `per-turn` is the only kind producible in M2, but the
-  copy map carries all three canonical variants so M3 / M5 add
-  no UI work; `{storyName}` resolution from the orphan's
+- **Recovery-report handoff:** a `pendingRecoveryReport` slot in
+  the UI-state store plus bootstrap wiring that publishes the
+  report only when `reversed.length > 0`. Failure-only and
+  zero-reverse reports remain observability-only; the bootstrap
+  keeps its never-block-boot behavior.
+- **Recovery modal:** atomic `useEffect` drain of the slot on the
+  first user-facing surface; AlertDialog with single `OK`;
+  kind-aware copy — `per-turn` is the only kind producible in M2,
+  but the copy map carries all three canonical variants so M3 /
+  M5 add no UI work; `{storyName}` resolution from the orphan's
   `story_id` with the non-named fallback; multi-orphan
   single-paragraph concatenation.
-- **Parse-failure badge:** story card error badge driven by the
-  C1 open-failure state; card click while failed re-surfaces the
-  failure (no navigation); actions per the canonical contract —
-  `Open file` (deep-link the SQLite file in the OS file manager;
-  platform-appropriate degradation on Android) and
-  `Reset settings for this story` (rewrite `settings` — and
-  `definition`? see Open questions — to parsed defaults,
-  preserving all delta-replayable narrative content), behind a
-  destructive-action confirm.
+- **Parse-failure badge:** story card error badge driven by the C1
+  open-failure state; card click while failed re-surfaces the failure
+  (no navigation). `definition-corrupt` reads _"Couldn't open — story
+  definition corrupted"_; desktop offers `Open file`, while Android
+  has no repair action. No reset appears on either platform.
+  `settings-corrupt` reads _"Couldn't open — settings corrupted"_ and
+  offers `Reset settings for this story` behind a destructive-action
+  confirm on both platforms; desktop additionally offers `Open file`,
+  deep-linking the SQLite file in the OS file manager. Reset rebuilds
+  `StorySettings` from the current app-level defaults through the
+  creation path, preserving definition and all delta-replayable
+  narrative content.
 - i18n strings for all copy; Storybook stories for both surfaces'
   states.
 
@@ -93,40 +109,41 @@ the failure state slot lives in the stories store (C1).
 
 - Fixture-injected `RecoveryReport` with one reversed `per-turn`
   orphan renders the modal with the per-turn copy and the story
-  name; with two orphans, one concatenated paragraph; with only
-  zero-reverse orphans, no modal.
+  name; with two reversed orphans, one concatenated paragraph.
+- Bootstrap publishes a recovery report to the UI-state slot iff
+  it contains at least one reversed orphan; a zero-reverse pass,
+  failure-only report, or empty report leaves the slot empty and
+  boot proceeds normally.
 - The slot drains exactly once — re-render / re-navigation does
   not re-show the modal.
 - A story row with corrupted `settings` JSON (fixture) badges on
   the list, other stories open normally; `Reset` rewrites
-  defaults, the story opens, and its entries / entities are
-  intact; the confirm gate fires before any write.
+  current app-level defaults through the copy-on-create path, the
+  story opens, and its definition / entries / entities are intact;
+  the confirm gate fires before any write.
+- A story row with corrupted `definition` JSON badges distinctly;
+  its failure surface offers no reset action, and other stories open
+  normally.
 - `Open file` launches the OS file manager at the DB path on
-  desktop; on Android it takes one of the two concrete fallbacks
-  (share-sheet the DB file, or show the path copyable) — picked
-  at planning, recorded in Implementation notes — and never
-  crashes.
+  desktop. Android omits `Open file` for both per-story failure kinds;
+  `settings-corrupt` still offers reset, while `definition-corrupt`
+  has no mobile repair path in v1.
 - Kill-mid-turn manual test (with [Slice 2.7](./07-wiring.md)
   merged): next boot shows the modal naming the story.
 
 ## Tests
 
-- Vitest: drain-once logic, copy selection per kind, reset
-  action's preserve-narrative assertion (entries untouched,
-  settings re-parsed to defaults).
+- Vitest: bootstrap-to-slot publication gate, drain-once logic,
+  copy selection per kind, reset action's preserve-narrative
+  assertion (definition and entries untouched, settings rebuilt
+  through copy-on-create), and the `definition-corrupt` no-reset
+  surface.
 - Storybook: modal variants (single / multi / non-named),
   badge + failed-open card states.
 
 ## Open questions
 
-- Whether `Reset settings for this story` also resets a
-  corrupted `definition` (the canonical contract names the
-  story-level reset action generically; definition reset loses
-  wizard-authored content — likely a second, scarier confirm or
-  out of scope for M2 with `settings`-only reset).
-- `Open file` behavior on Android (no desktop-style file
-  manager deep-link; options: share-sheet the file, show the
-  path, or hide the action on native) — decide at planning.
+None.
 
 ## Implementation notes
 
