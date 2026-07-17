@@ -201,8 +201,11 @@ fetch }` endpoints; the choice is invisible above `lib/ai`. The interim
 defaultProviderId, storyModels }` explicitly (no store read), so 2.9
   pre-flight calls it per agent and 2.7 builds the store adapter at the
   call site. `getModel` does read `appSettingsStore` to resolve a real
-  provider instance, with the temporary stub registry as a fallback until
-  [Slice 2.7](./07-wiring.md) removes the smoke seam.
+  provider instance, then falls back to the empty-in-production
+  `findTestProvider(providerId)` test seam. The `modelId` remains a separate
+  `getModel` argument passed to the provider factory; the test registry does
+  not resolve it. [Slice 2.7](./07-wiring.md) removed runtime stub
+  registration but intentionally retained this injection seam.
 - **Configured provider keys are registered into the `httpCallSink`
   redaction comparator at `app_settings` hydrate.** The M1 redaction was
   fed only by the stub registry, so a real OAI-compat call would have

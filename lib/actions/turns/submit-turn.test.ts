@@ -1,8 +1,15 @@
+import { and, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { branches, storyEntries, type StoryEntry } from '@/lib/db'
+import {
+  branches,
+  storyDefinitionSchema,
+  storyEntries,
+  storySettingsSchema,
+  type StoryEntry,
+} from '@/lib/db'
 import { definePipeline, getPipeline, type PhaseResult } from '@/lib/pipeline'
-import { entriesStore, hydrateAppSettings, undoRedoStore } from '@/lib/stores'
+import { currentStoryStore, entriesStore, hydrateAppSettings, undoRedoStore } from '@/lib/stores'
 
 import { PER_TURN_KIND } from './pipeline'
 import { submitTurn } from './submit-turn'
@@ -60,6 +67,56 @@ const WORKING_CONFIG = {
   diagnostics: { enabled: false, debug_level_enabled: false },
 }
 
+const STORY_DEFINITION = storyDefinitionSchema.parse({
+  mode: 'adventure',
+  leadEntityId: 'char_00000000-0000-4000-8000-000000000001',
+  narration: 'first',
+  genre: { label: 'Fantasy', promptBody: 'high fantasy' },
+  tone: { label: 'Wry', promptBody: 'wry' },
+  setting: 'A keep on a hill.',
+  calendarSystemId: 'gregorian',
+  worldTimeOrigin: { year: 0 },
+})
+const STORY_SETTINGS = storySettingsSchema.parse({
+  classifierCadence: 8,
+  piggybackMode: 'off',
+  embeddingBackend: 'local',
+  embedding_model_id: 'm',
+  retrievalBudgets: { entities: 1, lore: 1, happenings: 1, threads: 1, chapters: 1 },
+  composerModesEnabled: true,
+  composerWrapPov: 'first',
+  suggestionsEnabled: false,
+  suggestionCategories: [],
+  translation: {
+    enabled: false,
+    targetLanguage: null,
+    granularToggles: {
+      narrative: false,
+      entityNames: false,
+      entityDescriptions: false,
+      lore: false,
+      threads: false,
+      happenings: false,
+      chapterMeta: false,
+    },
+  },
+  models: {},
+  activePackId: 'pack_bundled_default',
+  packVariables: {},
+})
+
+// narrativePhase (pipeline.ts) reads the open story from currentStoryStore, not
+// from the run's own storyId/branchId — mirrors the real app opening a story
+// before the composer can submit a turn.
+function openStory(storyId: string, branchId: string) {
+  currentStoryStore.set({
+    storyId,
+    branchId,
+    definition: STORY_DEFINITION,
+    settings: STORY_SETTINGS,
+  })
+}
+
 function branchEntries(branchId: string) {
   return [...entriesStore.getEntries().values()].filter((e) => e.branchId === branchId)
 }
@@ -74,8 +131,9 @@ describe('submitTurn', () => {
     resetSingletons()
   })
 
-  it('registers a single-phase pill-only hard-gate per-turn pipeline', async () => {
+  it('registers a two-phase pill-and-banner hard-gate per-turn pipeline', async () => {
     const { ctx } = await makeHarness()
+    openStory('s1', 'b1')
     entriesStore.hydrate('b1', [])
     await hydrateAppSettings(async () => WORKING_CONFIG)
 
@@ -83,13 +141,15 @@ describe('submitTurn', () => {
 
     const pipeline = getPipeline(PER_TURN_KIND)
     expect(pipeline.kind).toBe(PER_TURN_KIND)
-    expect(pipeline.phases).toHaveLength(1)
-    expect(pipeline.affordance).toBe('pill-only')
+    expect(pipeline.phases).toHaveLength(2)
+    expect(pipeline.affordance).toBe('pill-and-banner')
     expect(pipeline.gateBehavior).toBe('hard-gate')
+    expect(pipeline.concurrencyPolicy.blockedBy).toEqual([PER_TURN_KIND, 'chapter-close'])
   })
 
   it('completes a turn: persists the user action and the streamed AI reply', async () => {
     const { ctx } = await makeHarness()
+    openStory('s1', 'b1')
     entriesStore.hydrate('b1', [])
     await hydrateAppSettings(async () => WORKING_CONFIG)
 
@@ -107,6 +167,52 @@ describe('submitTurn', () => {
       { kind: 'user_action', content: 'Hello there', position: 1 },
       { kind: 'ai_reply', content: 'A reply.', position: 2 },
     ])
+
+    const [reply] = await ctx.db
+      .select()
+      .from(storyEntries)
+      .where(and(eq(storyEntries.branchId, 'b1'), eq(storyEntries.kind, 'ai_reply')))
+    expect(reply?.metadata?.sceneEntities).toEqual([])
+    expect(reply?.metadata?.currentLocationId).toBeNull()
+    expect(typeof reply?.metadata?.model).toBe('string')
+  })
+
+  it('inherits worldTime from the tail entry onto the user_action, and the ai_reply inherits it too', async () => {
+    const { ctx } = await makeHarness()
+    const opening: StoryEntry = {
+      id: 'seed-opening',
+      branchId: 'b1',
+      position: 1,
+      kind: 'opening',
+      content: 'The keep looms over the valley.',
+      chapterId: null,
+      metadata: { sceneEntities: [], currentLocationId: null, worldTime: 5 },
+      createdAt: 1,
+    }
+    await ctx.db.insert(storyEntries).values(opening)
+    openStory('s1', 'b1')
+    entriesStore.hydrate('b1', [opening])
+    await hydrateAppSettings(async () => WORKING_CONFIG)
+
+    await submitTurn(
+      { storyId: 's1', branchId: 'b1' },
+      { content: 'I look around.', composerMode: 'do' },
+      ctx,
+    )
+
+    const [ua] = await ctx.db
+      .select()
+      .from(storyEntries)
+      .where(and(eq(storyEntries.branchId, 'b1'), eq(storyEntries.kind, 'user_action')))
+    expect(ua?.metadata?.worldTime).toBe(5)
+    expect(ua?.metadata?.sceneEntities).toEqual([])
+    expect(ua?.metadata?.currentLocationId).toBeNull()
+
+    const [reply] = await ctx.db
+      .select()
+      .from(storyEntries)
+      .where(and(eq(storyEntries.branchId, 'b1'), eq(storyEntries.kind, 'ai_reply')))
+    expect(reply?.metadata?.worldTime).toBe(5)
   })
 
   it('positions the new user action at MAX(position)+1, not the store row count', async () => {
@@ -124,6 +230,7 @@ describe('submitTurn', () => {
       createdAt: position,
     }))
     for (const row of seeded) await ctx.db.insert(storyEntries).values(row)
+    openStory('s1', 'b1')
     entriesStore.hydrate('b1', seeded)
     await hydrateAppSettings(async () => WORKING_CONFIG)
 
@@ -143,6 +250,7 @@ describe('submitTurn', () => {
 
   it('assigns distinct positions to two turns submitted concurrently on the same branch', async () => {
     const { ctx } = await makeHarness()
+    openStory('s1', 'b1')
     entriesStore.hydrate('b1', [])
     await hydrateAppSettings(async () => WORKING_CONFIG)
 
@@ -219,6 +327,7 @@ describe('submitTurn', () => {
 
   it('clears the redo stack on success (a new turn is a new unrelated action)', async () => {
     const { ctx } = await makeHarness()
+    openStory('s1', 'b1')
     entriesStore.hydrate('b1', [])
     await hydrateAppSettings(async () => WORKING_CONFIG)
     undoRedoStore.pushRedoGroup([])
@@ -231,6 +340,7 @@ describe('submitTurn', () => {
 
   it('fails the turn and writes no ai_reply when the provider stream errors', async () => {
     const { ctx } = await makeHarness()
+    openStory('s1', 'b1')
     entriesStore.hydrate('b1', [])
     await hydrateAppSettings(async () => WORKING_CONFIG)
     // Matches the live "TypeError: Failed to fetch" — a network reject, not an

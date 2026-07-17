@@ -19,6 +19,7 @@ import { useTier } from '@/hooks/use-tier'
 import {
   clearSystemEntry,
   getRollbackCounts,
+  loadOpenStory,
   PER_TURN_KIND,
   redoLastAction,
   rollbackToEntry,
@@ -26,6 +27,7 @@ import {
   undoLastAction,
   updateStoryEntryContent,
   writeSystemEntry,
+  type LoadOpenStoryResult,
   type RollbackCounts,
 } from '@/lib/actions'
 import { wrapComposerText } from '@/lib/composer-wrap'
@@ -35,6 +37,8 @@ import { createHtmlStreamBuffer, type HtmlStreamBuffer } from '@/lib/markdown'
 import { awaitRunTerminal, pipelineEventBus, type PipelineError } from '@/lib/pipeline'
 import { createAutoscrollMachine } from '@/lib/reader-scroll'
 import {
+  currentStoryStore,
+  entitiesStore,
   entriesStore,
   generationStore,
   isUserEditBlocked,
@@ -48,6 +52,14 @@ const ctx = { db, runInTransaction }
 type RollbackState = { targetId: string; targetNumber: number; counts: RollbackCounts }
 type StreamingRow = { id: string; kind: 'streaming'; content: string }
 type WindowRow = StoryEntry | StreamingRow
+type BranchHydrationState =
+  | { branchId: string; status: 'loading' }
+  | {
+      branchId: string
+      status: 'success'
+      result: Extract<LoadOpenStoryResult, { status: 'ok' }>
+    }
+  | { branchId: string; status: 'failure'; result: LoadOpenStoryResult | null }
 
 const RECENT_WINDOW_SIZE = 50
 const JUMP_TO_BOTTOM_SETTLE_MS = 500
@@ -84,6 +96,25 @@ export default function ReaderComposerRoute() {
   const isGenerating = generationStore.useGeneration((s) =>
     [...s.txState.runs.values()].some((r) => r.branchId === branchId),
   )
+
+  const open = currentStoryStore.useCurrentStory((s) => s)
+  const [hydration, setHydration] = useState<BranchHydrationState>({
+    branchId,
+    status: 'loading',
+  })
+  const hydrationIsCurrent = hydration.branchId === branchId
+  const hydrationSucceeded =
+    hydrationIsCurrent && hydration.status === 'success' && hydration.result.branchId === branchId
+  const hydrationFailed = hydrationIsCurrent && hydration.status === 'failure'
+  const openForBranch = hydrationSucceeded && open?.branchId === branchId ? open : null
+  const leadEntityId = openForBranch?.definition.leadEntityId ?? null
+  const leadName = entitiesStore.useEntities((m) =>
+    leadEntityId ? (m.get(leadEntityId)?.name ?? '') : '',
+  )
+  const modesEnabled =
+    openForBranch?.settings.composerModesEnabled === true &&
+    openForBranch.definition.mode === 'adventure'
+  const wrapPov = openForBranch?.settings.composerWrapPov ?? 'first'
 
   // Buffer instance lives in a ref (mutable, not render state); the safe output
   // it computes on each push drives the re-render via streamingContent.
@@ -207,8 +238,34 @@ export default function ReaderComposerRoute() {
   }, [branchId])
 
   useEffect(() => {
-    if (entriesStore.getLoadedBranch() !== branchId) void reload()
-  }, [branchId, reload])
+    let cancelled = false
+    const current = currentStoryStore.getCurrentStory()
+    if (current?.branchId === branchId) {
+      setHydration({
+        branchId,
+        status: 'success',
+        result: { status: 'ok', storyId: current.storyId, branchId },
+      })
+      return
+    }
+
+    setHydration({ branchId, status: 'loading' })
+    void loadOpenStory(branchId, ctx)
+      .then((result) => {
+        if (cancelled) return
+        if (result.status === 'ok' && result.branchId === branchId) {
+          setHydration({ branchId, status: 'success', result })
+        } else {
+          setHydration({ branchId, status: 'failure', result })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHydration({ branchId, status: 'failure', result: null })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [branchId])
 
   const storyRows = storiesStore.useStories((s) => s.rows)
   useEffect(() => {
@@ -230,7 +287,7 @@ export default function ReaderComposerRoute() {
 
   const runSubmit = useCallback(
     async (content: string, composerMode: string) => {
-      if (!storyId) return
+      if (!storyId || !hydrationSucceeded) return
       setLastError(undefined)
       // A prior failure leaves a system entry as the branch tail; drop it (and
       // resync the store) before the turn so the pipeline's prompt/position
@@ -258,7 +315,7 @@ export default function ReaderComposerRoute() {
         })
       }
     },
-    [storyId, branchId, reload, showTurnFailure],
+    [storyId, branchId, hydrationSucceeded, reload, showTurnFailure],
   )
 
   // fixAction (config-resolver fixes) has no EntryCard slot in the M2 subset;
@@ -388,7 +445,18 @@ export default function ReaderComposerRoute() {
       <View className="flex-1 flex-row">
         <View className="flex-1">
           <View className="flex-1">
-            {entries.length === 0 ? (
+            {hydrationFailed ? (
+              <View className="flex-1 items-center justify-center">
+                <EmptyState
+                  title={t('reader:hydrationFailedTitle')}
+                  subtext={t('reader:hydrationFailedBody')}
+                />
+              </View>
+            ) : !hydrationSucceeded ? (
+              <View className="flex-1 items-center justify-center">
+                <EmptyState title={t('reader:hydrationLoading')} />
+              </View>
+            ) : entries.length === 0 ? (
               <View className="flex-1 items-center justify-center">
                 <EmptyState title={t('reader:emptyTitle')} subtext={t('reader:emptyBody')} />
               </View>
@@ -427,19 +495,18 @@ export default function ReaderComposerRoute() {
           </View>
           <View className="border-t border-border p-3">
             <Composer
-              // modesEnabled should AND stories.settings.composerModesEnabled with
-              // adventure-mode once story settings are readable here.
-              modesEnabled
+              modesEnabled={modesEnabled}
               isGenerating={isGenerating}
-              disabled={editBlocked}
+              disabled={editBlocked || !hydrationSucceeded}
+              disabledReason={
+                hydrationFailed
+                  ? t('reader:hydrationFailedBody')
+                  : !hydrationSucceeded
+                    ? t('reader:hydrationLoading')
+                    : undefined
+              }
               onSend={(rawText, mode) => {
-                // pov / leadName come from stories.settings / stories.definition
-                // once readable here; interim first-person defaults.
-                const wrapped = wrapComposerText(rawText, {
-                  mode,
-                  pov: 'first',
-                  leadName: 'You',
-                })
+                const wrapped = wrapComposerText(rawText, { mode, pov: wrapPov, leadName })
                 void runSubmit(wrapped, mode)
               }}
               onCancel={() => void awaitRunTerminal(PER_TURN_KIND, 'cancel')}
