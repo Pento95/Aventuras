@@ -1,0 +1,141 @@
+{
+  "topBar": {
+    "cancel": "← Cancel",
+    "title": "New story · step {{step}} of 5"
+  },
+  "steps": {
+    "frame": "Frame",
+    "calendar": "Calendar",
+    "world": "World",
+    "cast": "Cast",
+    "opening": "Opening"
+  },
+  "footer": {
+    "saveDraft": "Save as draft",
+    "back": "← Back",
+    "next": "Next →",
+    "finish": "Finish"
+  },
+  "opening": {
+    "heading": "How does this story begin?",
+    "emptyHint": "Generate with ✨, or start typing below.",
+    "placeholder": "Write the opening, or generate one with ✨.",
+    "sceneMetadata": "Scene metadata: {{value}}",
+    "storyName": "Story name",
+    "opening": {
+      "label": "Opening",
+      "assist": "Suggest opening",
+      "guidance": "e.g. \"open in the thick of a storm\""
+    },
+    "title": {
+      "label": "Title",
+      "assist": "Suggest title",
+      "placeholder": "Name your story",
+      "guidance": "e.g. \"one word, ominous\""
+    },
+    "description": {
+      "label": "Description",
+      "assist": "Suggest description",
+      "placeholder": "A one-line synopsis (optional)",
+      "guidance": "e.g. \"emphasize the mystery\""
+    }
+  },
+  "finish": {
+    "invalidList": "Add {{fields}} before finishing.",
+    "missing": {
+      "title": "a title",
+      "opening": "an opening",
+      "lead": "a lead character name"
+    },
+    "failed": "Couldn't create the story."
+  },
+  "errors": {
+    "saveDraftFailed": "Couldn't save the draft. Please try again."
+  },
+  "frame": {
+    "heading": "How is this story told?",
+    "mode": {
+      "label": "Mode",
+      "adventure": {
+        "label": "Adventure",
+        "description": "You play a character. AI runs the world."
+      },
+      "creative": {
+        "label": "Creative",
+        "description": "You write the prose. AI helps draft."
+      }
+    },
+    "narration": {
+      "label": "Narration",
+      "first": {
+        "label": "First",
+        "description": "\"I drew…\""
+      },
+      "second": {
+        "label": "Second",
+        "description": "\"You drew…\""
+      },
+      "third": {
+        "label": "Third",
+        "description": "\"Aria drew…\""
+      }
+    },
+    "leadNotice": "This combination will require a lead character in Cast.",
+    "leadName": {
+      "label": "Lead character name",
+      "placeholder": "e.g. Aria Stoneheart"
+    }
+  },
+  "calendarStep": {
+    "originError": "Enter a value between {{min}} and {{max}}.",
+    "heading": "When does this story take place?",
+    "intro": "Pick a calendar system and your in-world starting moment. Every entry's worldTime is recorded relative to this start.",
+    "system": {
+      "label": "Calendar system",
+      "copy": "Pick a calendar that matches your story's setting. Default is Earth (Gregorian)."
+    },
+    "origin": {
+      "label": "Story start moment",
+      "copy": "What in-world date and time the story begins. Defaults seeded from this calendar's example start value."
+    },
+    "originResetNotice": "Origin reset for the new calendar.",
+    "era": {
+      "label": "Era",
+      "comingSoon": "Era selection lands in a later milestone."
+    },
+    "summary": {
+      "placeholderLabel": "Placeholder",
+      "detail": {
+        "constant": "constant: {{value}} {{unit}}",
+        "table": "table: {{min}}–{{max}} {{unit}}",
+        "rule": "rule: leap-adjusted ({{against}})",
+        "baseUnit": "base unit"
+      },
+      "subdivisions": {
+        "none": "none",
+        "weekday": "{{name}}: {{first}}–{{last}} ({{length}}-{{unit}} cycle)"
+      },
+      "eras": {
+        "disabled": "disabled",
+        "freeform": "enabled (free-form)",
+        "preset": "enabled (preset names: {{names}})"
+      }
+    }
+  },
+  "aiAssist": {
+    "guidance": {
+      "label": "Optional guidance"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "generate": "Generate",
+      "discard": "Discard",
+      "useThis": "Use this",
+      "tryAgain": "Try again",
+      "setup": "Set up in Settings"
+    },
+    "notConfigured": "AI is not configured.",
+    "loading": "Generating with {{model}}…",
+    "failure": "Couldn't generate. {{reason}}."
+  }
+}

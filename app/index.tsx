@@ -21,13 +21,22 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
-import { deleteStory, openStory, setStoryArchived, setStoryFavorite } from '@/lib/actions'
+import {
+  clearLiveSession,
+  deleteStory,
+  loadDraft,
+  loadLiveSession,
+  openStory,
+  setStoryArchived,
+  setStoryFavorite,
+} from '@/lib/actions'
 import { db, runInTransaction } from '@/lib/db'
 import { t } from '@/lib/i18n'
 import {
   rehydrateStories,
   selectStoryCards,
   storiesStore,
+  wizardStore,
   type StoryFilter,
   type StoryListQuery,
   type StorySort,
@@ -56,20 +65,36 @@ export default function Index() {
 
   const cards = useMemo(() => selectStoryCards(rows, query, Date.now()), [rows, query])
 
-  const goWizard = () => router.push('/wizard' as Href)
+  const goWizard = (draftId?: string) =>
+    router.push((draftId ? `/wizard?draftId=${draftId}` : '/wizard') as Href)
+
   const onNewStory = () => {
     if (sessionExists) {
       setPrompt({ trigger: 'new-story' })
       return
     }
+    // No persisted session, but the in-memory store can hold stale state from an
+    // instant-cancel inside the autosave debounce window — start from a clean slate.
+    wizardStore.reset()
     goWizard()
   }
+
   const openDraft = (storyId: string) => {
     if (sessionExists) {
       setPrompt({ trigger: 'draft', storyId })
       return
     }
-    goWizard()
+    runAction(
+      loadDraft(storyId, ctx).then((draft) => {
+        if (draft) wizardStore.hydrate(draft)
+        goWizard(storyId)
+      }),
+      {
+        event: 'action_layer.wizard_draft_load_failed',
+        toastMessage: t('landing:errors.draftLoadFailed'),
+        context: { storyId },
+      },
+    )
   }
 
   const cardHandlers = (storyId: string): StoryCardHandlers => {
@@ -129,20 +154,51 @@ export default function Index() {
         }
       />
 
-      {prompt ? (
-        <ConcurrentStatePrompt
-          trigger={prompt.trigger}
-          onContinueSession={() => {
-            setPrompt(null)
-            goWizard()
-          }}
-          onDiscard={() => {
-            setPrompt(null)
-            goWizard()
-          }}
-          onDismiss={() => setPrompt(null)}
-        />
-      ) : null}
+      <ConcurrentStatePrompt
+        open={prompt != null}
+        trigger={prompt?.trigger ?? 'new-story'}
+        draftName={rows.find((r) => r.id === prompt?.storyId)?.title}
+        onContinueSession={() => {
+          // wizardStore is in-memory only, so it doesn't survive an app
+          // restart — re-hydrate from the persisted live session before
+          // opening the wizard, or a resumed session would render blank.
+          runAction(
+            loadLiveSession(ctx).then((session) => {
+              if (session) wizardStore.hydrate(session)
+              setPrompt(null)
+              goWizard()
+            }),
+            {
+              event: 'action_layer.wizard_session_resume_failed',
+              toastMessage: t('landing:errors.resumeSessionFailed'),
+            },
+          )
+        }}
+        onDiscard={() => {
+          const target = prompt
+          runAction(
+            clearLiveSession(ctx).then(async () => {
+              if (target?.trigger === 'draft' && target.storyId) {
+                const draft = await loadDraft(target.storyId, ctx)
+                if (draft) wizardStore.hydrate(draft)
+                else wizardStore.reset()
+                setPrompt(null)
+                goWizard(target.storyId)
+                return
+              }
+              wizardStore.reset()
+              setPrompt(null)
+              goWizard()
+            }),
+            {
+              event: 'action_layer.wizard_session_discard_failed',
+              toastMessage: t('landing:errors.discardSessionFailed'),
+              context: { storyId: target?.storyId },
+            },
+          )
+        }}
+        onDismiss={() => setPrompt(null)}
+      />
 
       <AlertDialog
         open={pendingDelete != null}

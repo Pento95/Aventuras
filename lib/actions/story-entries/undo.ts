@@ -5,10 +5,10 @@ import { deltas } from '@/lib/db'
 import { entriesStore, generationStore, undoRedoStore } from '@/lib/stores'
 import { selectUndoTarget } from '@/lib/undo'
 
+import { resolveRollbackWindow } from './operational'
 import { applyRedo, snapshotForRedo } from '../delta/redo'
 import { DeltaReplayError, reverseAndPruneDeltaRows } from '../delta/reverse-replay'
 import type { DbCtx } from '../types'
-import { resolveRollbackWindow } from './operational'
 
 export type UndoResult = { status: 'ok' } | { status: 'rejected'; reason: string }
 

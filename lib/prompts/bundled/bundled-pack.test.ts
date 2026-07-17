@@ -21,12 +21,14 @@ describe('bundled pack', () => {
         genre: { promptBody: '' },
         tone: { promptBody: '' },
       },
-      lead: { name: 'Aria' },
+      leadName: 'Aria',
+      leadEntityId: 'c1',
     })
     expect(out).toContain('adventure')
     expect(out).toContain('A frozen coast.')
     expect(out).toContain('Aria')
-    expect(out).toContain('Write the next beat') // included output-format macro
+    expect(out).toContain('cast id: c1')
+    expect(out).toContain('Respond with a single JSON object') // included output-format macro
     expect(out).toMatchSnapshot()
   })
 })

@@ -22,6 +22,7 @@ import type {
   threads,
   translations,
   vaultCalendars,
+  wizardSessions,
 } from './schema'
 
 export type SqlOp = { sql: string; params: unknown[] }
@@ -90,3 +91,6 @@ export type NewPipelineRun = typeof pipelineRuns.$inferInsert
 
 export type Delta = typeof deltas.$inferSelect
 export type NewDelta = typeof deltas.$inferInsert
+
+export type WizardSession = typeof wizardSessions.$inferSelect
+export type NewWizardSession = typeof wizardSessions.$inferInsert

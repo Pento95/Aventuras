@@ -16,6 +16,7 @@ import { rehydrateStories, storiesStore } from './stories/stories'
 import { threadsStore } from './threads/threads'
 import { translationsStore } from './translations/translations'
 import { undoRedoStore } from './ui/undo-redo'
+import { wizardStore } from './wizard/wizard'
 
 // Test-harness seam: resets every domain store in one call
 export function resetAllStores(): void {
@@ -36,6 +37,7 @@ export function resetAllStores(): void {
   navigationStore.__reset()
   appSettingsStore.__reset()
   undoRedoStore.clear()
+  wizardStore.reset()
 }
 
 export {
@@ -60,6 +62,7 @@ export {
   threadsStore,
   translationsStore,
   undoRedoStore,
+  wizardStore,
 }
 
 export { createWorkingSetStore } from './factory/working-set-store'
