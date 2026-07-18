@@ -1,4 +1,33 @@
 /**
+ * Minimal concurrency limiter. Returns a function that wraps tasks and
+ * runs at most `n` concurrently.
+ */
+export function pLimit(n: number) {
+  const queue: Array<() => void> = []
+  let active = 0
+  const next = () => {
+    active--
+    if (queue.length > 0) {
+      active++
+      queue.shift()!()
+    }
+  }
+  return function run<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const start = () => {
+        fn().then(resolve, reject).finally(next)
+      }
+      if (active < n) {
+        active++
+        start()
+      } else {
+        queue.push(start)
+      }
+    })
+  }
+}
+
+/**
  * Merges multiple AsyncGenerators into a single AsyncGenerator.
  * Yields values from all generators as they become available.
  * Completes when all generators are finished.

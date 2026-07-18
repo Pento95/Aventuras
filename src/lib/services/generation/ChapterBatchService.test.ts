@@ -311,3 +311,52 @@ describe('ChapterBatchService — classification step', () => {
     expect(content).toContain('the raw turn')
   })
 })
+
+describe('ChapterBatchService — timeline + classification together', () => {
+  it('classifies each chapter with its own timeline bracket, not a stale value', async () => {
+    // Phase 2 (timeline) must fully finish, brackets and all, before phase 3
+    // (classification) starts reading the time tracker — otherwise chapter 1
+    // could be classified with chapter 3's time or vice versa.
+    let time: TimeTracker = { years: 0, days: 0, hours: 0, minutes: 0 }
+    const setTimeTracker = vi.fn(async (t: TimeTracker) => {
+      time = t
+    })
+    const getTimeTracker = vi.fn(() => time)
+    const deps = baseDeps({
+      getTimeTracker,
+      setTimeTracker,
+      classifyChapter: vi.fn(async () => makeClassificationResult()),
+      estimateChapterTimeline: vi.fn(async () => ({ years: 0, days: 0, hours: 3, minutes: 0 })),
+    })
+    const service = new ChapterBatchService(deps)
+
+    await service.run(
+      baseInput({ includeTimeline: true, includeClassification: true }),
+      baseCallbacks(),
+    )
+
+    const calls = vi.mocked(deps.classifyChapter).mock.calls
+    expect(calls[0][1]).toEqual({ years: 0, days: 0, hours: 3, minutes: 0 })
+    expect(calls[1][1]).toEqual({ years: 0, days: 0, hours: 6, minutes: 0 })
+    expect(calls[2][1]).toEqual({ years: 0, days: 0, hours: 9, minutes: 0 })
+  })
+})
+
+describe('ChapterBatchService — progress callbacks', () => {
+  it('reports granular progress during timeline and classification phases', async () => {
+    const onTimelineProgress = vi.fn()
+    const onClassificationProgress = vi.fn()
+    const deps = baseDeps()
+    const service = new ChapterBatchService(deps)
+
+    await service.run(
+      baseInput({ includeTimeline: true, includeClassification: true }),
+      baseCallbacks({ onTimelineProgress, onClassificationProgress }),
+    )
+
+    expect(onTimelineProgress).toHaveBeenCalled()
+    expect(onClassificationProgress).toHaveBeenCalled()
+    expect(onTimelineProgress).toHaveBeenLastCalledWith(3, 3)
+    expect(onClassificationProgress).toHaveBeenLastCalledWith(3, 3)
+  })
+})

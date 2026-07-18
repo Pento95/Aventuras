@@ -125,6 +125,9 @@
         includeTimeline: chapterizeIncludeTimeline,
         includeClassification: chapterizeIncludeClassification,
       })
+    } catch (err) {
+      console.error('Chapterization failed:', err)
+      ui.showToast(err instanceof Error ? err.message : 'Chapterization failed', 'error')
     } finally {
       chapterizing = false
     }
@@ -191,8 +194,8 @@
         <div class="flex flex-col items-center gap-4 py-2 text-center">
           <Loader2 class="text-primary h-8 w-8 animate-spin" />
           <p class="text-foreground font-medium">
-            {#if story.chapterizationLoreStatus}
-              {story.chapterizationLoreStatus}
+            {#if story.chapterizationStatus}
+              {story.chapterizationStatus}
             {:else if story.chapterizationProgress}
               Generating chapters: {story.chapterizationProgress.current}/{story
                 .chapterizationProgress.total}
@@ -310,7 +313,7 @@
     </div>
 
     <ResponsiveModal.Footer class="mt-auto border-t px-6 py-4">
-      {#if chapterizing}
+      {#if chapterizing && (!story.chapterizationStatus || !story.chapterizationStatus.includes('lore'))}
         <Button variant="outline" onclick={() => story.requestChapterizationCancel()} class="gap-2">
           <X class="h-4 w-4" />
           Cancel

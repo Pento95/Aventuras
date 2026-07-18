@@ -106,7 +106,9 @@ class StoryStore {
   // single-operation flow owned by whichever screen started it, unlike
   // ui.loreManagementProgress which tracks an ambient background task.
   chapterizationProgress = $state<{ current: number; total: number } | null>(null)
-  chapterizationLoreStatus = $state<string | null>(null)
+  chapterizationTimelineProgress = $state<{ current: number; total: number } | null>(null)
+  chapterizationClassificationProgress = $state<{ current: number; total: number } | null>(null)
+  chapterizationStatus = $state<string | null>(null)
   private chapterizationCancelRequested = $state(false)
 
   // Branching system
@@ -3212,9 +3214,15 @@ class StoryStore {
           onChapterProgress: (current, total) => {
             this.chapterizationProgress = { current, total }
           },
+          onTimelineProgress: (current, total) => {
+            this.chapterizationTimelineProgress = { current, total }
+          },
+          onClassificationProgress: (current, total) => {
+            this.chapterizationClassificationProgress = { current, total }
+          },
           loreCallbacks: {
             onCreateEntry: async (entry) => {
-              await this.addLorebookEntry(entry)
+               await this.addLorebookEntry(entry)
             },
             onUpdateEntry: this.updateLorebookEntry.bind(this),
             onDeleteEntry: this.deleteLorebookEntry.bind(this),
@@ -3232,13 +3240,13 @@ class StoryStore {
           },
           loreUICallbacks: {
             onStart: () => {
-              this.chapterizationLoreStatus = 'Updating lorebook...'
+              this.chapterizationStatus = 'Updating lorebook...'
             },
             onProgress: (message) => {
-              this.chapterizationLoreStatus = message
+              this.chapterizationStatus = message
             },
             onComplete: () => {
-              this.chapterizationLoreStatus = null
+              this.chapterizationStatus = null
             },
           },
         },
@@ -3252,7 +3260,9 @@ class StoryStore {
       return { chaptersCreated: result.chapters.length, cancelled: result.cancelled }
     } finally {
       this.chapterizationProgress = null
-      this.chapterizationLoreStatus = null
+      this.chapterizationTimelineProgress = null
+      this.chapterizationClassificationProgress = null
+      this.chapterizationStatus = null
     }
   }
 

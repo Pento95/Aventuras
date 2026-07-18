@@ -36,6 +36,7 @@
       <Switch
         checked={chapterizeAfterImport}
         onCheckedChange={(v) => onChapterizeAfterImportChange(v)}
+        aria-label="Generate chapters from history"
       />
     </div>
     {#if chapterizeAfterImport}
@@ -48,6 +49,7 @@
           <Switch
             checked={chapterizeIncludeLorebook}
             onCheckedChange={(v) => onChapterizeIncludeLorebookChange(v)}
+            aria-label="Also update the lorebook"
           />
         </div>
         <p class="text-muted-foreground mt-1 pl-6 text-xs">
@@ -63,6 +65,7 @@
           <Switch
             checked={chapterizeIncludeTimeline}
             onCheckedChange={(v) => onChapterizeIncludeTimelineChange(v)}
+            aria-label="Estimate timeline"
           />
         </div>
         <p class="text-muted-foreground mt-1 pl-6 text-xs">
@@ -79,6 +82,7 @@
           <Switch
             checked={chapterizeIncludeClassification}
             onCheckedChange={(v) => onChapterizeIncludeClassificationChange(v)}
+            aria-label="Populate characters, locations & items"
           />
         </div>
         <p class="text-muted-foreground mt-1 pl-6 text-xs">

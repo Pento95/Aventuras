@@ -633,6 +633,16 @@ export class STImportWizardStore {
     this.isCreatingStory = true
     this.createError = null
 
+    // Reset progress/status of chapterization in the global story store
+    story.chapterizationProgress = null
+    story.chapterizationStatus = null
+
+    // Temporarily switch activePanel to 'library' during story creation and chapterization
+    // so that AppShell.svelte does not prematurely switch to the story view and unmount
+    // the wizard before chapterization completes.
+    const originalPanel = ui.activePanel
+    ui.setActivePanel('library')
+
     try {
       const protagonistName = this.protagonist?.name || 'the protagonist'
 
@@ -765,11 +775,15 @@ export class STImportWizardStore {
           await story.importSTChat(messagesToImport)
 
           if (this.chapterizeAfterImport) {
-            await story.chapterizeFromBeginning({
-              includeLorebook: this.chapterizeIncludeLorebook,
-              includeTimeline: this.chapterizeIncludeTimeline,
-              includeClassification: this.chapterizeIncludeClassification,
-            })
+            try {
+              await story.chapterizeFromBeginning({
+                includeLorebook: this.chapterizeIncludeLorebook,
+                includeTimeline: this.chapterizeIncludeTimeline,
+                includeClassification: this.chapterizeIncludeClassification,
+              })
+            } catch (chapterErr) {
+              console.error('Chapterization failed, but import succeeded:', chapterErr)
+            }
           }
         }
       }
@@ -789,6 +803,7 @@ export class STImportWizardStore {
       ui.setActivePanel('story')
       this.onClose()
     } catch (err) {
+      ui.setActivePanel(originalPanel)
       console.error('Failed to create story from ST import:', err)
       this.createError = err instanceof Error ? err.message : 'Failed to create story'
     } finally {

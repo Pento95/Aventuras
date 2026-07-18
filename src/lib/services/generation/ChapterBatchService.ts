@@ -1,10 +1,18 @@
 /**
  * ChapterBatchService - Orchestrates batch chapterization of a pre-existing
- * entry history (e.g. after a SillyTavern import). Never uses analyzeForChapter:
- * boundaries are precomputed deterministically by ChapterBatchPlanner. Chapters
- * are created strictly in sequence (each depends on state written by the last),
- * then, optionally, a single Lore Management session runs over all chapters
- * created in the batch.
+ * entry history (e.g. after a SillyTavern import). Boundaries are precomputed
+ * deterministically by ChapterBatchPlanner.
+ *
+ * Runs sequentially chapter-by-chapter:
+ * 1. For each chapter:
+ *    a. Creates the chapter (strictly sequential summary generation).
+ *    b. Estimates the timeline duration and assigns the timeline bracket (sequential).
+ *    c. Runs classification to update characters/locations/items (sequential).
+ * 2. After all chapters are processed, runs a single lore management pass
+ *    over the whole batch to update lorebook entries.
+ *
+ * Running sequentially prevents rate limits, keeps code simple, and ensures
+ * each step receives the updated entity and time state from the previous chapter.
  */
 
 import type { Chapter, Entry, StoryEntry, StoryMode, POV, Tense, TimeTracker } from '$lib/types'
@@ -55,6 +63,8 @@ export interface ChapterBatchInput {
 export interface ChapterBatchCallbacks {
   isCancelled: () => boolean
   onChapterProgress: (current: number, total: number) => void
+  onTimelineProgress?: (current: number, total: number) => void
+  onClassificationProgress?: (current: number, total: number) => void
   loreCallbacks: LoreManagementCallbacks
   loreUICallbacks?: LoreManagementUICallbacks
 }
@@ -84,29 +94,72 @@ export class ChapterBatchService {
 
     log('Batch planned', { boundaryCount: boundaries.length, startIndex: input.startIndex })
 
-    const chapters: Chapter[] = []
+    let chapters: Chapter[] = []
+    let time = this.deps.getTimeTracker()
+    const totalChapters = boundaries.length
 
-    for (const boundary of boundaries) {
+    for (let i = 0; i < boundaries.length; i++) {
       if (callbacks.isCancelled()) {
-        log('Batch cancelled', { chaptersCreated: chapters.length, planned: boundaries.length })
+        log('Batch cancelled during execution', {
+          chaptersCreated: chapters.length,
+          planned: totalChapters,
+        })
         return { chapters, cancelled: true }
       }
 
+      const boundary = boundaries[i]
+      
+      // 1. Generate and save chapter
       let chapter = await this.deps.buildAndSaveChapter(boundary.startIndex, boundary.endIndex)
-
-      if (input.includeTimeline) {
-        chapter = await this.runTimelineStep(chapter)
-      }
-
-      if (input.includeClassification) {
-        await this.runClassificationStep(chapter)
-      }
-
       chapters.push(chapter)
-      callbacks.onChapterProgress(chapters.length, boundaries.length)
+      const chapterIndex = chapters.length - 1
+      callbacks.onChapterProgress(chapters.length, totalChapters)
+
+      // 2. Timeline (sequential)
+      if (input.includeTimeline) {
+        callbacks.onTimelineProgress?.(chapterIndex, totalChapters)
+        const delta = await this.deps.estimateChapterTimeline(chapter.summary)
+        const startTime = time
+        await this.deps.setTimeTracker({
+          years: startTime.years + delta.years,
+          days: startTime.days + delta.days,
+          hours: startTime.hours + delta.hours,
+          minutes: startTime.minutes + delta.minutes,
+        })
+        time = this.deps.getTimeTracker()
+        await this.deps.updateChapterTimes(chapter.id, startTime, time)
+        chapter = { ...chapter, startTime, endTime: time }
+        chapters[chapterIndex] = chapter
+        callbacks.onTimelineProgress?.(chapterIndex + 1, totalChapters)
+      }
+
+      // 3. Classification (sequential)
+      if (input.includeClassification) {
+        callbacks.onClassificationProgress?.(chapterIndex, totalChapters)
+        const rawText = this.deps
+          .getChapterEntries(chapter)
+          .map((e) => `[${e.type}]: ${e.content}`)
+          .join('\n\n')
+        const content = `Chapter summary: ${chapter.summary}\n\nFull chapter content:\n${rawText}`
+        const currentTime = chapter.endTime ?? this.deps.getTimeTracker()
+        const result = await this.deps.classifyChapter(content, currentTime)
+        result.scene.timeProgression = 'none'
+        await this.deps.applyClassificationResult(result)
+        callbacks.onClassificationProgress?.(chapterIndex + 1, totalChapters)
+      }
     }
 
-    if (input.includeLorebook && chapters.length > 0) {
+    if (chapters.length === 0) {
+      return { chapters, cancelled: false }
+    }
+
+    if (callbacks.isCancelled()) {
+      log('Batch cancelled before lore management phase', { chaptersCreated: chapters.length })
+      return { chapters, cancelled: true }
+    }
+
+    // Phase 4: lore management, a single pass over the whole batch.
+    if (input.includeLorebook) {
       log('Running single lore management pass over batch', { chapterCount: chapters.length })
       const coordinator = new LoreManagementCoordinator({
         runLoreManagement: this.deps.runLoreManagement,
@@ -127,43 +180,5 @@ export class ChapterBatchService {
     }
 
     return { chapters, cancelled: false }
-  }
-
-  /**
-   * Estimate elapsed time from the chapter's summary, advance the running
-   * TimeTracker, and persist the resulting bracket onto the chapter.
-   * Returns a new chapter object (buildAndSaveChapter's return value isn't
-   * the reactive store reference, so the caller must use this one going
-   * forward — e.g. for the lore pass, which reads chapter.startTime/endTime).
-   */
-  private async runTimelineStep(chapter: Chapter): Promise<Chapter> {
-    const startTime = this.deps.getTimeTracker()
-    const delta = await this.deps.estimateChapterTimeline(chapter.summary)
-    await this.deps.setTimeTracker({
-      years: startTime.years + delta.years,
-      days: startTime.days + delta.days,
-      hours: startTime.hours + delta.hours,
-      minutes: startTime.minutes + delta.minutes,
-    })
-    const endTime = this.deps.getTimeTracker() // now normalized by setTimeTracker
-    await this.deps.updateChapterTimes(chapter.id, startTime, endTime)
-    return { ...chapter, startTime, endTime }
-  }
-
-  /**
-   * Classify the chapter (summary + full raw content) and apply the result
-   * to World Tracking (characters/locations/items/story beats). Suppresses
-   * the classifier's own coarse per-turn time progression: Timeline (or
-   * nothing) already owns time at chapter granularity here.
-   */
-  private async runClassificationStep(chapter: Chapter): Promise<void> {
-    const rawText = this.deps
-      .getChapterEntries(chapter)
-      .map((e) => `[${e.type}]: ${e.content}`)
-      .join('\n\n')
-    const content = `Chapter summary: ${chapter.summary}\n\nFull chapter content:\n${rawText}`
-    const result = await this.deps.classifyChapter(content, this.deps.getTimeTracker())
-    result.scene.timeProgression = 'none'
-    await this.deps.applyClassificationResult(result)
   }
 }

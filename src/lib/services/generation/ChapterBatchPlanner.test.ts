@@ -110,3 +110,21 @@ describe('planChapterBoundaries — token count fallback', () => {
     expect(boundaries.length).toBeGreaterThan(1)
   })
 })
+
+describe('planChapterBoundaries — invalid threshold validation', () => {
+  it('returns an empty array for zero, negative, or NaN thresholds', () => {
+    const entries = makeEntries(10, 100)
+    expect(planChapterBoundaries(entries, 0, 0, 0)).toEqual([])
+    expect(planChapterBoundaries(entries, -500, 0, 0)).toEqual([])
+    expect(planChapterBoundaries(entries, NaN, 0, 0)).toEqual([])
+  })
+})
+
+describe('planChapterBoundaries — mid-turn cut at protected buffer boundary', () => {
+  it('moves maxSelectableEndIndex back one position if the last selectable is user_action and the next is narration', () => {
+    const entries = makeEntries(10, 100)
+    const boundaries = planChapterBoundaries(entries, 1000, 1, 0)
+    const lastBoundary = boundaries[boundaries.length - 1]
+    expect(lastBoundary.endIndex).toBe(8)
+  })
+})

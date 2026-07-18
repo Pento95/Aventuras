@@ -29,9 +29,22 @@ export function planChapterBoundaries(
   chapterBuffer: number,
   startIndex: number,
 ): ChapterBoundary[] {
+  if (!tokenThreshold || tokenThreshold <= 0 || isNaN(tokenThreshold)) {
+    return []
+  }
+
   const boundaries: ChapterBoundary[] = []
   const protectedCount = Math.max(0, chapterBuffer)
-  const maxSelectableEndIndex = Math.max(0, entries.length - protectedCount)
+  let maxSelectableEndIndex = Math.max(0, entries.length - protectedCount)
+
+  if (
+    maxSelectableEndIndex > 0 &&
+    maxSelectableEndIndex < entries.length &&
+    entries[maxSelectableEndIndex - 1].type === 'user_action' &&
+    entries[maxSelectableEndIndex].type === 'narration'
+  ) {
+    maxSelectableEndIndex--
+  }
 
   let cursor = Math.max(0, startIndex)
 
