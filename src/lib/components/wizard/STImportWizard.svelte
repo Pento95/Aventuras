@@ -39,7 +39,10 @@
   ]
 </script>
 
-<ResponsiveModal.Root open={true} onOpenChange={(open) => !open && !wizard.isCreatingStory && onClose()}>
+<ResponsiveModal.Root
+  open={true}
+  onOpenChange={(open) => !open && !wizard.isCreatingStory && onClose()}
+>
   <ResponsiveModal.Content
     class="flex h-full flex-col gap-0 p-0 sm:h-auto sm:max-h-[90vh] sm:max-w-3xl"
     interactOutsideBehavior={wizard.isCreatingStory ? 'ignore' : 'close'}

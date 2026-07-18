@@ -3222,7 +3222,7 @@ class StoryStore {
           },
           loreCallbacks: {
             onCreateEntry: async (entry) => {
-               await this.addLorebookEntry(entry)
+              await this.addLorebookEntry(entry)
             },
             onUpdateEntry: this.updateLorebookEntry.bind(this),
             onDeleteEntry: this.deleteLorebookEntry.bind(this),
