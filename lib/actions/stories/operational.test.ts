@@ -4,10 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   branches,
   deltas,
+  entities,
   storyDefinitionSchema,
+  storyEntries,
   storySettingsSchema,
   stories,
   type StoryDefinition,
+  type StorySettings,
 } from '@/lib/db'
 import { createTestDb } from '@/lib/db/__tests__/test-db'
 import {
@@ -194,5 +197,90 @@ describe('stories column writes', () => {
     expect(result).toEqual({ status: 'open-failed', kind: 'definition-corrupt' })
     expect(navigate).not.toHaveBeenCalled()
     expect(storiesStore.getStories().openFailures.story_corrupt).toBe('definition-corrupt')
+  })
+
+  it('badges settings corruption distinctly while another story still opens', async () => {
+    const { db, ctx } = await setup()
+    await db
+      .update(stories)
+      .set({
+        settings: {
+          ...STORY_SETTINGS,
+          classifierCadence: 'invalid',
+        } as unknown as StorySettings,
+      })
+      .where(eq(stories.id, 'story_1'))
+    await db.insert(stories).values({
+      id: 'story_healthy',
+      title: 'Healthy',
+      status: 'active',
+      favorite: 0,
+      createdAt: 1,
+      updatedAt: 1,
+      currentBranchId: 'br_healthy',
+      definition: STORY_DEFINITION,
+      settings: STORY_SETTINGS,
+    })
+    await db
+      .insert(branches)
+      .values({ id: 'br_healthy', storyId: 'story_healthy', name: 'main', createdAt: 1 })
+
+    const navigate = vi.fn()
+    const corruptResult = await openStory('story_1', ctx, navigate)
+
+    expect(corruptResult).toEqual({ status: 'open-failed', kind: 'settings-corrupt' })
+    expect(navigate).not.toHaveBeenCalled()
+    expect(storiesStore.getStories().openFailures.story_1).toBe('settings-corrupt')
+
+    const healthyResult = await openStory('story_healthy', ctx, navigate)
+
+    expect(healthyResult).toEqual({ status: 'ok', branchId: 'br_healthy' })
+    expect(navigate).toHaveBeenCalledWith('br_healthy')
+  })
+
+  it('cancels a stale open before publishing its working set or navigation', async () => {
+    const { db, ctx } = await setup()
+    await db.insert(storyEntries).values({
+      id: 'entry_1',
+      branchId: 'br_1',
+      position: 1,
+      kind: 'opening',
+      content: 'The keep looms over the valley.',
+      createdAt: 1,
+    })
+    await db.insert(entities).values({
+      id: 'entity_1',
+      branchId: 'br_1',
+      kind: 'character',
+      name: 'Aria',
+      status: 'active',
+      injectionMode: 'auto',
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const navigate = vi.fn()
+    const isCurrent = vi
+      .fn<() => boolean>()
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValue(false)
+
+    const result = await openStory('story_1', ctx, navigate, 999, isCurrent)
+
+    expect(result).toEqual({ status: 'cancelled' })
+    expect(currentStoryStore.getCurrentStory()).toBeNull()
+    expect(entriesStore.getLoadedBranch()).toBeNull()
+    expect(entriesStore.getEntries().size).toBe(0)
+    expect(entitiesStore.getLoadedBranch()).toBeNull()
+    expect(entitiesStore.getEntities().size).toBe(0)
+    expect(navigationStore.getNavigation()).toEqual({
+      currentStoryId: null,
+      currentBranchId: null,
+    })
+    expect(navigate).not.toHaveBeenCalled()
+    expect(
+      (await db.select().from(stories).where(eq(stories.id, 'story_1')))[0].lastOpenedAt,
+    ).toBeNull()
   })
 })

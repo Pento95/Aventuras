@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppActionsMenu } from '@/components/compounds/app-actions-menu'
 import { ScreenShell } from '@/components/shells/screen-shell'
 import { AppBannerHost } from '@/components/story/app-banner-host'
+import { StoryConfigRecoveryDialog } from '@/components/story/story-config-recovery-dialog'
 import { StoryList, type StoryCardHandlers } from '@/components/story/story-list'
 import {
   ConcurrentStatePrompt,
@@ -27,16 +28,23 @@ import {
   loadDraft,
   loadLiveSession,
   openStory,
+  resetStorySettings,
   setStoryArchived,
   setStoryFavorite,
 } from '@/lib/actions'
 import { db, runInTransaction } from '@/lib/db'
 import { t } from '@/lib/i18n'
 import {
+  createStoryRecoveryCoordinator,
+  getDatabaseFileRevealAction,
+  handleStoryRecoveryResetOutcome,
+} from '@/lib/recovery'
+import {
   rehydrateStories,
   selectStoryCards,
   storiesStore,
   wizardStore,
+  type OpenFailureKind,
   type StoryFilter,
   type StoryListQuery,
   type StorySort,
@@ -44,12 +52,15 @@ import {
 import { runAction } from '@/lib/utils'
 
 const ctx = { db, runInTransaction }
+const revealDatabaseFile = getDatabaseFileRevealAction()
 
 type PromptState = { trigger: 'new-story' | 'draft'; storyId?: string }
+type PendingStoryRecovery = { storyId: string; kind: OpenFailureKind }
 
 export default function Index() {
   const router = useRouter()
   const rows = storiesStore.useStories((s) => s.rows)
+  const openFailures = storiesStore.useStories((s) => s.openFailures)
   const [query, setQuery] = useState<StoryListQuery>({
     search: '',
     filter: 'all',
@@ -57,18 +68,40 @@ export default function Index() {
   })
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [prompt, setPrompt] = useState<PromptState | null>(null)
+  const [storyRecovery, setStoryRecovery] = useState<PendingStoryRecovery | null>(null)
+  const [recoveryCoordinator] = useState(createStoryRecoveryCoordinator)
   const sessionExists = useWizardSessionExists()
 
   useEffect(() => {
     void rehydrateStories(db)
   }, [])
 
+  useEffect(
+    () => () => {
+      recoveryCoordinator.invalidate()
+    },
+    [recoveryCoordinator],
+  )
+
   const cards = useMemo(() => selectStoryCards(rows, query, Date.now()), [rows, query])
 
   const goWizard = (draftId?: string) =>
     router.push((draftId ? `/wizard?draftId=${draftId}` : '/wizard') as Href)
 
+  const navigateToStory = (branchId: string) => router.push(`/reader-composer/${branchId}`)
+
+  const showStoryRecovery = (recovery: PendingStoryRecovery) => {
+    recoveryCoordinator.invalidate()
+    setStoryRecovery(recovery)
+  }
+
+  const dismissStoryRecovery = () => {
+    recoveryCoordinator.invalidate()
+    setStoryRecovery(null)
+  }
+
   const onNewStory = () => {
+    dismissStoryRecovery()
     if (sessionExists) {
       setPrompt({ trigger: 'new-story' })
       return
@@ -80,6 +113,7 @@ export default function Index() {
   }
 
   const openDraft = (storyId: string) => {
+    dismissStoryRecovery()
     if (sessionExists) {
       setPrompt({ trigger: 'draft', storyId })
       return
@@ -97,6 +131,29 @@ export default function Index() {
     )
   }
 
+  const attemptOpenStory = (storyId: string) => {
+    const knownFailure = openFailures[storyId]
+    if (knownFailure) {
+      showStoryRecovery({ storyId, kind: knownFailure })
+      return
+    }
+
+    setStoryRecovery(null)
+    runAction(
+      recoveryCoordinator.attemptOpen({
+        open: (navigate, isCurrentRequest) =>
+          openStory(storyId, ctx, navigate, undefined, isCurrentRequest),
+        navigate: navigateToStory,
+        onOpenFailed: (kind) => showStoryRecovery({ storyId, kind }),
+      }),
+      {
+        event: 'action_layer.story_open_failed',
+        toastMessage: t('landing:errors.openFailed'),
+        context: { storyId },
+      },
+    )
+  }
+
   const cardHandlers = (storyId: string): StoryCardHandlers => {
     const row = rows.find((r) => r.id === storyId)
     const isDraft = row?.status === 'draft'
@@ -106,14 +163,7 @@ export default function Index() {
           openDraft(storyId)
           return
         }
-        runAction(
-          openStory(storyId, ctx, (branchId) => router.push(`/reader-composer/${branchId}`)),
-          {
-            event: 'action_layer.story_open_failed',
-            toastMessage: t('landing:errors.openFailed'),
-            context: { storyId },
-          },
-        )
+        attemptOpenStory(storyId)
       },
       onToggleFavorite: () => {
         runAction(setStoryFavorite(storyId, !(row?.favorite === 1), ctx), {
@@ -133,6 +183,10 @@ export default function Index() {
     }
   }
 
+  const recoveryRow = storyRecovery
+    ? rows.find((row) => row.id === storyRecovery.storyId)
+    : undefined
+
   return (
     <ScreenShell
       variant="app-root"
@@ -143,6 +197,7 @@ export default function Index() {
       <StoryList
         cards={cards}
         totalCount={rows.length}
+        openFailures={openFailures}
         query={query}
         onSearch={(search) => setQuery((q) => ({ ...q, search }))}
         onFilter={(filter: StoryFilter) => setQuery((q) => ({ ...q, filter }))}
@@ -199,6 +254,60 @@ export default function Index() {
         }}
         onDismiss={() => setPrompt(null)}
       />
+
+      {storyRecovery && recoveryRow ? (
+        <StoryConfigRecoveryDialog
+          key={`${storyRecovery.storyId}:${storyRecovery.kind}`}
+          open
+          kind={storyRecovery.kind}
+          storyName={recoveryRow.title}
+          onOpenFile={
+            revealDatabaseFile
+              ? () => {
+                  runAction(revealDatabaseFile(), {
+                    event: 'action_layer.database_file_reveal_failed',
+                    toastMessage: t('landing:errors.openDatabaseFileFailed'),
+                    context: { storyId: storyRecovery.storyId },
+                  })
+                }
+              : undefined
+          }
+          onReset={() => {
+            const storyId = storyRecovery.storyId
+            const operation = recoveryCoordinator.startReset({
+              storyId,
+              reset: () => resetStorySettings(storyId, ctx),
+              open: (navigate, isCurrentRequest) =>
+                openStory(storyId, ctx, navigate, undefined, isCurrentRequest),
+              navigate: navigateToStory,
+              onOpened: () => setStoryRecovery(null),
+              onOpenFailed: (kind) => showStoryRecovery({ storyId, kind }),
+            })
+            if (operation) {
+              void operation.then((outcome) => {
+                handleStoryRecoveryResetOutcome(outcome, {
+                  onResetFailure: (error) => {
+                    runAction(Promise.reject(error), {
+                      event: 'action_layer.story_settings_reset_failed',
+                      toastMessage: t('landing:errors.resetStorySettingsFailed'),
+                      context: { storyId },
+                    })
+                  },
+                  onReopenFailure: (error) => {
+                    dismissStoryRecovery()
+                    runAction(Promise.reject(error), {
+                      event: 'action_layer.story_open_failed',
+                      toastMessage: t('landing:errors.openFailed'),
+                      context: { storyId },
+                    })
+                  },
+                })
+              })
+            }
+          }}
+          onDismiss={dismissStoryRecovery}
+        />
+      ) : null}
 
       <AlertDialog
         open={pendingDelete != null}
