@@ -115,73 +115,85 @@
       id: 'base',
       label: 'Preparing story database',
       status: baseDone ? 'completed' : 'active',
-      details: baseDone ? 'Done' : 'Creating database records...'
+      details: baseDone ? 'Done' : 'Creating database records...',
     })
 
     // 2. Chapter Generation
     if (chapterizeAfterImport) {
-      const active = chapterizationProgress !== null &&
-                     chapterizationProgress.current < chapterizationProgress.total
-      const done = chapterizationProgress !== null &&
-                   chapterizationProgress.current === chapterizationProgress.total
+      const active =
+        chapterizationProgress !== null &&
+        chapterizationProgress.current < chapterizationProgress.total
+      const done =
+        chapterizationProgress !== null &&
+        chapterizationProgress.current === chapterizationProgress.total
       list.push({
         id: 'chapters',
         label: 'Generating chapters',
-        status: done ? 'completed' : (active ? 'active' : 'pending'),
+        status: done ? 'completed' : active ? 'active' : 'pending',
         details: active
           ? `Processing chapter ${chapterizationProgress.current}/${chapterizationProgress.total}`
-          : (done ? 'Done' : 'Waiting in queue...')
+          : done
+            ? 'Done'
+            : 'Waiting in queue...',
       })
     }
 
     // 3. Timeline Estimation
     if (chapterizeIncludeTimeline) {
-      const active = chapterizationTimelineProgress !== null &&
-                     chapterizationTimelineProgress.current < chapterizationTimelineProgress.total
-      const done = chapterizationTimelineProgress !== null &&
-                   chapterizationTimelineProgress.current === chapterizationTimelineProgress.total
+      const active =
+        chapterizationTimelineProgress !== null &&
+        chapterizationTimelineProgress.current < chapterizationTimelineProgress.total
+      const done =
+        chapterizationTimelineProgress !== null &&
+        chapterizationTimelineProgress.current === chapterizationTimelineProgress.total
       list.push({
         id: 'timeline',
         label: 'Estimating timelines',
-        status: done ? 'completed' : (active ? 'active' : 'pending'),
+        status: done ? 'completed' : active ? 'active' : 'pending',
         details: active
           ? `Estimating timeline: chapter ${chapterizationTimelineProgress.current}/${chapterizationTimelineProgress.total}`
-          : (done ? 'Done' : 'Waiting in queue...')
+          : done
+            ? 'Done'
+            : 'Waiting in queue...',
       })
     }
 
     // 4. Chapter Classification
     if (chapterizeIncludeClassification) {
-      const active = chapterizationClassificationProgress !== null &&
-                     chapterizationClassificationProgress.current < chapterizationClassificationProgress.total
-      const done = chapterizationClassificationProgress !== null &&
-                   chapterizationClassificationProgress.current === chapterizationClassificationProgress.total
+      const active =
+        chapterizationClassificationProgress !== null &&
+        chapterizationClassificationProgress.current < chapterizationClassificationProgress.total
+      const done =
+        chapterizationClassificationProgress !== null &&
+        chapterizationClassificationProgress.current === chapterizationClassificationProgress.total
       list.push({
         id: 'classification',
         label: 'Classifying chapters',
-        status: done ? 'completed' : (active ? 'active' : 'pending'),
+        status: done ? 'completed' : active ? 'active' : 'pending',
         details: active
           ? `Classifying: chapter ${chapterizationClassificationProgress.current}/${chapterizationClassificationProgress.total}`
-          : (done ? 'Done' : 'Waiting in queue...')
+          : done
+            ? 'Done'
+            : 'Waiting in queue...',
       })
     }
 
     // 5. Lorebook update
     if (chapterizeIncludeLorebook) {
-      const active = chapterizationStatus !== null &&
-                     (chapterizationStatus.toLowerCase().includes('lorebook') ||
-                      chapterizationStatus.toLowerCase().includes('updating'))
+      const active =
+        chapterizationStatus !== null &&
+        (chapterizationStatus.toLowerCase().includes('lorebook') ||
+          chapterizationStatus.toLowerCase().includes('updating'))
       list.push({
         id: 'lorebook',
         label: 'Updating lorebook',
         status: active ? 'active' : 'pending',
-        details: active ? chapterizationStatus : 'Waiting in queue...'
+        details: active ? chapterizationStatus : 'Waiting in queue...',
       })
     }
 
     return list
   })
-
 
   const progressPercent = $derived.by(() => {
     if (!chapterizationProgress) return 0
@@ -201,10 +213,12 @@
     }
     if (chapterizeIncludeLorebook) {
       totalUnits += 1
-      const isLoreDone = chapterizationStatus === null &&
-                         chapterizationProgress.current === totalChapters &&
-                         (!chapterizeIncludeTimeline || (chapterizationTimelineProgress?.current === totalChapters)) &&
-                         (!chapterizeIncludeClassification || (chapterizationClassificationProgress?.current === totalChapters))
+      const isLoreDone =
+        chapterizationStatus === null &&
+        chapterizationProgress.current === totalChapters &&
+        (!chapterizeIncludeTimeline || chapterizationTimelineProgress?.current === totalChapters) &&
+        (!chapterizeIncludeClassification ||
+          chapterizationClassificationProgress?.current === totalChapters)
       if (isLoreDone) {
         completedUnits += 1
       }
@@ -378,9 +392,9 @@
 
   <!-- Loading -->
   {#if isCreatingStory}
-    <div class="bg-muted/40 border-muted rounded-lg border p-4 space-y-4 text-sm">
+    <div class="bg-muted/40 border-muted space-y-4 rounded-lg border p-4 text-sm">
       <div class="flex items-center justify-between border-b pb-2">
-        <span class="font-medium text-foreground">Importing Story & Processing Chapters</span>
+        <span class="text-foreground font-medium">Importing Story & Processing Chapters</span>
         {#if (chapterizationProgress || chapterizationStatus) && (!chapterizationStatus || !chapterizationStatus.includes('lore'))}
           <Button variant="outline" size="sm" class="h-8 gap-1.5" onclick={onCancelChapterization}>
             <X class="h-3.5 w-3.5" />
@@ -391,9 +405,9 @@
 
       {#if progressPercent > 0}
         <div class="space-y-1.5 border-b pb-3">
-          <div class="flex justify-between text-xs text-muted-foreground">
+          <div class="text-muted-foreground flex justify-between text-xs">
             <span>Overall progress</span>
-            <span class="font-medium text-foreground">{Math.round(progressPercent)}%</span>
+            <span class="text-foreground font-medium">{Math.round(progressPercent)}%</span>
           </div>
           <div class="bg-secondary h-2 w-full overflow-hidden rounded-full">
             <div
@@ -405,23 +419,29 @@
       {/if}
 
       <div class="space-y-3">
-        {#each steps as step}
+        {#each steps as step (step.id)}
           <div class="flex items-start gap-3">
             <div class="mt-0.5 shrink-0">
               {#if step.status === 'completed'}
                 <CheckCircle2 class="h-4 w-4 text-emerald-500" />
               {:else if step.status === 'active'}
-                <Loader2 class="h-4 w-4 text-primary animate-spin" />
+                <Loader2 class="text-primary h-4 w-4 animate-spin" />
               {:else}
-                <Circle class="h-4 w-4 text-muted-foreground/30" />
+                <Circle class="text-muted-foreground/30 h-4 w-4" />
               {/if}
             </div>
-            <div class="flex-1 min-w-0">
-              <p class="font-medium {step.status === 'active' ? 'text-primary' : step.status === 'completed' ? 'text-muted-foreground line-through' : 'text-muted-foreground'}">
+            <div class="min-w-0 flex-1">
+              <p
+                class="font-medium {step.status === 'active'
+                  ? 'text-primary'
+                  : step.status === 'completed'
+                    ? 'text-muted-foreground line-through'
+                    : 'text-muted-foreground'}"
+              >
                 {step.label}
               </p>
               {#if step.status === 'active' && step.details}
-                <p class="text-xs text-muted-foreground mt-0.5">{step.details}</p>
+                <p class="text-muted-foreground mt-0.5 text-xs">{step.details}</p>
               {/if}
             </div>
           </div>
