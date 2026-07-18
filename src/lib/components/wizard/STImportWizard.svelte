@@ -1,5 +1,6 @@
 <script lang="ts">
   import { STImportWizardStore } from '$lib/stores/wizard/stImportWizard.svelte'
+  import { story } from '$lib/stores/story.svelte'
   import { hasRequiredCredentials } from '$lib/services/ai/image'
   import * as ResponsiveModal from '$lib/components/ui/responsive-modal'
   import { Button } from '$lib/components/ui/button'
@@ -222,10 +223,22 @@
           hasCard={wizard.hasCard}
           vaultTag={wizard.vaultTag}
           vaultDescription={wizard.vaultDescription}
+          chapterizeAfterImport={wizard.chapterizeAfterImport}
+          chapterizeIncludeLorebook={wizard.chapterizeIncludeLorebook}
+          chapterizeIncludeTimeline={wizard.chapterizeIncludeTimeline}
+          chapterizeIncludeClassification={wizard.chapterizeIncludeClassification}
+          chapterizationProgress={story.chapterizationProgress}
+          chapterizationLoreStatus={story.chapterizationLoreStatus}
           onTitleChange={(v) => (wizard.storyTitle = v)}
           onSaveToVaultChange={(v) => (wizard.saveToVault = v)}
           onVaultTagChange={(v) => (wizard.vaultTag = v)}
           onVaultDescriptionChange={(v) => (wizard.vaultDescription = v)}
+          onChapterizeAfterImportChange={(v) => (wizard.chapterizeAfterImport = v)}
+          onChapterizeIncludeLorebookChange={(v) => (wizard.chapterizeIncludeLorebook = v)}
+          onChapterizeIncludeTimelineChange={(v) => (wizard.chapterizeIncludeTimeline = v)}
+          onChapterizeIncludeClassificationChange={(v) =>
+            (wizard.chapterizeIncludeClassification = v)}
+          onCancelChapterization={() => story.requestChapterizationCancel()}
         />
       {/if}
     </div>

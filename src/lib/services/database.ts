@@ -740,7 +740,9 @@ class DatabaseService {
   /**
    * Delete all main-branch entries for a story (branch_id IS NULL).
    * Also clears related world_state_snapshots so stale snapshots don't
-   * reference non-existent entry positions after the import.
+   * reference non-existent entry positions after the import, and clears
+   * main-branch chapters so none are left pointing at deleted entries
+   * (chapters have no ON DELETE behavior tying them to story_entries).
    * Used by the SillyTavern chat import to overwrite story content.
    */
   async clearStoryEntries(storyId: string): Promise<void> {
@@ -751,6 +753,7 @@ class DatabaseService {
     await db.execute('DELETE FROM world_state_snapshots WHERE story_id = ? AND branch_id IS NULL', [
       storyId,
     ])
+    await db.execute('DELETE FROM chapters WHERE story_id = ? AND branch_id IS NULL', [storyId])
   }
 
   /**

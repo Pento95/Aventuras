@@ -9,6 +9,7 @@
     Loader2,
     AlertCircle,
     Save,
+    X,
   } from 'lucide-svelte'
   import * as Card from '$lib/components/ui/card'
   import * as Alert from '$lib/components/ui/alert'
@@ -16,6 +17,8 @@
   import { Label } from '$lib/components/ui/label'
   import { Badge } from '$lib/components/ui/badge'
   import { Switch } from '$lib/components/ui/switch'
+  import { Button } from '$lib/components/ui/button'
+  import ChapterizeOptions from '$lib/components/shared/ChapterizeOptions.svelte'
   import type { GeneratedProtagonist, GeneratedCharacter } from '$lib/services/ai/sdk'
   import type { ImportedLorebookItem } from '../wizardTypes'
   import type { StoryMode, POV } from '$lib/types'
@@ -40,10 +43,21 @@
     hasCard: boolean
     vaultTag: string
     vaultDescription: string
+    chapterizeAfterImport: boolean
+    chapterizeIncludeLorebook: boolean
+    chapterizeIncludeTimeline: boolean
+    chapterizeIncludeClassification: boolean
+    chapterizationProgress: { current: number; total: number } | null
+    chapterizationLoreStatus: string | null
     onTitleChange: (v: string) => void
     onSaveToVaultChange: (v: boolean) => void
     onVaultTagChange: (v: string) => void
     onVaultDescriptionChange: (v: string) => void
+    onChapterizeAfterImportChange: (v: boolean) => void
+    onChapterizeIncludeLorebookChange: (v: boolean) => void
+    onChapterizeIncludeTimelineChange: (v: boolean) => void
+    onChapterizeIncludeClassificationChange: (v: boolean) => void
+    onCancelChapterization: () => void
   }
 
   let {
@@ -65,10 +79,21 @@
     hasCard,
     vaultTag,
     vaultDescription,
+    chapterizeAfterImport,
+    chapterizeIncludeLorebook,
+    chapterizeIncludeTimeline,
+    chapterizeIncludeClassification,
+    chapterizationProgress,
+    chapterizationLoreStatus,
     onTitleChange,
     onSaveToVaultChange,
     onVaultTagChange,
     onVaultDescriptionChange,
+    onChapterizeAfterImportChange,
+    onChapterizeIncludeLorebookChange,
+    onChapterizeIncludeTimelineChange,
+    onChapterizeIncludeClassificationChange,
+    onCancelChapterization,
   }: Props = $props()
 
   const totalLorebookEntries = $derived(importedLorebooks.flatMap((lb) => lb.entries).length)
@@ -208,6 +233,20 @@
       </Card.Content>
     </Card.Root>
 
+    <!-- Generate Chapters from History -->
+    {#if importChatAsEntries && chatMessageCount > 0}
+      <ChapterizeOptions
+        {chapterizeAfterImport}
+        {chapterizeIncludeLorebook}
+        {chapterizeIncludeTimeline}
+        {chapterizeIncludeClassification}
+        {onChapterizeAfterImportChange}
+        {onChapterizeIncludeLorebookChange}
+        {onChapterizeIncludeTimelineChange}
+        {onChapterizeIncludeClassificationChange}
+      />
+    {/if}
+
     <!-- Save to Vault Option -->
     {#if hasCard}
       <Card.Root>
@@ -224,9 +263,23 @@
 
   <!-- Loading -->
   {#if isCreatingStory}
-    <div class="flex items-center gap-2 text-sm">
-      <Loader2 class="text-primary h-4 w-4 animate-spin" />
-      Creating your story...
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center gap-2">
+        <Loader2 class="text-primary h-4 w-4 animate-spin" />
+        {#if chapterizationLoreStatus}
+          {chapterizationLoreStatus}
+        {:else if chapterizationProgress}
+          Generating chapters: {chapterizationProgress.current}/{chapterizationProgress.total}
+        {:else}
+          Creating your story...
+        {/if}
+      </div>
+      {#if chapterizationProgress || chapterizationLoreStatus}
+        <Button variant="outline" size="sm" class="gap-1.5" onclick={onCancelChapterization}>
+          <X class="h-3.5 w-3.5" />
+          Cancel chapter generation
+        </Button>
+      {/if}
     </div>
   {/if}
 
