@@ -3,8 +3,8 @@
  * These convert vault entity types to exportable formats.
  */
 
-import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { resolveSaveTarget } from '$lib/services/exportTarget'
 import type { VaultLorebook, VaultLorebookEntry, VaultCharacter, VaultScenario } from '$lib/types'
 import type { Entry, EntryType } from '$lib/types'
 import type { ExportFormat } from '../types'
@@ -154,17 +154,13 @@ export async function exportVaultScenario(scenario: VaultScenario): Promise<bool
 
 async function saveFile(content: string, defaultPath: string): Promise<boolean> {
   try {
-    const filePath = await save({
-      defaultPath,
-      filters: [
-        { name: 'JSON', extensions: ['json'] },
-        { name: 'Text', extensions: ['txt'] },
-      ],
-    })
+    const target = await resolveSaveTarget(defaultPath, [
+      { name: 'JSON', extensions: ['json'] },
+      { name: 'Text', extensions: ['txt'] },
+    ])
+    if (!target) return false
 
-    if (!filePath) return false
-
-    await writeTextFile(filePath, content)
+    await writeTextFile(target.destPath, content)
     return true
   } catch (error) {
     console.error('[VaultExporter] Failed to save file:', error)

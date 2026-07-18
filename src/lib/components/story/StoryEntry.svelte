@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { StoryEntry, EmbeddedImage } from '$lib/types'
+  import type { StoryEntry, EmbeddedImage, TimeTracker } from '$lib/types'
   import { story } from '$lib/stores/story.svelte'
   import { ui } from '$lib/stores/ui.svelte'
   import { settings } from '$lib/stores/settings.svelte'
@@ -41,6 +41,7 @@
   import ReasoningBlock from './ReasoningBlock.svelte'
   import { countTokens } from '$lib/services/tokenizer'
   import { Button } from '$lib/components/ui/button'
+  import * as Popover from '$lib/components/ui/popover'
   import { Textarea } from '$lib/components/ui/textarea'
   import { Input } from '$lib/components/ui/input'
   import * as ResponsiveModal from '$lib/components/ui/responsive-modal'
@@ -75,6 +76,40 @@
 
   // Check if Visual Prose mode is enabled for this story
   const visualProseMode = $derived(story.currentStory?.settings?.visualProseMode ?? false)
+
+  // Generation info shown in the "info" popover (model/profile/effort/timestamp)
+  const showInfo = $derived(entry.type === 'narration')
+
+  function formatStoryTime(time: TimeTracker | null | undefined): string {
+    if (!time) return ''
+    const parts: string[] = []
+    // TimeTracker's fields are all required, but this data is persisted JSON: a story imported
+    // from an older .avt can carry a partial tracker that the type system never sees.
+    if (time.years && time.years > 0) parts.push(`Y${time.years}`)
+    if (time.days && time.days > 0) parts.push(`D${time.days}`)
+    const hours = time.hours ?? 0
+    const minutes = time.minutes ?? 0
+    parts.push(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`)
+    return parts.join(' ')
+  }
+
+  const generationInfo = $derived.by(() => {
+    const m = entry.metadata
+    // In-story time range for this message (start → end after time progression)
+    const start = formatStoryTime(m?.timeStart)
+    const end = formatStoryTime(m?.timeEnd)
+    const storyTime = start && end && start !== end ? `${start} → ${end}` : start || end || null
+    return {
+      model: m?.model,
+      profileName: m?.profileName,
+      reasoningEffort: m?.reasoningEffort,
+      temperature: m?.temperature,
+      duration:
+        typeof m?.generationTime === 'number' ? `${(m.generationTime / 1000).toFixed(1)}s` : null,
+      storyTime,
+      timestamp: new Date(entry.createdAt).toLocaleString(),
+    }
+  })
 
   // Check if this is the latest narration entry (for retry button)
   const isLatestNarration = $derived.by(() => {
@@ -1118,6 +1153,73 @@
     <!-- Right side: Action buttons toolbar (always visible on mobile, hover-only on desktop) -->
     {#if !isEditing && !isDeleting && !isBranching && !isCreatingCheckpoint && entry.type !== 'system'}
       <div class="flex items-center gap-0.5">
+        {#if showInfo}
+          <Popover.Root>
+            <Popover.Trigger>
+              {#snippet child({ props })}
+                <Button
+                  variant="text"
+                  size="icon"
+                  class="text-muted-foreground hover:text-foreground h-7 w-7"
+                  title="Response info"
+                  {...props}
+                >
+                  <Info class="h-4 w-4" />
+                </Button>
+              {/snippet}
+            </Popover.Trigger>
+            <Popover.Content class="w-64 p-3 text-xs" align="end">
+              <p class="text-foreground mb-2 text-sm font-medium">Response info</p>
+              <dl class="space-y-1.5">
+                {#if generationInfo.storyTime}
+                  <div class="flex justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">Story time</dt>
+                    <dd class="text-right">{generationInfo.storyTime}</dd>
+                  </div>
+                {/if}
+                {#if generationInfo.model}
+                  <div class="flex justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">Model</dt>
+                    <dd class="text-right break-all">{generationInfo.model}</dd>
+                  </div>
+                {/if}
+                {#if generationInfo.profileName}
+                  <div class="flex justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">Profile</dt>
+                    <dd class="text-right break-all">{generationInfo.profileName}</dd>
+                  </div>
+                {/if}
+                {#if generationInfo.reasoningEffort}
+                  <div class="flex justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">Thinking</dt>
+                    <dd class="text-right">{generationInfo.reasoningEffort}</dd>
+                  </div>
+                {/if}
+                {#if generationInfo.temperature !== undefined}
+                  <div class="flex justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">Temperature</dt>
+                    <dd class="text-right">{generationInfo.temperature}</dd>
+                  </div>
+                {/if}
+                {#if generationInfo.duration}
+                  <div class="flex justify-between gap-3">
+                    <dt class="text-muted-foreground shrink-0">Duration</dt>
+                    <dd class="text-right">{generationInfo.duration}</dd>
+                  </div>
+                {/if}
+                <div class="flex justify-between gap-3">
+                  <dt class="text-muted-foreground shrink-0">Generated at</dt>
+                  <dd class="text-right">{generationInfo.timestamp}</dd>
+                </div>
+                {#if !generationInfo.model}
+                  <p class="text-muted-foreground pt-1">
+                    Model details were not recorded for this response.
+                  </p>
+                {/if}
+              </dl>
+            </Popover.Content>
+          </Popover.Root>
+        {/if}
         {#if canRetry}
           <Button
             variant="text"

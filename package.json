@@ -10,6 +10,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "release": "node scripts/release.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -49,7 +51,6 @@
     "harper.js": "^1.2.0",
     "html5-qrcode": "^2.3.8",
     "jsonrepair": "^3.13.2",
-    "jszip": "^3.10.1",
     "liquidjs": "^10.24.0",
     "lucide-svelte": "^0.468.0",
     "marked": "^17.0.1",
@@ -92,6 +93,7 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.54.0",
     "vaul-svelte": "^1.0.0-next.7",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^3.2.7"
   }
 }

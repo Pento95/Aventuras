@@ -4,6 +4,7 @@
   import { story } from '$lib/stores/story.svelte'
   import { settings } from '$lib/stores/settings.svelte'
   import { exportService, gatherStoryData } from '$lib/services/export'
+  import { errMessage } from '$lib/utils/error'
   import { Button } from '$lib/components/ui/button'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import {
@@ -106,34 +107,31 @@
       }
     } catch (error) {
       console.error('[Header] Export failed:', error)
-      ui.showToast(
-        `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error',
-      )
+      ui.showToast(`Export failed: ${errMessage(error)}`, 'error')
     }
   }
 
   async function exportAventuras() {
     const currentStory = story.currentStory
     if (!currentStory) return
-    const data = await gatherStoryData(currentStory.id)
-    await handleExport(
-      () =>
-        exportService.exportToAventura(
-          currentStory,
-          data.entries,
-          data.characters,
-          data.locations,
-          data.items,
-          data.storyBeats,
-          data.lorebookEntries,
-          data.embeddedImages,
-          data.checkpoints,
-          data.branches,
-          data.chapters,
-        ),
-      'Aventuras (.avt)',
-    )
+    // Gather inside the exportFn so handleExport's try/catch surfaces any failure as a toast
+    // (previously the gather ran outside it, so errors failed silently — nothing happened).
+    await handleExport(async () => {
+      const data = await gatherStoryData(currentStory.id)
+      return exportService.exportToAventura(
+        currentStory,
+        data.entries,
+        data.characters,
+        data.locations,
+        data.items,
+        data.storyBeats,
+        data.lorebookEntries,
+        data.embeddedImages,
+        data.checkpoints,
+        data.branches,
+        data.chapters,
+      )
+    }, 'Aventuras (.avt)')
   }
 
   async function exportMarkdown() {

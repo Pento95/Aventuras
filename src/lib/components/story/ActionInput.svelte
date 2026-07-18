@@ -3,6 +3,7 @@
   import { ui } from '$lib/stores/ui.svelte'
   import { story } from '$lib/stores/story.svelte'
   import { settings } from '$lib/stores/settings.svelte'
+  import type { EntryMetadata } from '$lib/types'
   import { aiService } from '$lib/services/ai'
   import { database } from '$lib/services/database'
   import { SimpleActivationTracker } from '$lib/services/ai/retrieval/EntryRetrievalService'
@@ -449,6 +450,18 @@
     const streamingEntryId = crypto.randomUUID()
     const narrationEntryId = crypto.randomUUID()
 
+    // Snapshot the narrative generation config so we can record which model/profile/effort
+    // produced this response. Captured at start to reflect the settings used for the request.
+    const narrativeProfile = settings.getMainNarrativeProfile()
+    const generationStartedAt = Date.now()
+    const generationMeta: EntryMetadata = {
+      model: settings.apiSettings.defaultModel,
+      profileId: narrativeProfile?.id,
+      profileName: narrativeProfile?.name,
+      reasoningEffort: settings.apiSettings.reasoningEffort ?? 'off',
+      temperature: settings.apiSettings.temperature,
+    }
+
     ui.setGenerating(true)
     ui.clearGenerationError()
     ui.clearActionChoices(story.currentStory.id)
@@ -490,7 +503,6 @@
 
       const storyPosition = story.entries.length
       const activationTracker = ui.getActivationTracker(storyPosition) as SimpleActivationTracker
-      const embeddedImages = await database.getEmbeddedImagesForStory(currentStoryRef.id)
       const protagonist = story.characters.find((c) => c.relationship === 'self')
 
       const ctx: GenerationContext = {
@@ -508,7 +520,6 @@
       }
 
       const cfg: PipelineConfig = {
-        embeddedImages,
         rawInput: userActionContent,
         actionType,
         wasRawActionChoice: false,
@@ -617,10 +628,11 @@
         }
 
         if (event.type === 'phase_complete' && event.phase === 'narrative' && fullResponse.trim()) {
+          generationMeta.generationTime = Date.now() - generationStartedAt
           narrationEntry = await story.addEntry(
             'narration',
             fullResponse,
-            undefined,
+            generationMeta,
             fullReasoning || undefined,
             narrationEntryId,
           )
@@ -971,7 +983,7 @@
     inputValue = ''
     if (textareaRef) textareaRef.scrollTop = 0
 
-    const embeddedImages = await database.getEmbeddedImagesForStory(story.currentStory.id)
+    const embeddedImageIds = await database.getEmbeddedImageIdsForStory(story.currentStory.id)
     ui.createRetryBackup(
       story.currentStory.id,
       story.entries,
@@ -979,7 +991,7 @@
       story.locations,
       story.items,
       story.storyBeats,
-      embeddedImages,
+      embeddedImageIds,
       content,
       rawInput,
       actionType,

@@ -29,7 +29,6 @@ interface PollinationsImageModelResponse {
   description?: string
   input_modalities?: string[]
   output_modalities?: string[]
-  paid_only?: boolean
   pricing?: {
     completionImageTokens?: string | number
     promptTextTokens?: string | number
@@ -106,9 +105,7 @@ export function createPollinationsProvider(config: ImageProviderConfig): ImagePr
         if (!Array.isArray(data) || data.length === 0) return getFallbackModels()
 
         return (data as PollinationsImageModelResponse[])
-          .filter(
-            (model) => (model.output_modalities?.includes('image') ?? false) && !model.paid_only,
-          )
+          .filter((model) => model.output_modalities?.includes('image') ?? false)
           .map((model) => ({
             id: model.name,
             name: model.name,

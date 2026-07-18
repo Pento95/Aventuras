@@ -9,6 +9,7 @@
   import { Label } from '$lib/components/ui/label'
   import { cn } from '$lib/utils/cn'
   import { ui } from '$lib/stores/ui.svelte'
+  import { errMessage } from '$lib/utils/error'
 
   type ExportFormat = LorebookImportExport.ExportFormat
   type EntityType = 'lorebook' | 'character' | 'scenario'
@@ -56,7 +57,7 @@
       }
     } catch (err) {
       console.error('[VaultExportModal] Export failed:', err)
-      ui.showToast('Export failed', 'error')
+      ui.showToast(`Export failed: ${errMessage(err)}`, 'error')
     } finally {
       exporting = false
     }

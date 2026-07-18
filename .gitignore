@@ -49,6 +49,9 @@ src-tauri/WixTools/
 src-tauri/Cargo.lock.bak
 
 # Android: files regenerated at build time (do NOT track)
+# NB: Tauri also writes src-tauri/gen/android/app/.gitignore listing what it regenerates
+# (tauri.properties, proguard-tauri.pro, tauri.build.gradle.kts, ...). Rules there cover this
+# directory; a file already committed stays tracked regardless, and needs `git rm --cached`.
 src-tauri/gen/android/app/src/main/jniLibs/
 src-tauri/gen/android/app/src/main/assets/
 src-tauri/gen/android/app/src/main/java/**/generated/
