@@ -94,9 +94,11 @@ export class ChapterBatchService {
 
     log('Batch planned', { boundaryCount: boundaries.length, startIndex: input.startIndex })
 
-    let chapters: Chapter[] = []
+    const chapters: Chapter[] = []
     let time = this.deps.getTimeTracker()
     const totalChapters = boundaries.length
+
+    callbacks.onChapterProgress(0, totalChapters)
 
     for (let i = 0; i < boundaries.length; i++) {
       if (callbacks.isCancelled()) {
@@ -108,7 +110,7 @@ export class ChapterBatchService {
       }
 
       const boundary = boundaries[i]
-      
+
       // 1. Generate and save chapter
       let chapter = await this.deps.buildAndSaveChapter(boundary.startIndex, boundary.endIndex)
       chapters.push(chapter)

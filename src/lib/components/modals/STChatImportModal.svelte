@@ -313,7 +313,7 @@
     </div>
 
     <ResponsiveModal.Footer class="mt-auto border-t px-6 py-4">
-      {#if chapterizing && (!story.chapterizationStatus || !story.chapterizationStatus.includes('lore'))}
+      {#if chapterizing && !story.chapterizationStatus}
         <Button variant="outline" onclick={() => story.requestChapterizationCancel()} class="gap-2">
           <X class="h-4 w-4" />
           Cancel

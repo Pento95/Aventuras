@@ -3,6 +3,9 @@
  * runs at most `n` concurrently.
  */
 export function pLimit(n: number) {
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new TypeError('Expected `concurrency` to be a positive integer')
+  }
   const queue: Array<() => void> = []
   let active = 0
   const next = () => {
@@ -15,7 +18,7 @@ export function pLimit(n: number) {
   return function run<T>(fn: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const start = () => {
-        fn().then(resolve, reject).finally(next)
+        Promise.resolve().then(fn).then(resolve, reject).finally(next)
       }
       if (active < n) {
         active++

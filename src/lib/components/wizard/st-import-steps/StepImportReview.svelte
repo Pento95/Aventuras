@@ -180,15 +180,20 @@
 
     // 5. Lorebook update
     if (chapterizeIncludeLorebook) {
-      const active =
-        chapterizationStatus !== null &&
-        (chapterizationStatus.toLowerCase().includes('lorebook') ||
-          chapterizationStatus.toLowerCase().includes('updating'))
+      const active = chapterizationStatus !== null
+      const done =
+        chapterizationStatus === null &&
+        chapterizationProgress !== null &&
+        chapterizationProgress.current === chapterizationProgress.total &&
+        (!chapterizeIncludeTimeline ||
+          chapterizationTimelineProgress?.current === chapterizationProgress.total) &&
+        (!chapterizeIncludeClassification ||
+          chapterizationClassificationProgress?.current === chapterizationProgress.total)
       list.push({
         id: 'lorebook',
         label: 'Updating lorebook',
-        status: active ? 'active' : 'pending',
-        details: active ? chapterizationStatus : 'Waiting in queue...',
+        status: done ? 'completed' : active ? 'active' : 'pending',
+        details: done ? 'Done' : active ? chapterizationStatus : 'Waiting in queue...',
       })
     }
 

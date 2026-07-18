@@ -149,9 +149,11 @@ describe('ChapterBatchService — sequential execution', () => {
 
     await service.run(baseInput(), baseCallbacks({ onChapterProgress }))
 
-    expect(onChapterProgress).toHaveBeenNthCalledWith(1, 1, 3)
-    expect(onChapterProgress).toHaveBeenNthCalledWith(2, 2, 3)
-    expect(onChapterProgress).toHaveBeenNthCalledWith(3, 3, 3)
+    expect(onChapterProgress).toHaveBeenCalledTimes(4)
+    expect(onChapterProgress).toHaveBeenNthCalledWith(1, 0, 3)
+    expect(onChapterProgress).toHaveBeenNthCalledWith(2, 1, 3)
+    expect(onChapterProgress).toHaveBeenNthCalledWith(3, 2, 3)
+    expect(onChapterProgress).toHaveBeenNthCalledWith(4, 3, 3)
   })
 })
 
