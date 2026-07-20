@@ -2,22 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { APP_SETTINGS_DEFAULTS } from '@/lib/db'
 import { makeLogger } from '@/lib/diagnostics'
-import { getPipeline } from '@/lib/pipeline'
-import { appSettingsStore, currentStoryStore, resetAllStores } from '@/lib/stores'
+import { appSettingsStore, currentStoryStore, entriesStore, resetAllStores } from '@/lib/stores'
 
-import { ensurePerTurnPipelineRegistered, PER_TURN_KIND } from './pipeline'
+import { ensurePerTurnPipelineRegistered, PER_TURN_KIND } from './per-turn'
+import { getPipeline } from '../authoring/registry'
 
-const { getModelMock, streamProviderCallMock } = vi.hoisted(() => ({
-  getModelMock: vi.fn(),
-  streamProviderCallMock: vi.fn(),
+const { streamTextMock } = vi.hoisted(() => ({
+  streamTextMock: vi.fn(),
 }))
 
 vi.mock('@/lib/ai', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return {
     ...actual,
-    getModel: getModelMock,
-    streamProviderCall: streamProviderCallMock,
+    streamText: streamTextMock,
   }
 })
 
@@ -40,22 +38,26 @@ const definition = {
   worldTimeOrigin: { year: 0 },
 }
 
-function failingStream() {
+function failingStreamCall() {
   return {
-    textStream: (async function* () {
-      throw new Error('stop after call')
-    })(),
+    ok: true,
+    modelId: 'model-1',
+    stream: {
+      fullStream: (async function* () {
+        throw new Error('stop after call')
+      })(),
+    },
   }
 }
 
-async function runNarrativePhase() {
+async function runNarrativePhase(abortSignal = new AbortController().signal) {
   ensurePerTurnPipelineRegistered()
   const phase = getPipeline(PER_TURN_KIND).phases[1]
   if (!phase || !('run' in phase)) throw new Error('expected a single-run narrative phase node')
   return phase
     .run({
       actionId: 'act_1',
-      abortSignal: new AbortController().signal,
+      abortSignal,
       intermediates: {},
       log: makeLogger('act_1'),
       db: {} as never,
@@ -67,8 +69,7 @@ async function runNarrativePhase() {
 
 beforeEach(() => {
   vi.restoreAllMocks()
-  getModelMock.mockReset().mockReturnValue({})
-  streamProviderCallMock.mockReset().mockReturnValue(failingStream())
+  streamTextMock.mockReset().mockReturnValue(failingStreamCall())
   resetAllStores()
 })
 
@@ -110,6 +111,7 @@ describe('per-turn pipeline declaration', () => {
       definition,
       settings: { partialChapterBuffer: 3, models: { narrative: 'story-model' } } as never,
     })
+    entriesStore.hydrate('b1', [])
     vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
       ...APP_SETTINGS_DEFAULTS,
       providers: [provider],
@@ -126,7 +128,13 @@ describe('per-turn pipeline declaration', () => {
 
     await runNarrativePhase()
 
-    expect(getModelMock).toHaveBeenCalledWith(provider.id, 'story-model', 'act_1')
+    expect(streamTextMock).toHaveBeenCalledWith(
+      'narrative',
+      expect.objectContaining({
+        actionId: 'act_1',
+        config: expect.objectContaining({ storyModels: { narrative: 'story-model' } }),
+      }),
+    )
   })
 
   it('rejects an open story from a different story on the same branch', async () => {
@@ -146,45 +154,88 @@ describe('per-turn pipeline declaration', () => {
         error: { kind: 'orchestrator', detail: 'per-turn: no open story for branch' },
       },
     })
-    expect(getModelMock).not.toHaveBeenCalled()
+    expect(streamTextMock).not.toHaveBeenCalled()
   })
 
-  it('maps narrative profile parameters to SDK stream options', async () => {
+  it('fails when the entries store is loaded for another branch', async () => {
     currentStoryStore.set({
       storyId: 's1',
       branchId: 'b1',
       definition,
       settings: { partialChapterBuffer: 3, models: {} } as never,
     })
-    vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
-      ...APP_SETTINGS_DEFAULTS,
-      providers: [provider],
-      profiles: [
-        {
-          id: 'prof-narrative',
-          kind: 'narrative',
-          name: 'Narrative',
-          modelRef: { providerId: provider.id, modelId: 'global-model' },
-          temperature: 0.7,
-          maxOutput: 2048,
-          thinking: 1024,
-          timeout: 45,
+    entriesStore.hydrate('b-other', [])
+
+    const result = await runNarrativePhase()
+
+    expect(result).toEqual({
+      done: true,
+      value: {
+        status: 'failed',
+        error: {
+          kind: 'orchestrator',
+          detail: 'per-turn: entries store loaded for another branch',
         },
-      ],
-      defaultProviderId: provider.id,
+      },
+    })
+    expect(streamTextMock).not.toHaveBeenCalled()
+  })
+
+  it('returns aborted, committing nothing, when a cancel ends the stream gracefully', async () => {
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {} } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    const controller = new AbortController()
+    // ai@6 fullStream ends without throwing on abort (an 'abort' part, no
+    // onError) — the phase must classify via the signal, not a stream error.
+    streamTextMock.mockReturnValue({
+      ok: true,
+      modelId: 'model-1',
+      stream: {
+        fullStream: (async function* () {
+          controller.abort()
+        })(),
+      },
     })
 
-    await runNarrativePhase()
+    const result = await runNarrativePhase(controller.signal)
 
-    expect(streamProviderCallMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        temperature: 0.7,
-        maxOutputTokens: 2048,
-        providerOptions: {
-          anthropic: { thinking: { type: 'enabled', budgetTokens: 1024 } },
+    // done:true on the FIRST next() proves no delta_emitted was yielded — the
+    // partial entry is discarded, not committed.
+    expect(result).toEqual({ done: true, value: { status: 'aborted' } })
+  })
+
+  it('surfaces a resolve failure as a config-resolver phase error', async () => {
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {} } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    streamTextMock.mockReturnValue({
+      ok: false,
+      kind: 'no-profile-assigned',
+      target: 'narrative',
+    })
+
+    const result = await runNarrativePhase()
+
+    expect(result).toEqual({
+      done: true,
+      value: {
+        status: 'failed',
+        error: {
+          kind: 'config-resolver',
+          failure: 'no-profile-assigned',
+          target: 'narrative',
+          phaseName: 'narrative',
         },
-        timeout: { totalMs: 45_000 },
-      }),
-    )
+      },
+    })
   })
 })

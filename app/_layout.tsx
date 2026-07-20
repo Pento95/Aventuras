@@ -8,16 +8,19 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context'
 
-import '@/lib/polyfills'
-import '@/global.css'
 import { SettingsRecoveryScreen } from '@/components/shells/settings-recovery-screen'
 import { CrashRecoveryModalHost } from '@/components/story/crash-recovery-modal-host'
 import { Toaster } from '@/components/ui/toast'
+import '@/global.css'
+import { setAppearanceThemeId } from '@/lib/actions'
 import { useBootstrap } from '@/lib/boot'
 import { queryClient } from '@/lib/cache'
 import { DrizzleStudioDevTools, db, ensureAppSettingsSingleton, useDbMigrations } from '@/lib/db'
 import { DensityProvider } from '@/lib/density'
+import { logger } from '@/lib/diagnostics'
 import { i18n } from '@/lib/i18n'
+import '@/lib/polyfills'
+import { appSettingsStore } from '@/lib/stores'
 import { ThemeProvider } from '@/lib/themes'
 
 export default function RootLayout() {
@@ -56,7 +59,17 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <KeyboardProvider>
-            <ThemeProvider>
+            <ThemeProvider
+              initialThemeId={appSettingsStore.getAppSettings().appearance.themeId}
+              onThemeChange={(id) =>
+                void setAppearanceThemeId(id, { db }).catch((err) =>
+                  logger.error('action_layer.theme_persist_failed', {
+                    themeId: id,
+                    error: err instanceof Error ? err.message : String(err),
+                  }),
+                )
+              }
+            >
               <DensityProvider>
                 <I18nextProvider i18n={i18n}>
                   <BottomSheetModalProvider>

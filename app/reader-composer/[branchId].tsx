@@ -1,16 +1,24 @@
 import { and, desc, eq, lt } from 'drizzle-orm'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { View } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Platform, View } from 'react-native'
 
+import { type ActionGroup } from '@/components/compounds/actions-menu'
 import { AppActionsMenu } from '@/components/compounds/app-actions-menu'
-import { EntryCard } from '@/components/compounds/entry-card'
 import { GenerationStatusPill } from '@/components/compounds/generation-status-pill'
-import { Composer } from '@/components/reader/composer'
-import { EntryWindow, type EntryWindowHandle } from '@/components/reader/entry-window'
-import { JumpButtons } from '@/components/reader/jump-buttons'
+import { Composer, type ComposerHandle } from '@/components/reader/composer'
+import ReaderDocument, { type ReaderDocumentRef } from '@/components/reader/reader-document'
+import {
+  type EditResult,
+  type ReaderSurfaceHandle,
+} from '@/components/reader/reader-document-types'
+import { ReaderSurface } from '@/components/reader/reader-surface'
 import { RollbackConfirmModal } from '@/components/reader/rollback-confirm'
-import { useSystemEntryActions } from '@/components/reader/system-entry-actions'
+import {
+  describeTurnFailure,
+  toSystemFailureMeta,
+  useSystemEntryActions,
+} from '@/components/reader/system-entry-actions'
 import { ScreenShell } from '@/components/shells/screen-shell'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Text } from '@/components/ui/text'
@@ -18,9 +26,10 @@ import { useGlobalHotkey } from '@/hooks/use-global-hotkey'
 import { useTier } from '@/hooks/use-tier'
 import {
   clearSystemEntry,
+  ENTRIES_WINDOW_SIZE,
   getRollbackCounts,
   loadOpenStory,
-  PER_TURN_KIND,
+  readRecentEntries,
   redoLastAction,
   rollbackToEntry,
   submitTurn,
@@ -30,13 +39,18 @@ import {
   type LoadOpenStoryResult,
   type RollbackCounts,
 } from '@/lib/actions'
-import { wrapComposerText } from '@/lib/composer-wrap'
+import { wrapComposerText, type ComposerMode } from '@/lib/composer-wrap'
 import { branches, db, runInTransaction, storyEntries, type StoryEntry } from '@/lib/db'
 import { t } from '@/lib/i18n'
 import { createHtmlStreamBuffer, type HtmlStreamBuffer } from '@/lib/markdown'
-import { awaitRunTerminal, pipelineEventBus, type PipelineError } from '@/lib/pipeline'
-import { createAutoscrollMachine } from '@/lib/reader-scroll'
 import {
+  awaitRunTerminal,
+  PER_TURN_KIND,
+  pipelineEventBus,
+  type PipelineError,
+} from '@/lib/pipeline'
+import {
+  appSettingsStore,
   currentStoryStore,
   entitiesStore,
   entriesStore,
@@ -44,14 +58,14 @@ import {
   isUserEditBlocked,
   rehydrateStories,
   storiesStore,
+  undoRedoStore,
 } from '@/lib/stores'
+import { useTheme } from '@/lib/themes'
 import { toast } from '@/lib/toast'
 
 const ctx = { db, runInTransaction }
 
 type RollbackState = { targetId: string; targetNumber: number; counts: RollbackCounts }
-type StreamingRow = { id: string; kind: 'streaming'; content: string }
-type WindowRow = StoryEntry | StreamingRow
 type BranchHydrationState =
   | { branchId: string; status: 'loading' }
   | {
@@ -61,9 +75,6 @@ type BranchHydrationState =
     }
   | { branchId: string; status: 'failure'; result: LoadOpenStoryResult | null }
 
-const RECENT_WINDOW_SIZE = 50
-const JUMP_TO_BOTTOM_SETTLE_MS = 500
-
 export default function ReaderComposerRoute() {
   const router = useRouter()
   const tier = useTier()
@@ -71,10 +82,7 @@ export default function ReaderComposerRoute() {
   const { branchId } = useLocalSearchParams<{ branchId: string }>()
 
   const [storyId, setStoryId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState('')
   const [rollback, setRollback] = useState<RollbackState | null>(null)
-  const [lastError, setLastError] = useState<PipelineError | undefined>(undefined)
   const [lastSubmission, setLastSubmission] = useState<{
     content: string
     composerMode: string
@@ -116,30 +124,41 @@ export default function ReaderComposerRoute() {
     openForBranch.definition.mode === 'adventure'
   const wrapPov = openForBranch?.settings.composerWrapPov ?? 'first'
 
-  // Buffer instance lives in a ref (mutable, not render state); the safe output
-  // it computes on each push drives the re-render via streamingContent.
-  const streamBufferRef = useRef<{ entryId: string; buffer: HtmlStreamBuffer } | null>(null)
-  const [streamingContent, setStreamingContent] = useState<{
+  // Buffer instances live in a ref (mutable, not render state); the safe output
+  // they compute on each push drives the re-render via `streaming`.
+  const streamBufferRef = useRef<{
+    entryId: string
+    content: HtmlStreamBuffer
+    reasoning: HtmlStreamBuffer
+  } | null>(null)
+  const [streaming, setStreaming] = useState<{
     entryId: string
     content: string
+    reasoning: string
   } | null>(null)
-  const entryWindowRef = useRef<EntryWindowHandle>(null)
-  const autoscrollRef = useRef(createAutoscrollMachine())
-  const lastDistanceRef = useRef(0)
-  // Timestamp of the last jump-to-bottom click while idle. The smooth-scroll
-  // it triggers reports several intermediate, non-zero distanceFromBottomPx
-  // values before settling, so a bounded time window — not a plain flag —
-  // is what lets a fast-following stream still treat it as "at bottom"
-  // without also capturing an unrelated, much-later stream after the user
-  // has genuinely scrolled away in between.
-  const pendingJumpToBottomAtRef = useRef(0)
-  const [showJumpToBottom, setShowJumpToBottom] = useState(false)
+  const composerRef = useRef<ComposerHandle>(null)
+  const surfaceRef = useRef<ReaderSurfaceHandle>(null)
+  const documentRef = useRef<ReaderDocumentRef>(null)
+  const [syncNonce, setSyncNonce] = useState(0)
+  const [documentPainted, setDocumentPainted] = useState(false)
+
+  // A full first window means older entries may exist; any shorter load
+  // proves the branch top is already inside the window.
+  const [hasOlder, setHasOlder] = useState(false)
+  const hasOlderSeededRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!hydrationSucceeded || hasOlderSeededRef.current === branchId || entries.length === 0)
+      return
+    hasOlderSeededRef.current = branchId
+    setHasOlder(entries.length >= ENTRIES_WINDOW_SIZE)
+  }, [hydrationSucceeded, branchId, entries.length])
 
   // A branch switch must drop any in-flight buffer from the prior branch —
   // it belongs to a different entry list and would otherwise leak forward.
   useEffect(() => {
     streamBufferRef.current = null
-    setStreamingContent(null)
+    setStreaming(null)
+    setHasOlder(false)
   }, [branchId])
 
   useEffect(
@@ -154,54 +173,52 @@ export default function ReaderComposerRoute() {
         if (streamBufferRef.current?.entryId !== event.targetEntryId) {
           streamBufferRef.current = {
             entryId: event.targetEntryId,
-            buffer: createHtmlStreamBuffer(),
+            content: createHtmlStreamBuffer(),
+            reasoning: createHtmlStreamBuffer(),
           }
-          const jumpedRecently =
-            Date.now() - pendingJumpToBottomAtRef.current < JUMP_TO_BOTTOM_SETTLE_MS
-          autoscrollRef.current.streamStarted({
-            distanceFromBottomPx: jumpedRecently ? 0 : lastDistanceRef.current,
-          })
         }
-        const safe = streamBufferRef.current.buffer.push(event.text)
-        setStreamingContent({ entryId: event.targetEntryId, content: safe })
+        const buffers = streamBufferRef.current
+        const safe = (event.channel === 'reasoning' ? buffers.reasoning : buffers.content).push(
+          event.text,
+        )
+        setStreaming((prev) => {
+          const base =
+            prev?.entryId === event.targetEntryId
+              ? prev
+              : { entryId: event.targetEntryId, content: '', reasoning: '' }
+          return event.channel === 'reasoning'
+            ? { ...base, reasoning: safe }
+            : { ...base, content: safe }
+        })
       }),
     [branchId],
   )
-
-  // Runs after React commits streamingContent, so the scroll targets the row
-  // height the just-arrived chunk actually produced.
-  useLayoutEffect(() => {
-    if (streamingContent == null || autoscrollRef.current.state !== 'engaged') return
-    entryWindowRef.current?.scrollToBottom()
-    autoscrollRef.current.autoscrollApplied({ distanceFromBottomPx: 0 })
-  }, [streamingContent])
 
   // Covers the abort/failure paths where no committed row ever lands to
   // trigger the entries.some(...) hide check below.
   useEffect(() => {
     if (!isGenerating) {
       streamBufferRef.current = null
-      setStreamingContent(null)
-      autoscrollRef.current.streamEnded()
+      setStreaming(null)
     }
   }, [isGenerating])
 
-  // The real commit lands in entriesStore mid-phase, before isGenerating flips
-  // false — checking against entries (not just isGenerating) prevents a frame
-  // where both the synthetic and the real committed card are visible.
+  // Visible from the moment the run starts (pre-first-chunk placeholder), and
+  // hidden the frame the committed row lands: the real commit hits entriesStore
+  // mid-phase, before isGenerating flips false — checking against entries (not
+  // just isGenerating) prevents a frame where both the synthetic and the real
+  // committed card are visible.
   const streamingVisible =
-    isGenerating &&
-    streamingContent != null &&
-    !entries.some((e) => e.id === streamingContent.entryId)
+    isGenerating && !(streaming != null && entries.some((e) => e.id === streaming.entryId))
 
   const reload = useCallback(async () => {
-    const recent = (await db
-      .select()
-      .from(storyEntries)
-      .where(eq(storyEntries.branchId, branchId))
-      .orderBy(desc(storyEntries.position))
-      .limit(RECENT_WINDOW_SIZE)) as StoryEntry[]
-    entriesStore.hydrate(branchId, recent.reverse())
+    const recent = await readRecentEntries(branchId, db)
+    entriesStore.hydrate(branchId, recent)
+    // A recent-window reload drops any older entries a scroll-up had loaded, so
+    // recompute the boundary: a full window means older may exist, a short one
+    // proves the branch top is in the window. The seed guard won't do this.
+    hasOlderSeededRef.current = branchId
+    setHasOlder(recent.length >= ENTRIES_WINDOW_SIZE)
   }, [branchId])
 
   const loadOlderEntries = useCallback(async () => {
@@ -216,11 +233,12 @@ export default function ReaderComposerRoute() {
       .from(storyEntries)
       .where(and(eq(storyEntries.branchId, branchId), lt(storyEntries.position, minPosition)))
       .orderBy(desc(storyEntries.position))
-      .limit(RECENT_WINDOW_SIZE)) as StoryEntry[]
+      .limit(ENTRIES_WINDOW_SIZE)) as StoryEntry[]
 
     for (const row of older) {
       entriesStore.patch(branchId, { op: 'create', id: row.id, row })
     }
+    setHasOlder(older.length >= ENTRIES_WINDOW_SIZE)
   }, [branchId])
 
   useEffect(() => {
@@ -277,18 +295,28 @@ export default function ReaderComposerRoute() {
   )
 
   const showTurnFailure = useCallback(
-    async (error: PipelineError | undefined) => {
-      setLastError(error)
-      await writeSystemEntry({ branchId, content: t('reader:systemEntry.failureMessage') }, ctx)
+    async (
+      error: PipelineError | undefined,
+      submission: { content: string; composerMode: string },
+    ) => {
+      // Copy + discriminant + the reversed user_action's text all persist on
+      // the entry, so kind-specific recovery survives an app restart.
+      await writeSystemEntry(
+        {
+          branchId,
+          content: describeTurnFailure(error).content,
+          failure: toSystemFailureMeta(error, submission),
+        },
+        ctx,
+      )
       await reload()
     },
     [branchId, reload],
   )
 
   const runSubmit = useCallback(
-    async (content: string, composerMode: string) => {
+    async (content: string, composerMode: string, raw?: { text: string; mode: ComposerMode }) => {
       if (!storyId || !hydrationSucceeded) return
-      setLastError(undefined)
       // A prior failure leaves a system entry as the branch tail; drop it (and
       // resync the store) before the turn so the pipeline's prompt/position
       // reads the real content tail, not the failure singleton.
@@ -299,41 +327,62 @@ export default function ReaderComposerRoute() {
         await clearSystemEntry(branchId, ctx)
         await reload()
       }
-      setLastSubmission({ content, composerMode })
+      const submission = { content, composerMode }
+      setLastSubmission(submission)
       try {
         const result = await submitTurn({ storyId, branchId }, { content, composerMode }, ctx)
-        if (result.outcome === 'failed') await showTurnFailure(result.error)
+        if (result.outcome === 'failed') await showTurnFailure(result.error, submission)
         else if (result.outcome === 'rejected')
-          await showTurnFailure({ kind: 'orchestrator', detail: `blocked by ${result.blockedBy}` })
+          await showTurnFailure(
+            { kind: 'orchestrator', detail: `blocked by ${result.blockedBy}` },
+            submission,
+          )
+        else if (result.outcome === 'aborted')
+          // Cancel reverses the whole turn (user_action included, C6) — hand
+          // the text back for edit/re-send. A retry has no raw pre-wrap text,
+          // so the wrapped content returns under 'free' (no re-wrap on send).
+          composerRef.current?.restoreDraft(raw?.text ?? content, raw?.mode ?? 'free')
       } catch (err) {
         // submitTurn throws on a rejected user_action write — treat a thrown
         // failure like a structured 'failed' outcome so the UI surfaces an
         // error and stays retriable instead of hanging.
-        await showTurnFailure({
-          kind: 'orchestrator',
-          detail: err instanceof Error ? err.message : String(err),
-        })
+        await showTurnFailure(
+          {
+            kind: 'orchestrator',
+            detail: err instanceof Error ? err.message : String(err),
+          },
+          submission,
+        )
       }
     },
     [storyId, branchId, hydrationSucceeded, reload, showTurnFailure],
   )
 
-  // fixAction (config-resolver fixes) has no EntryCard slot in the M2 subset;
-  // only the retry passthrough is wired here.
-  const { onRetry: retrySystemEntry } = useSystemEntryActions(lastError, () => {
-    if (lastSubmission) void runSubmit(lastSubmission.content, lastSubmission.composerMode)
+  // Derived from the persisted entry, not React state, so the failure kind,
+  // fix action, and retryable submission all survive an app restart.
+  const systemFailure = useMemo(
+    () => entries.find((e) => e.kind === 'system')?.metadata?.systemFailure,
+    [entries],
+  )
+
+  const { onRetry: retrySystemEntry, fixAction } = useSystemEntryActions(systemFailure, () => {
+    const submission = lastSubmission ?? systemFailure?.submission
+    if (submission) void runSubmit(submission.content, submission.composerMode)
   })
 
   const dismissSystemEntry = useCallback(async () => {
     await clearSystemEntry(branchId, ctx)
-    setLastError(undefined)
     await reload()
   }, [branchId, reload])
 
   const openRollback = useCallback(
     async (targetId: string) => {
       const counts = await getRollbackCounts(branchId, targetId, ctx)
-      if ('status' in counts) return
+      if ('status' in counts) {
+        // A tapped delete silently doing nothing reads as broken.
+        toast.error(t('reader:rollbackFailed'))
+        return
+      }
       const target = entriesStore.getById(targetId)
       setRollback({ targetId, targetNumber: target?.position ?? 0, counts })
     },
@@ -351,26 +400,52 @@ export default function ReaderComposerRoute() {
     setRollback(null)
   }, [branchId, rollback])
 
-  const startEdit = useCallback((id: string) => {
-    setEditingId(id)
-    setEditDraft(entriesStore.getById(id)?.content ?? '')
+  const handleCommitEdit = useCallback(
+    async (entryId: string, content: string): Promise<EditResult> => {
+      const result = await updateStoryEntryContent(branchId, entryId, content, ctx)
+      if (result.status === 'rejected') {
+        // The draft stays open in the document; the host owns the toast.
+        toast.error(t('reader:editFailed'))
+        return { ok: false }
+      }
+      return { ok: true }
+    },
+    [branchId],
+  )
+
+  const handleRequestRollback = useCallback(
+    async (entryId: string) => {
+      await openRollback(entryId)
+    },
+    [openRollback],
+  )
+
+  const handleReady = useCallback(async () => {
+    // Boot/reload handshake: emissions before onReady are lost, so bump the
+    // nonce to force a fresh full-prop emission, and re-arm the loading veil.
+    setDocumentPainted(false)
+    setSyncNonce((n) => n + 1)
   }, [])
 
-  const commitEdit = useCallback(async () => {
-    if (!editingId) return
-    const result = await updateStoryEntryContent(branchId, editingId, editDraft, ctx)
-    if (result.status === 'rejected') {
-      // Keep the draft open so a rejected edit doesn't silently discard typing.
-      toast.error(t('reader:editFailed'))
-      return
-    }
-    setEditingId(null)
-    setEditDraft('')
-  }, [branchId, editingId, editDraft])
+  const handleFirstPaint = useCallback(async () => {
+    setDocumentPainted(true)
+  }, [])
 
-  const cancelEdit = useCallback(() => {
-    setEditingId(null)
-    setEditDraft('')
+  // Recovery reloads re-request the document's own URL; blocking that freezes
+  // the surface. Everything else is dropped — entry hrefs are stripped at
+  // sanitize, so any foreign navigation is hostile or a sanitize regression.
+  // The latch must only ever accept a
+  // document-shaped URL (Metro in dev, bundled file/about otherwise): Android
+  // fires no request callback for the initial loadUrl, so an unguarded latch
+  // would record the first foreign navigation as "own URL" and allow it.
+  const documentUrlRef = useRef<string | null>(null)
+  const handleShouldStartLoad = useCallback((request: { url: string }) => {
+    if (documentUrlRef.current != null) return request.url === documentUrlRef.current
+    if (/^(file:|about:|https?:\/\/localhost[:/])/i.test(request.url)) {
+      documentUrlRef.current = request.url
+      return true
+    }
+    return false
   }, [])
 
   const matchesUndoRedoShortcut = useCallback(
@@ -389,43 +464,94 @@ export default function ReaderComposerRoute() {
   )
   useGlobalHotkey(matchesUndoRedoShortcut, handleUndoRedoShortcut, { ignoreEditableTargets: true })
 
-  const windowRows: WindowRow[] = useMemo(() => {
-    if (streamingVisible && streamingContent) {
-      return [
-        ...entries,
-        { id: streamingContent.entryId, kind: 'streaming', content: streamingContent.content },
-      ]
-    }
-    return entries
-  }, [entries, streamingVisible, streamingContent])
+  // Touch-tier path to undo/redo (the shortcut is keyboard-only). A tapped menu
+  // item silently doing nothing reads as broken, so rejections toast — unlike
+  // the keyboard path, which stays silent per native undo convention.
+  const hasRedo = undoRedoStore.useUndoRedo((s) => s.redoStack.length > 0)
+  const menuUndo = useCallback(async () => {
+    const result = await undoLastAction(branchId, ctx)
+    if (result.status === 'rejected') toast.info(t('reader:actions.nothingToUndo'))
+  }, [branchId])
+  const menuRedo = useCallback(async () => {
+    const result = await redoLastAction(branchId, ctx)
+    if (result.status === 'rejected') toast.info(t('reader:actions.nothingToRedo'))
+  }, [branchId])
+  // Engage/settle semantics live in the surface's own jumpToBottom; the host
+  // only routes the request to whichever mount is live on this platform.
+  const jumpToBottom = useCallback(() => {
+    if (Platform.OS === 'web') surfaceRef.current?.jumpToBottom()
+    else documentRef.current?.jumpToBottom()
+  }, [])
 
-  const renderRow = (row: WindowRow) => {
-    if (row.kind === 'streaming') {
-      return <EntryCard kind="streaming" content={row.content} streamingPhase="reply" />
+  const handleRetrySystemEntry = useCallback(async () => retrySystemEntry(), [retrySystemEntry])
+  const handleDismissSystemEntry = useCallback(async () => {
+    await dismissSystemEntry()
+  }, [dismissSystemEntry])
+  const handleFixSystemEntry = useCallback(async () => fixAction?.onPress(), [fixAction])
+  const matchesJumpToBottomShortcut = useCallback((ev: KeyboardEvent) => ev.key === 'End', [])
+  // Editable-target exclusion keeps End moving the caret inside the composer.
+  useGlobalHotkey(matchesJumpToBottomShortcut, jumpToBottom, { ignoreEditableTargets: true })
+  const contextualActions: ActionGroup = useMemo(() => {
+    const blocked = {
+      disabled: isGenerating,
+      disabledReason: t('reader:actions.blockedWhileGenerating'),
     }
-    const e = row
-    const isEditing = editingId === e.id
-    const isSystem = e.kind === 'system'
-    return (
-      <EntryCard
-        kind={e.kind}
-        content={isEditing ? editDraft : e.content}
-        meta={e.metadata ?? undefined}
-        reasoning={e.metadata?.reasoning}
-        disabled={editBlocked}
-        editing={isEditing}
-        onEdit={isSystem ? undefined : () => startEdit(e.id)}
-        onContentChange={setEditDraft}
-        onCommitEdit={() => void commitEdit()}
-        onCancelEdit={cancelEdit}
-        onDelete={isSystem || e.kind === 'opening' ? undefined : () => void openRollback(e.id)}
-        onRetry={isSystem ? retrySystemEntry : undefined}
-        onDismiss={isSystem ? () => void dismissSystemEntry() : undefined}
-      />
-    )
+    return {
+      id: 'reader',
+      header: t('chrome.onThisScreen'),
+      entries: [
+        {
+          id: 'undo',
+          label: t('reader:actions.undo'),
+          ...blocked,
+          onActivate: () => void menuUndo(),
+        },
+        // Absent, not disabled, when the stack is empty — the menu doesn't
+        // surface dead commands (actions-menu spec); emptiness is store-derived
+        // and cheap, unlike undo's DB-backed target lookup.
+        ...(hasRedo
+          ? [
+              {
+                id: 'redo',
+                label: t('reader:actions.redo'),
+                ...blocked,
+                onActivate: () => void menuRedo(),
+              },
+            ]
+          : []),
+        ...(entries.length > 0
+          ? [{ id: 'jump-to-bottom', label: t('reader:jumpToBottom'), onActivate: jumpToBottom }]
+          : []),
+      ],
+    }
+  }, [hasRedo, isGenerating, menuUndo, menuRedo, entries.length, jumpToBottom])
+
+  const streamingPayload = useMemo(
+    () =>
+      streamingVisible
+        ? { content: streaming?.content ?? '', reasoning: streaming?.reasoning ?? '' }
+        : null,
+    [streamingVisible, streaming],
+  )
+
+  const jumpButtonEnabled = appSettingsStore.useAppSettings((s) => s.appearance.showJumpToBottom)
+  const { theme } = useTheme()
+
+  const surfaceProps = {
+    rows: entries,
+    streaming: streamingPayload,
+    branchKey: branchId,
+    hasOlder,
+    editBlocked,
+    jumpButtonEnabled,
+    systemFixLabel: fixAction?.label,
+    onNearTop: loadOlderEntries,
+    onCommitEdit: handleCommitEdit,
+    onRequestRollback: handleRequestRollback,
+    onRetrySystemEntry: handleRetrySystemEntry,
+    onDismissSystemEntry: handleDismissSystemEntry,
+    onFixSystemEntry: handleFixSystemEntry,
   }
-
-  const showJump = entries.length > 0
 
   return (
     <ScreenShell
@@ -433,7 +559,7 @@ export default function ReaderComposerRoute() {
       title={<Text className="font-semibold">{storyTitle ?? t('reader:placeholderTitle')}</Text>}
       chapterProgress={0}
       onBack={() => router.back()}
-      actions={<AppActionsMenu />}
+      actions={<AppActionsMenu contextual={contextualActions} />}
       statusSlot={
         <GenerationStatusPill
           activePhase={isGenerating ? 'generating-narrative' : undefined}
@@ -460,57 +586,53 @@ export default function ReaderComposerRoute() {
               <View className="flex-1 items-center justify-center">
                 <EmptyState title={t('reader:emptyTitle')} subtext={t('reader:emptyBody')} />
               </View>
+            ) : Platform.OS === 'web' ? (
+              <ReaderSurface {...surfaceProps} ref={surfaceRef} />
             ) : (
-              <EntryWindow
-                ref={entryWindowRef}
-                key={branchId}
-                rows={windowRows}
-                renderRow={renderRow}
-                onNearTop={() => void loadOlderEntries()}
-                onNearBottomChange={(isNearBottom) => setShowJumpToBottom(!isNearBottom)}
-                onScrollPositionChange={(pos) => {
-                  lastDistanceRef.current = pos.distanceFromBottomPx
-                  autoscrollRef.current.userScrolled(pos)
-                }}
-              />
+              <View className="flex-1">
+                <ReaderDocument
+                  {...surfaceProps}
+                  ref={documentRef}
+                  themeId={theme.id}
+                  syncNonce={syncNonce}
+                  onReady={handleReady}
+                  onFirstPaint={handleFirstPaint}
+                  dom={{
+                    scrollEnabled: false,
+                    style: { flex: 1 },
+                    webviewDebuggingEnabled: __DEV__,
+                    onShouldStartLoadWithRequest: handleShouldStartLoad,
+                  }}
+                />
+                {!documentPainted ? (
+                  <View className="absolute inset-0 items-center justify-center bg-bg-base">
+                    <EmptyState title={t('reader:hydrationLoading')} />
+                  </View>
+                ) : null}
+              </View>
             )}
-            <JumpButtons
-              showJumpToBottom={showJump && showJumpToBottom}
-              onJumpToBottom={() => {
-                entryWindowRef.current?.scrollToBottom({ smooth: true })
-                lastDistanceRef.current = 0
-                if (isGenerating) {
-                  // Today's single-phase per-turn pipeline streams exactly one
-                  // entryId per run, so this forced engage already covers the
-                  // rest of it — nothing later reads pendingJumpToBottomAtRef
-                  // for this run. Revisit if a phase ever streams a second
-                  // entryId under the same run.
-                  autoscrollRef.current.streamStarted({ distanceFromBottomPx: 0 })
-                } else {
-                  autoscrollRef.current.autoscrollApplied({ distanceFromBottomPx: 0 })
-                  pendingJumpToBottomAtRef.current = Date.now()
-                }
-              }}
-            />
           </View>
-          <View className="border-t border-border p-3">
-            <Composer
-              modesEnabled={modesEnabled}
-              isGenerating={isGenerating}
-              disabled={editBlocked || !hydrationSucceeded}
-              disabledReason={
-                hydrationFailed
-                  ? t('reader:hydrationFailedBody')
-                  : !hydrationSucceeded
-                    ? t('reader:hydrationLoading')
-                    : undefined
-              }
-              onSend={(rawText, mode) => {
-                const wrapped = wrapComposerText(rawText, { mode, pov: wrapPov, leadName })
-                void runSubmit(wrapped, mode)
-              }}
-              onCancel={() => void awaitRunTerminal(PER_TURN_KIND, 'cancel')}
-            />
+          <View className="border-t border-border px-6 pb-3.5 pt-3">
+            <View className="mx-auto w-full max-w-[860px]">
+              <Composer
+                ref={composerRef}
+                modesEnabled={modesEnabled}
+                isGenerating={isGenerating}
+                disabled={editBlocked || !hydrationSucceeded}
+                disabledReason={
+                  hydrationFailed
+                    ? t('reader:hydrationFailedBody')
+                    : !hydrationSucceeded
+                      ? t('reader:hydrationLoading')
+                      : undefined
+                }
+                onSend={(rawText, mode) => {
+                  const wrapped = wrapComposerText(rawText, { mode, pov: wrapPov, leadName })
+                  void runSubmit(wrapped, mode, { text: rawText, mode })
+                }}
+                onCancel={() => void awaitRunTerminal(PER_TURN_KIND, 'cancel')}
+              />
+            </View>
           </View>
         </View>
         {showRail ? (

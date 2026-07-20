@@ -11,14 +11,5 @@ the two files is normal as scope clarifies; see
 [`conventions.md → Followups vs parked`](./conventions.md#followups-vs-parked)
 for the placement rule.
 
-## UX
-
-- **Jump-to-bottom's `End` key and Actions-menu entry aren't wired.**
-  Slice 2.5's `reader-composer.md#jump-buttons` scope names all three
-  affordances (floating button, `End` key, Actions-menu "Jump to
-  bottom"), but only the floating button is wired
-  (`app/reader-composer/[branchId].tsx`) — no `End`-key handler, and
-  `AppActionsMenu` has no reader-contextual entries yet. Low priority
-  (the button alone satisfies the slice's acceptance criteria); wire
-  the other two whenever the reader's Actions-menu contextual zone is
-  next touched.
+No active items. The ledger empties as milestones close; new
+deferrals land here per the placement rule above.

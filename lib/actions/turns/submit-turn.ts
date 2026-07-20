@@ -1,11 +1,14 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, ne } from 'drizzle-orm'
 
 import { storyEntries, type EntryMetadata } from '@/lib/db'
 import { generateId } from '@/lib/ids'
-import { runPipeline, type RunCtx } from '@/lib/pipeline'
-import { undoRedoStore } from '@/lib/stores'
+import {
+  ensurePerTurnPipelineRegistered,
+  PER_TURN_KIND,
+  runPipeline,
+  type RunCtx,
+} from '@/lib/pipeline'
 
-import { ensurePerTurnPipelineRegistered, PER_TURN_KIND } from './pipeline'
 import { applyDeltaAction } from '../delta/apply-delta-action'
 import { DeltaReplayError, reverseReplayDeltas } from '../delta/reverse-replay'
 import type { DbCtx } from '../types'
@@ -50,18 +53,29 @@ export async function submitTurn(
     // Queued per-branch so a second submit can't read the same MAX before the
     // first one's insert lands.
     const [tail] = await ctx.db
-      .select({ position: storyEntries.position, metadata: storyEntries.metadata })
+      .select({ position: storyEntries.position })
       .from(storyEntries)
       .where(eq(storyEntries.branchId, ids.branchId))
+      .orderBy(desc(storyEntries.position))
+      .limit(1)
+    // Scene state (membership, location, worldTime) inherits from the last
+    // non-system entry: a system tail carries null metadata and would reset
+    // it. M2 has no classifier, so this propagates the opening's values
+    // forward until piggyback/classifier (M3+) emits fresh ones. Position
+    // still comes from the overall tail so numbering never collides.
+    const [sceneTail] = await ctx.db
+      .select({ metadata: storyEntries.metadata })
+      .from(storyEntries)
+      .where(and(eq(storyEntries.branchId, ids.branchId), ne(storyEntries.kind, 'system')))
       .orderBy(desc(storyEntries.position))
       .limit(1)
     const position = (tail?.position ?? 0) + 1
     const entryId = generateId('entry')
     const createdAt = Date.now()
     const metadata: EntryMetadata = {
-      sceneEntities: [],
-      currentLocationId: null,
-      worldTime: tail?.metadata?.worldTime ?? 0,
+      sceneEntities: sceneTail?.metadata?.sceneEntities ?? [],
+      currentLocationId: sceneTail?.metadata?.currentLocationId ?? null,
+      worldTime: sceneTail?.metadata?.worldTime ?? 0,
     }
 
     const result = await applyDeltaAction(
@@ -90,8 +104,6 @@ export async function submitTurn(
     )
     if (result.status === 'rejected')
       throw new Error(`submitTurn: user_action write rejected: ${result.reason}`)
-    // A second unrelated action clears the redo stack (data-model.md).
-    undoRedoStore.clear()
 
     const runCtx: RunCtx = {
       storyId: ids.storyId,

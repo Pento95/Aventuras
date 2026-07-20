@@ -1,6 +1,7 @@
 import {
   DeltaReplayError,
   applyDeltaAction,
+  normalizeAppSettingsRow,
   registerAllDomains,
   reverseReplayDeltas,
 } from '@/lib/actions'
@@ -10,9 +11,8 @@ import { configureDeltaActionPort, recoverInFlightRuns } from '@/lib/pipeline'
 import {
   appSettingsStore,
   type BootHydrateResult,
-  hydrateAppSettings,
-  readAppSettingsRow,
   recoveryReportStore,
+  rehydrateAppSettings,
 } from '@/lib/stores'
 
 // __DEV__ force-on folds into isEnabled so dev captures the recovery pass; both
@@ -27,7 +27,7 @@ export function ensureDiagnosticsGate(): void {
 }
 
 // lib/pipeline can't import @/lib/actions directly (require cycle through
-// turns/pipeline.ts), so the real delta-action functions are wired in here.
+// submit-turn.ts), so the real delta-action functions are wired in here.
 export function ensureDeltaActionPort(): void {
   configureDeltaActionPort({
     applyDeltaAction,
@@ -51,5 +51,22 @@ export async function runBootstrap(ctx: DbCtx): Promise<BootHydrateResult> {
       error: err instanceof Error ? err.message : String(err),
     })
   }
-  return hydrateAppSettings(() => readAppSettingsRow(ctx.db))
+  // ctx.db (not the module-level default) so recovery and hydrate hit the
+  // same instance.
+  const result = await rehydrateAppSettings(ctx.db)
+  // Materialize schema-added defaults into the row (the DB is the settings
+  // editing surface until M7). Gated on a clean hydrate — a corrupt row must
+  // stay inspectable — and a failure here never blocks boot.
+  if (result.status === 'ok') {
+    try {
+      const normalized = await normalizeAppSettingsRow(ctx)
+      if (normalized.status === 'normalized')
+        logger.debug('bootstrap.app_settings_normalized', { columns: normalized.columns })
+    } catch (err) {
+      logger.error('bootstrap.app_settings_normalize_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+  return result
 }

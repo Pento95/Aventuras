@@ -15,6 +15,12 @@ Sister patterns:
   `onCommitEdit / onCancelEdit` for the host to bind.
 - [`forms.md → Textarea primitive`](./forms.md#textarea-primitive) —
   the in-place edit textarea.
+- [`rich-entry-rendering.md`](./rich-entry-rendering.md) — the
+  main content slot's rendering fork: entries exceeding the
+  plainly-translatable subset render through a shadow-root rich
+  host. The fork lives entirely inside the content slot; card
+  chrome never enters the shadow root. The card itself renders in
+  the [reader document](./reader-document.md) on every platform.
 
 Used by:
 
@@ -128,10 +134,9 @@ deterministic.
 EntryCard's).** The reasoning body sits above content; expanding
 above the viewport top would shift the user's view. EntryCard's
 contract: emit a measurable, deterministic layout transition;
-never pin its own height; let the parent's `measureElement`
-(web) or `maintainVisibleContentPosition` (native) track the
-shift. The
-[reader narrative scroll-anchoring](../screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)
+never pin its own height; the parent list owns keeping the
+viewport stable through the shift. The
+[reader narrative anchor preservation](../screens/reader-composer/reader-composer.md#anchor-preservation-under-shifts)
 section covers the parent's mechanic.
 
 ## Edit mode
@@ -259,7 +264,7 @@ EntryCard's contract for parent virtualized lists:
 - **No layout effects fighting the parent.** EntryCard doesn't
   measure itself or apply scroll fixes.
 
-The reader narrative scroll-anchoring concern is the parent
+The reader narrative anchor-preservation concern is the parent
 list's responsibility, not EntryCard's. EntryCard ships
 compatible.
 

@@ -1,19 +1,15 @@
 import { eq, sql } from 'drizzle-orm'
 
-import { getModel, resolveModel, streamProviderCall } from '@/lib/ai'
+import { streamText } from '@/lib/ai'
 import { storyEntries, type EntryMetadata } from '@/lib/db'
 import { generateId, IdBiMap } from '@/lib/ids'
-import {
-  definePipeline,
-  getPipeline,
-  type PhaseContext,
-  type PhaseEmittedEvent,
-  type PhaseResult,
-} from '@/lib/pipeline'
 import { renderTemplate, TEMPLATE_IDS } from '@/lib/prompts'
 import { appSettingsStore, currentStoryStore, entitiesStore, entriesStore } from '@/lib/stores'
 
-import { buildPerTurnGenerationContext } from './context'
+import { buildGenerationContext } from './generation-context'
+import { definePipeline } from '../authoring/define'
+import { getPipeline } from '../authoring/registry'
+import type { PhaseContext, PhaseEmittedEvent, PhaseResult } from '../types'
 
 export const PER_TURN_KIND = 'per-turn'
 
@@ -26,6 +22,16 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
       error: { kind: 'orchestrator', detail: 'per-turn: no open story for branch' },
     }
 
+  // Defense-in-depth against store desync: currentStoryStore is guarded above,
+  // but the entry buffer + worldTime tail read from entriesStore — a future
+  // multi-branch/background path hydrating it elsewhere would otherwise feed a
+  // silent degenerate prompt.
+  if (entriesStore.getLoadedBranch() !== branchId)
+    return {
+      status: 'failed',
+      error: { kind: 'orchestrator', detail: 'per-turn: entries store loaded for another branch' },
+    }
+
   const entries = [...entriesStore.getEntries().values()]
     .filter((e) => e.branchId === branchId)
     .sort((a, b) => a.position - b.position)
@@ -33,7 +39,7 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
 
   const idMap = new IdBiMap()
   ctx.intermediates.idMap = idMap
-  const context = buildPerTurnGenerationContext({
+  const context = buildGenerationContext({
     entries,
     entities,
     definition: open.definition,
@@ -43,76 +49,66 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
   const prompt = renderTemplate(TEMPLATE_IDS.perTurnNarrative, context)
 
   const cfg = appSettingsStore.getAppSettings()
-  const resolved = resolveModel('narrative', {
-    providers: cfg.providers,
-    profiles: cfg.profiles,
-    assignments: cfg.assignments,
-    defaultProviderId: cfg.defaultProviderId,
-    storyModels: open.settings.models,
-  })
-  // Preflight halts before this phase on a broken resolver, so a failure here only
-  // covers a resolver-time race the preflight snapshot missed — surface it, don't fabricate.
-  if (!resolved.ok)
-    return {
-      status: 'failed',
-      error: {
-        kind: 'config-resolver',
-        failure: resolved.kind,
-        target: resolved.target,
-        phaseName: 'narrative',
-      },
-    }
-
   const entryId = generateId('entry')
-  const model = getModel(resolved.providerId, resolved.modelId, ctx.actionId)
-  const provider = cfg.providers.find((candidate) => candidate.id === resolved.providerId)
   const startedAt = Date.now()
   let streamError: unknown
   // streamText (ai@6) does NOT throw from textStream on a network/connection failure —
   // it terminates iteration silently and surfaces the error only via onError. Capture it
   // there and gate the commit on it.
-  const stream = streamProviderCall({
-    model,
+  const call = streamText('narrative', {
     prompt,
+    config: {
+      providers: cfg.providers,
+      profiles: cfg.profiles,
+      assignments: cfg.assignments,
+      defaultProviderId: cfg.defaultProviderId,
+      storyModels: open.settings.models,
+    },
     abortSignal: ctx.abortSignal,
-    ...(resolved.params.temperature !== undefined
-      ? { temperature: resolved.params.temperature }
-      : {}),
-    ...(resolved.params.maxOutput !== undefined
-      ? { maxOutputTokens: resolved.params.maxOutput }
-      : {}),
-    ...(resolved.params.thinking !== undefined && provider?.type === 'anthropic'
-      ? {
-          providerOptions: {
-            anthropic: {
-              thinking:
-                resolved.params.thinking > 0
-                  ? { type: 'enabled', budgetTokens: resolved.params.thinking }
-                  : { type: 'disabled' },
-            },
-          },
-        }
-      : {}),
-    ...(resolved.params.timeout !== undefined
-      ? { timeout: { totalMs: resolved.params.timeout * 1000 } }
-      : {}),
+    actionId: ctx.actionId,
     onError: ({ error }) => {
       streamError = error
     },
   })
+  // Preflight halts before this phase on a broken resolver, so a failure here only
+  // covers a resolver-time race the preflight snapshot missed — surface it, don't fabricate.
+  if (!call.ok)
+    return {
+      status: 'failed',
+      error: {
+        kind: 'config-resolver',
+        failure: call.kind,
+        target: call.target,
+        phaseName: 'narrative',
+      },
+    }
+  const { stream } = call
   let content = ''
   try {
-    for await (const chunk of stream.textStream) {
-      content += chunk
-      yield { type: 'stream_chunk', targetEntryId: entryId, text: chunk }
+    // fullStream, not textStream: reasoning deltas stream to the UI as the
+    // model thinks instead of appearing only post-hoc in metadata.
+    for await (const part of stream.fullStream) {
+      if (part.type === 'text-delta') {
+        content += part.text
+        yield { type: 'stream_chunk', targetEntryId: entryId, text: part.text, channel: 'text' }
+      } else if (part.type === 'reasoning-delta') {
+        yield {
+          type: 'stream_chunk',
+          targetEntryId: entryId,
+          text: part.text,
+          channel: 'reasoning',
+        }
+      }
     }
   } catch (e) {
     streamError = e
   }
+  // Checked unconditionally, not only under streamError: fullStream ends
+  // GRACEFULLY on abort (an 'abort' part, no throw, no onError), so gating on
+  // an error would fall through and commit the partial entry a cancel was
+  // supposed to discard.
+  if (ctx.abortSignal.aborted) return { status: 'aborted' }
   if (streamError !== undefined) {
-    // A cancel rides the same error path; classify it as abort, not provider failure,
-    // so CTRL-Z semantics stay distinct from a real fault.
-    if (ctx.abortSignal.aborted) return { status: 'aborted' }
     return {
       status: 'failed',
       error: {
@@ -128,9 +124,11 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
   const usage = await Promise.resolve(stream.usage).catch(() => undefined)
   const reasoningText = await Promise.resolve(stream.reasoningText).catch(() => undefined)
   const tail = entries.at(-1)
-  // Inherited from the tail entry — by submitTurn ordering that is the just-written
-  // user_action, which carries the inherited worldTime (see submit-turn.ts). M2 has no
-  // time advancement, so this propagates the opening's worldTime forward.
+  // Scene state (membership, location, worldTime) inherits from the tail — by
+  // submitTurn ordering that is the just-written user_action, which carries the
+  // inherited values (see submit-turn.ts). M2 has no classifier, so this
+  // propagates the opening's values forward until piggyback/classifier (M3+)
+  // emits fresh ones.
   const worldTime = tail?.metadata?.worldTime ?? 0
   const metadata: EntryMetadata = {
     ...(usage
@@ -138,16 +136,17 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
           tokens: {
             prompt: usage.inputTokens ?? 0,
             completion: usage.outputTokens ?? 0,
-            ...(usage.reasoningTokens != null ? { reasoning: usage.reasoningTokens } : {}),
+            ...(usage.outputTokenDetails?.reasoningTokens != null
+              ? { reasoning: usage.outputTokenDetails.reasoningTokens }
+              : {}),
           },
         }
       : {}),
-    model: resolved.modelId,
+    model: call.modelId,
     generationTimingMs: Date.now() - startedAt,
     ...(reasoningText ? { reasoning: reasoningText } : {}),
-    // M2: scene membership + current location are piggyback/classifier-emitted (M3+); empty here.
-    sceneEntities: [],
-    currentLocationId: null,
+    sceneEntities: tail?.metadata?.sceneEntities ?? [],
+    currentLocationId: tail?.metadata?.currentLocationId ?? null,
     worldTime,
   }
 

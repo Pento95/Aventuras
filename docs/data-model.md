@@ -293,7 +293,7 @@ erDiagram
         text embedding_provider_id "FK into providers[].id when embedding_backend defaults to 'provider'; null when defaults to 'local'. Users may run a different provider for embeddings than for narrative LLM calls. Distinct from default_provider_id (narrative) — embedders have no LLM-profile parameter shape (no temperature, max output, thinking, structured-output) so they don't route through the Profiles tab."
         json default_story_settings "see 'Story settings shape' — copy-at-creation source for new stories"
         text default_calendar_id "id into the merged calendar registry (built-ins from code + vault_calendars rows); seeds new stories' calendarSystemId"
-        json appearance "{ themeId, readerFontScale, accentOverride?, density } — density: 'default'|'compact'|'regular'|'comfortable' (sentinel 'default' resolves per tier; see ui/foundations/spacing.md#density-toggle)"
+        json appearance "{ themeId, readerFontScale, showJumpToBottom, accentOverride?, density } — density: 'default'|'compact'|'regular'|'comfortable' (sentinel 'default' resolves per tier; see ui/foundations/spacing.md#density-toggle)"
         text ui_language "ISO 639-1; defaults to OS locale on first launch"
         integer onboarding_completed_at "set on first dismissal of the onboarding wizard (Finish, Skip, or Step 2 footer-link exit); null = wizard renders as root on next boot"
         json diagnostics "debug toggles. Includes enabled boolean (master gate for the diagnostics layer — memory probe captures, the in-memory diagnostics store, console mirroring; off by default) and debug_level_enabled boolean (secondary gate for debug-level log emissions; off by default; meaningful only when enabled is on). Per-story memory probe activation in stories.settings.probe_mode_active is no-op while enabled is off. See docs/observability.md → Gating model"
@@ -1291,7 +1291,14 @@ disentangles them and matches the UI's two-section structure.
    Defaults"). On story creation the current globals are copied into
    the new story's `settings`. After creation, the story owns its
    values; changing the global default does NOT propagate to existing
-   stories.
+   stories. The stored column is a **true partial**: only
+   explicitly-written keys persist, and an absent key falls back to
+   the current code default (`STORY_SETTINGS_DEFAULTS`) at copy
+   time — so an app upgrade that changes a default reaches the
+   untouched keys of future stories. The parse must preserve that
+   partiality (`storySettingsPartialSchema`; a plain `.partial()`
+   fires the inner `.default()`s and would freeze today's values as
+   if user-chosen).
 2. **Override-at-render** (`settings.models` only). Fields are
    optional; absent means "resolve the agent through the App Settings
    profile chain at render time" — `assignments[agentId] → profile.modelRef`.

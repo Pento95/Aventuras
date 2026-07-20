@@ -7,8 +7,10 @@ export { type RedoSnapshot } from './delta/redo'
 export { DeltaReplayError, reverseReplayDeltas } from './delta/reverse-replay'
 export {
   addProvider,
+  normalizeAppSettingsRow,
   quickWireModel,
   resetAppSettings,
+  setAppearanceThemeId,
   setAssignments,
   setDebugLevelEnabled,
   setDefaultProvider,
@@ -36,10 +38,10 @@ export {
   type RollbackCounts,
   type StoryEntryRejection,
 } from './story-entries/operational'
+export { ENTRIES_WINDOW_SIZE, readRecentEntries } from './story-entries/recent-window'
 export { STORY_ENTRY_REJECTION, type StoryEntryRejectionCode } from './story-entries/register'
 export { redoLastAction, undoLastAction, type UndoResult } from './story-entries/undo'
 export { clearSystemEntry, writeSystemEntry } from './story-entries/system-entry'
-export { PER_TURN_KIND } from './turns/pipeline'
 export { submitTurn, type SubmitTurnMeta } from './turns/submit-turn'
 export type { DbCtx, DeltaSource, MutationResult, PipelineAction } from './types'
 export {

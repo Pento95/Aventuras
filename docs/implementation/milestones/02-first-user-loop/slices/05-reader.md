@@ -203,12 +203,25 @@ chapter management (M5), branch picker (M6).
 
 ## Open questions
 
-- Harper.js bundle-size impact on the Android dev client — still
-  unmeasured (no Android build ran during this slice's
-  implementation); measure before the milestone closes. Tech-stack
-  flags WASM weight as composer-only by design.
+None outstanding — the Harper bundle-size question resolved by
+measurement (see Implementation notes → Harper.js native
+bundle-size); the resulting platform split landed post-M2
+(`lib/spellcheck/index.native.ts`).
 
 ## Implementation notes
+
+- **Harper.js native bundle-size (measured 2026-07-18).**
+  Via `expo export --platform android --no-bytecode --source-maps`
+  plus source-map-explorer: `harper.js/dist/binaryInlined.js` is
+  **24.3 MB of a 33.2 MB Android JS bundle (73.8%)** — the entire
+  rest of the app is ~8.7 MB. The weight is also dead on native:
+  Hermes has no `WebAssembly` (or `Worker`), so the linter cannot
+  execute there, and the composer's un-caught `lintNarrativeText`
+  promise rejects on every lint pass. Resolution: `lib/spellcheck`
+  platform split landed post-M2 — web keeps harper.js, native's
+  `index.native.ts` no-ops (type-only harper imports erase), and
+  the sibling `lib/markdown/sanitize.native.ts` split dropped the
+  Android bundle to 8.7 MB.
 
 - **Web prepend compensation stays reader-local.** `EntryWindow`
   (`components/reader/entry-window.tsx`) is not extracted into a

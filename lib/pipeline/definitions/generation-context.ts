@@ -2,7 +2,10 @@ import type { Entity, StoryDefinition, StorySettings, StoryEntry } from '@/lib/d
 import { substituteIds, type IdBiMap } from '@/lib/ids'
 
 type BuildArgs = {
-  entries: readonly StoryEntry[] // full branch buffer, ascending by position
+  // Caller-scoped entry window, ascending by position (per-turn: the open
+  // partial chapter; chapter-close: the closing chapter). Recency windowing
+  // is template-side via the `recent` filter, not done here.
+  entries: readonly StoryEntry[]
   entities: readonly Entity[]
   definition: StoryDefinition
   settings: StorySettings
@@ -17,13 +20,15 @@ function blankIfWhitespace(value: string): string {
   return value.trim() === '' ? '' : value
 }
 
-export function buildPerTurnGenerationContext(args: BuildArgs): Record<string, unknown> {
+// The one context builder for the `generationContext` group: every story
+// agent's phase calls this and its template picks from the same variable set
+// (pinned in templateContextMap; parity-tested here).
+export function buildGenerationContext(args: BuildArgs): Record<string, unknown> {
   const { entries, entities, definition, settings, idMap } = args
 
-  const buffer = entries
-    .filter((e) => e.kind !== 'system')
-    .slice(-settings.partialChapterBuffer)
-    .map((e) => ({ content: e.content }))
+  // System entries are technical-only rows (removed on generate) — templates
+  // must never see them, so exclusion is unconditional defense-in-depth.
+  const narrative = entries.filter((e) => e.kind !== 'system')
 
   const normalizedDefinition = {
     ...definition,
@@ -33,11 +38,13 @@ export function buildPerTurnGenerationContext(args: BuildArgs): Record<string, u
   }
 
   const context = {
-    entries: buffer,
+    entries: narrative.map((e) => ({ content: e.content })),
     entities,
-    sceneEntities: [] as string[], // M2: no classifier populates scene membership yet
+    // Writers inherit scene membership forward (submit-turn, per-turn), so the
+    // non-system tail always carries the current scene state.
+    sceneEntities: narrative.at(-1)?.metadata?.sceneEntities ?? [],
     definition: normalizedDefinition,
-    userSettings: {},
+    userSettings: { partialChapterBuffer: settings.partialChapterBuffer },
     intermediates: {},
   }
 

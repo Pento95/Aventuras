@@ -93,12 +93,22 @@ export const SystemKind: StoryT = {
   },
 }
 
+export const StreamingPending: StoryT = {
+  ...wrap,
+  args: {
+    kind: 'streaming',
+    streamingPhase: 'reply',
+    content: '',
+  },
+}
+
 export const StreamingReasoning: StoryT = {
   ...wrap,
   args: {
     kind: 'streaming',
     streamingPhase: 'reasoning',
-    content: 'Thinking about how the warden would respond to direct aggression…',
+    content: '',
+    reasoning: 'Thinking about how the warden would respond to direct aggression…',
   },
 }
 
@@ -107,6 +117,7 @@ export const StreamingReply: StoryT = {
   args: {
     kind: 'streaming',
     streamingPhase: 'reply',
+    reasoning: 'Thought about how the warden would respond to direct aggression.',
     content: 'The figure raises a single gloved hand and the air thickens around your bla',
   },
 }
@@ -235,7 +246,8 @@ export const KindMatrix: StoryT = {
       <EntryCard
         kind="streaming"
         streamingPhase="reasoning"
-        content="Working out the warden's first words…"
+        content=""
+        reasoning="Working out the warden's first words…"
       />
       <EntryCard
         kind="system"
@@ -300,19 +312,63 @@ export const MarkdownRendering: StoryT = {
   },
 }
 
+export const RichContent: StoryT = {
+  ...wrap,
+  args: {
+    ...baseProps,
+    kind: 'ai_reply',
+    content: [
+      'A styled scene card:',
+      '',
+      '<div style="background: linear-gradient(135deg, #1f2937, #4c1d95); padding: 12px; border-radius: 8px; color: #f9fafb">',
+      '<style>@keyframes pulse { 50% { opacity: 0.5 } } .glow { animation: pulse 2s infinite }</style>',
+      '<span class="glow">The beacon pulses.</span>',
+      '</div>',
+      '',
+      '| Name | Role |',
+      '| ---- | ---- |',
+      '| Ana  | Scout |',
+    ].join('\n'),
+    meta: aiMeta,
+  },
+}
+
 export const XssSanitizationAllowlist: StoryT = {
   ...wrap,
   args: {
     ...baseProps,
     kind: 'ai_reply',
-    content:
-      'Safe text. <script>window.__xss = true</script><img src=x onerror="window.__xss = true">',
+    // No <script> here: a script tag has no RNRH element model, so it flips
+    // the entry to the rich path (shadow root) — RichXssSanitization covers
+    // that. An onerror-bearing <img> keeps the entry on the plain path.
+    content: 'Safe text. <img src=x onerror="window.__xss = true">',
     meta: aiMeta,
   },
   play: async () => {
-    // window.__xss is only ever set by the payload's script/onerror executing —
+    // window.__xss is only ever set by the payload's onerror executing —
     // its absence is the sanitization assertion.
     expect((globalThis as { __xss?: boolean }).__xss).toBeUndefined()
     await waitFor(() => expect(screen.getByText(/Safe text\./)).toBeInTheDocument())
+  },
+}
+
+export const RichXssSanitization: StoryT = {
+  ...wrap,
+  args: {
+    ...baseProps,
+    kind: 'ai_reply',
+    content:
+      'Safe rich text. <style>@keyframes x { to { opacity: 0.5 } }</style><script>window.__xssRich = true</script><img src=x onerror="window.__xssRich = true">',
+    meta: aiMeta,
+  },
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const host = Array.from(canvasElement.querySelectorAll('div')).find(
+        (div) => div.shadowRoot != null,
+      )
+      expect(host).toBeDefined()
+      expect(host!.shadowRoot!.innerHTML).toContain('Safe rich text.')
+    })
+    expect((globalThis as { __xssRich?: boolean }).__xssRich).toBeUndefined()
   },
 }

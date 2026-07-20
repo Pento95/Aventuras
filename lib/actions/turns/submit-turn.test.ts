@@ -8,10 +8,9 @@ import {
   storySettingsSchema,
   type StoryEntry,
 } from '@/lib/db'
-import { definePipeline, getPipeline, type PhaseResult } from '@/lib/pipeline'
+import { definePipeline, getPipeline, PER_TURN_KIND, type PhaseResult } from '@/lib/pipeline'
 import { currentStoryStore, entriesStore, hydrateAppSettings, undoRedoStore } from '@/lib/stores'
 
-import { PER_TURN_KIND } from './pipeline'
 import { submitTurn } from './submit-turn'
 import { expectRan, makeHarness, resetSingletons } from '../../pipeline/__tests__/harness'
 
@@ -177,7 +176,7 @@ describe('submitTurn', () => {
     expect(typeof reply?.metadata?.model).toBe('string')
   })
 
-  it('inherits worldTime from the tail entry onto the user_action, and the ai_reply inherits it too', async () => {
+  it('inherits scene state from the tail entry onto the user_action, and the ai_reply inherits it too', async () => {
     const { ctx } = await makeHarness()
     const opening: StoryEntry = {
       id: 'seed-opening',
@@ -186,7 +185,11 @@ describe('submitTurn', () => {
       kind: 'opening',
       content: 'The keep looms over the valley.',
       chapterId: null,
-      metadata: { sceneEntities: [], currentLocationId: null, worldTime: 5 },
+      metadata: {
+        sceneEntities: ['char_00000000-0000-4000-8000-000000000001'],
+        currentLocationId: 'loc_00000000-0000-4000-8000-000000000002',
+        worldTime: 5,
+      },
       createdAt: 1,
     }
     await ctx.db.insert(storyEntries).values(opening)
@@ -205,14 +208,60 @@ describe('submitTurn', () => {
       .from(storyEntries)
       .where(and(eq(storyEntries.branchId, 'b1'), eq(storyEntries.kind, 'user_action')))
     expect(ua?.metadata?.worldTime).toBe(5)
-    expect(ua?.metadata?.sceneEntities).toEqual([])
-    expect(ua?.metadata?.currentLocationId).toBeNull()
+    expect(ua?.metadata?.sceneEntities).toEqual(['char_00000000-0000-4000-8000-000000000001'])
+    expect(ua?.metadata?.currentLocationId).toBe('loc_00000000-0000-4000-8000-000000000002')
 
     const [reply] = await ctx.db
       .select()
       .from(storyEntries)
       .where(and(eq(storyEntries.branchId, 'b1'), eq(storyEntries.kind, 'ai_reply')))
     expect(reply?.metadata?.worldTime).toBe(5)
+    expect(reply?.metadata?.sceneEntities).toEqual(['char_00000000-0000-4000-8000-000000000001'])
+    expect(reply?.metadata?.currentLocationId).toBe('loc_00000000-0000-4000-8000-000000000002')
+  })
+
+  it('inherits worldTime from the last non-system entry when a system tail lingers', async () => {
+    const { ctx } = await makeHarness()
+    const opening: StoryEntry = {
+      id: 'seed-opening',
+      branchId: 'b1',
+      position: 1,
+      kind: 'opening',
+      content: 'The keep looms over the valley.',
+      chapterId: null,
+      metadata: { sceneEntities: [], currentLocationId: null, worldTime: 5 },
+      createdAt: 1,
+    }
+    // An un-cleared failure singleton (metadata null) sitting at the tail —
+    // only reachable via a submitTurn caller that skips the reader's
+    // clear-system-tail step; worldTime must not reset to 0 from it.
+    const systemTail: StoryEntry = {
+      id: 'seed-system',
+      branchId: 'b1',
+      position: 2,
+      kind: 'system',
+      content: 'Generation failed.',
+      chapterId: null,
+      metadata: null,
+      createdAt: 2,
+    }
+    await ctx.db.insert(storyEntries).values([opening, systemTail])
+    openStory('s1', 'b1')
+    entriesStore.hydrate('b1', [opening, systemTail])
+    await hydrateAppSettings(async () => WORKING_CONFIG)
+
+    await submitTurn(
+      { storyId: 's1', branchId: 'b1' },
+      { content: 'I look around.', composerMode: 'do' },
+      ctx,
+    )
+
+    const [ua] = await ctx.db
+      .select()
+      .from(storyEntries)
+      .where(and(eq(storyEntries.branchId, 'b1'), eq(storyEntries.kind, 'user_action')))
+    expect(ua?.metadata?.worldTime).toBe(5)
+    expect(ua?.position).toBe(3)
   })
 
   it('positions the new user action at MAX(position)+1, not the store row count', async () => {

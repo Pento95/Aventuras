@@ -27,8 +27,9 @@ Cross-cutting principles that govern this screen are in
   (entry list at scale: virtualization layered on a loaded window
   per [Scroll behavior](#scroll-behavior) below)
 - [Actions menu (contextual zone)](../../patterns/actions-menu.md#contextual-zone)
-  (Reader contributes per-entry / chapter / branch commands to the
-  universal `⚲` directory)
+  (Reader contributes `Undo last action` / `Redo` / `Jump to
+bottom` to the universal `⚲` directory — the touch-tier path to
+  the CTRL-Z pair)
 - [Generation status pill](../../patterns/generation-status-pill.md)
   (top-bar status surface, click-to-cancel popover, sticky memory
   error variant)
@@ -637,6 +638,10 @@ jump buttons for terminal-endpoint navigation. The composed
 fetching + virtualization pattern is documented at
 [`patterns/lists.md → Composing virtualization with load-older`](../../patterns/lists.md#composing-virtualization-with-load-older);
 this section covers the reader-specific behaviors layered on top.
+The reader's list deviates from that pattern's JS-virtualizer
+substrate: it renders in the
+[reader document](../../patterns/reader-document.md) as fully
+rendered plain flow, and scroll policy lives inside the document.
 
 ### Loaded-set model
 
@@ -644,16 +649,26 @@ At any moment the reader holds a **single contiguous window** of
 entries — never two disconnected windows.
 
 **Window.** The contiguous range in memory + DOM. On branch open:
-~50 most recent entries. Inside the window, only visible rows +
-small overscan render to DOM (virtualization).
+~50 most recent entries. Every window row exists in the document
+**fully laid out** (see
+[`reader-document.md → Entry list`](../../patterns/reader-document.md#entry-list-fully-rendered-flow-layout)
+— real heights are what keep landing and prepend compensation
+exact). If long backwards-reading sessions make window growth
+measurable, the designed lever is a far-end trim cap on the loaded
+set — the window stays contiguous, bounded at the edge opposite
+the load.
 
 **Auto-load on scroll boundary.** As the user scrolls within the
 window:
 
 - Approaching the top of the loaded range (within ~one
   viewport-height of the topmost loaded entry) → auto-fetch the
-  next older chunk (~50 entries). Content prepends; the user's
-  apparent scroll position must stay anchored (see
+  next older chunk (~50 entries). The fetch fires **at scroll
+  rest** — the boundary signal latches during the gesture and
+  fires once scrolling quiesces, so the prepend never lands
+  mid-fling (a mid-gesture insert plus its compensating scroll
+  write reads as a jump). Content prepends; the user's apparent
+  scroll position must stay anchored (see
   [Anchor preservation under shifts](#anchor-preservation-under-shifts)
   for the cross-platform implementation requirement).
 - Approaching the bottom of the loaded range (within ~one
@@ -661,8 +676,13 @@ window:
   the live edge) → auto-fetch the next forward chunk. Content
   appends.
 
-Loading shimmer at the boundary edge during fetch — fast scrollers
-don't hit empty space. This is the reader's deviation from
+A boundary skeleton occupies the edge above the oldest loaded row
+whenever older entries may exist — permanent rather than
+fetch-scoped, so it never mounts mid-scroll (an appearing
+indicator would itself shift content). A fast fling can rest at
+the edge for a beat before rows replace the skeleton in place;
+when a short load proves the branch top, the skeleton unmounts
+once, compensated. This is the reader's deviation from
 [`lists.md → Load-older`](../../patterns/lists.md#load-older--log-shaped-unbounded-lists)'s
 explicit-click rule. The existing rule applies to History-tab-shaped
 surfaces where auto-loading older content while glancing at recent
@@ -720,10 +740,9 @@ re-evaluates the engage condition fresh.
 **Layout shifts during a stream.**
 
 - **Reasoning body expansion on an earlier entry** — document grows
-  above viewport; native browser scroll-anchoring keeps visible
-  content stable. The chosen virtualization library MUST preserve
-  scroll-anchoring on above-viewport mutations (per
-  [`lists.md → Library choice`](../../patterns/lists.md#library-choice)).
+  above the viewport; the visible content must stay stable. See
+  [Anchor preservation under shifts](#anchor-preservation-under-shifts)
+  for the mechanism and its current coverage.
 - **Suggestion panel appearing at stream end** — adds ~80px between
   last entry and composer. Engaged: viewport stays at the new
   bottom (engagement carries through the layout shift). Disengaged
@@ -751,12 +770,20 @@ One floating affordance in the scroll viewport, near the right
 edge, above the suggestion panel + composer chrome. There's no
 jump-to-top — returning to the live edge is the near-universal
 chat-app need; jumping to branch start wasn't, so it's cut rather
-than shipped as a rarely-used toggle.
+than shipped as a rarely-used toggle. Reaffirmed post-M2
+(2026-07-19): the M5 [chapter popover](#top-bar--chapter-navigation)
+ships per-chapter jumps, which subsume branch-top navigation with
+finer granularity — a branch-top button would duplicate "jump to
+chapter 1".
 
 **Visibility — conditional.** Jump-to-bottom is visible when the
-user is not at-bottom of the window (same ~viewport-height
-tolerance as the auto-load boundary check). Slides in / out on
-threshold cross. Hidden at-bottom.
+user is not near-bottom of the window (~20px tolerance — the
+button appears as soon as the user leaves the live edge;
+deliberately decoupled from the auto-load boundary's
+~viewport-height tolerance). Slides in / out on threshold cross.
+Hidden near-bottom. `app_settings.appearance.showJumpToBottom`
+(default true) hides the button entirely; DB-only until the M7.1
+appearance tab exposes the toggle.
 
 **Click behavior.** Smooth scroll (~150ms) to bottom — always a
 same-window scroll (see [No window swap](#loaded-set-model); the
@@ -790,16 +817,23 @@ shift, but what's in front of the user must not jump.
   on an entry above the fold can change the footer label's pixel
   width, wrapping or de-wrapping the footer row.
 
-**Native (FlatList) — `maintainVisibleContentPosition`** handles
-all three transparently at the FlatList level. No additional glue.
-
-**Web (`@tanstack/react-virtual`)** does NOT preserve native
-browser scroll-anchoring across prepend or in-place height
-changes. The implementation measures the prepended (or expanded)
-block, adds equivalent top padding before the layout commit,
-scrolls by the same delta, then drops the padding on the next
-frame. Validate against a real prepend stream once
-reader-composer is wired against live data.
+The mechanism is the reader document's **deterministic anchor
+rule**
+([`reader-document.md → Entry list`](../../patterns/reader-document.md#entry-list-fully-rendered-flow-layout)):
+browser scroll anchoring measurably does not fire for this tree,
+so the scroller opts out (`overflow-anchor: none`) and the surface
+itself applies the leading row's content-offset delta to the
+scroll position each commit. This replaces the earlier
+per-platform machinery (FlatList `maintainVisibleContentPosition`
+on native; a measured padding-and-scroll dance under the web
+virtualizer). Coverage: scenario 1 is device-verified
+(prepend + boundary-skeleton swap, leading row pixel-stable);
+scenarios 2 and 3 change heights _below_ the leading row and stay
+deliberately uncompensated — validated acceptable as felt (see the
+[reader-document validation record](../../patterns/reader-document.md#validation-record)).
+The designed extension — anchor on the topmost in-viewport row
+instead of the window's first — stays parked unless they ever
+measure.
 
 ## Browse rail — collapse / expand
 

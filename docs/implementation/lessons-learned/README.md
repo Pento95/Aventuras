@@ -40,9 +40,17 @@ slice plans when relevant.
   surfaces use `hover:opacity-90` / `active:opacity-90`.
 - [Icon `fill="currentColor"`](./icon-fill-currentcolor.md) —
   broken on Android; drive fill via Tailwind `fill-*` className.
+- [Raw HTML islands need an explicit theme baseline](./raw-html-island-theme-baseline.md)
+  — web inherits `body { color: var(--fg-primary) }`, native
+  RenderHTML always gets a `baseStyle` color; never patch color
+  per-island.
 - [Wide-table scroll containment](./table-scroll-containment.md)
   — wide tables wrap in their own `overflow-x: auto`; horizontal
   scroll must not bubble.
+- [Chrome scroll anchoring doesn't fire for RN-Web trees](./scroll-anchoring-rnweb-tree.md)
+  — engine anchoring silently skips RN-Web wrapper trees; opt out
+  with `overflow-anchor: none` and compensate deterministically,
+  never mid-gesture.
 
 ### rn-primitives substrate
 
@@ -98,6 +106,11 @@ slice plans when relevant.
 - [Native-module RN libs need a dev-client rebuild](./native-dep-expo-link.md)
   — `pnpm add` alone crashes Android for libs with native
   modules; config-plugin step is per-library, not universal.
+- [Metro's native resolution ignores browser-targeted builds](./metro-native-ignores-browser-builds.md)
+  — the `browser` main field and `browser` exports condition are
+  web-only; a dep can work on web and break every Android bundle.
+  Deep-import the client build or pin it via `resolveRequest`, and
+  verify with a real `expo export --platform android`.
 
 ### Doc authoring
 

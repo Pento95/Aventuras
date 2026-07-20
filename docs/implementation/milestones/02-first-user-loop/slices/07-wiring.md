@@ -167,19 +167,19 @@ single-open-chapter degenerate case: the last
 
 ## Open questions
 
-- Whether the `user_action` entry create lives inside phase 0 of
-  the run or in the submit action before `runPipeline` — both
-  satisfy the `actionId` grouping contract; pick at planning
-  against how abort-before-stream should treat the user's text
-  (keep vs reverse).
-- **Per-turn context-builder hygiene** (surfaced by Slice 2.6). The
-  builder must emit the `generationContext` variable names pinned in
-  `lib/prompts`'s `templateContextMap.ts` (a mismatch only fails at
-  integration); normalize empty or whitespace-only definitional
-  fields, since LiquidJS `!= blank` treats whitespace as non-empty
-  and would leak an otherwise-guarded section header; and guard
-  array contents passed to the `prose_join` / `json` filters, which
-  stringify `null` / `undefined` literally.
+None outstanding — both resolved during implementation:
+
+- **`user_action` entry placement** — in `submitTurn` before
+  `runPipeline`, with reverse-all abort semantics; see
+  Implementation notes → Abort semantics.
+- **Per-turn context-builder hygiene** (surfaced by Slice 2.6) —
+  `lib/pipeline/definitions/generation-context.ts` (named
+  `per-turn-context.ts` at slice time) normalizes whitespace-only
+  definitional fields via `blankIfWhitespace` (covered by
+  `context.test.ts`, which also asserts the rendered template's
+  guarded headers and the pinned `generationContext` variable
+  names); filter-input arrays are built from typed store rows, so
+  `null` / `undefined` elements are unrepresentable.
 
 ## Implementation notes
 
@@ -217,5 +217,10 @@ Resolved developer decisions and notable deviations from the brief.
 - **Open-failure surfacing.** `OpenStoryResult` widened with
   `open-failed`; the story-list badge that renders it is
   [Slice 2.10](./10-recovery-ui.md).
-- Deferred hardening from the task reviews is queued in
-  [`triage.md`](../../../triage.md) under the Slice 2.7 entries.
+- Deferred hardening from the task reviews landed post-M2 (tail-read
+  non-system worldTime filter, entries-store branch assert in
+  `narrativePhase`, `partialChapterBuffer` floor, shared
+  entries-hydrate window in `lib/actions/story-entries`); the two
+  cross-milestone remainders are recorded as roadmap slice-authoring
+  notes (M3.2 metadata-placeholder helper, M5.2 turn-capture
+  kind-gating) in [`roadmap.md`](../../../roadmap.md).

@@ -1,41 +1,23 @@
-import DOMPurify from 'dompurify'
 import juice from 'juice'
 
-// DOMPurify requires a DOM window to initialize its hooks and sanitization methods.
-// During Expo Router's static pre-rendering (which runs on Node.js), `window` is undefined,
-// causing DOMPurify to return an empty unsupported instance lacking these methods.
-// We dynamically initialize it using JSDOM on the server, or a non-crashing fallback.
-let purifyInstance: typeof DOMPurify
+import { declarationHasBannedValue } from './css-policy'
+import { createDomPurify, NAVIGATION_FORBID_ATTRS } from './purify-instance'
 
-if (typeof window !== 'undefined') {
-  purifyInstance = DOMPurify
-} else {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { JSDOM } = require('jsdom')
-    purifyInstance = DOMPurify(new JSDOM('').window)
-  } catch {
-    const mock = (() => {}) as any
-    mock.addHook = () => {}
-    mock.sanitize = (html: string) => html
-    purifyInstance = mock
-  }
-}
+const purifyInstance = createDomPurify()
 
-// Allow any CSS property, but strip any declaration containing url() to prevent external data exfiltration/tracking,
-// or other browser-specific executable expressions.
+// Allow any CSS property, but strip declarations that fetch an external
+// resource or execute legacy CSS (see css-policy: url()/image-set()/
+// expression()/behavior, including escape-obfuscated forms).
 function sanitizeStyleValue(value: string): string {
   return value
     .split(';')
     .map((decl) => decl.trim())
     .filter((decl) => {
-      const lowerDecl = decl.toLowerCase()
-      return (
-        lowerDecl.length > 0 &&
-        !lowerDecl.includes('url(') &&
-        !lowerDecl.includes('expression(') &&
-        !lowerDecl.includes('behavior')
-      )
+      if (decl.length === 0) return false
+      const colon = decl.indexOf(':')
+      const prop = colon >= 0 ? decl.slice(0, colon) : ''
+      const val = colon >= 0 ? decl.slice(colon + 1) : decl
+      return !declarationHasBannedValue(prop, val)
     })
     .join('; ')
 }
@@ -54,5 +36,5 @@ export function sanitizeHtml(html: string): string {
   const inlined = juice(html)
   // We do not restrict ALLOWED_TAGS or ALLOWED_ATTR to let DOMPurify's default safe allowlist
   // handle the elements (allowing divs, tables, spans, custom margins/padding via style, etc.).
-  return purifyInstance.sanitize(inlined)
+  return purifyInstance.sanitize(inlined, { FORBID_ATTR: NAVIGATION_FORBID_ATTRS })
 }

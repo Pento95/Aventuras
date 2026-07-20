@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ArrowLeftRight,
-  ArrowRight,
   Book,
   Brain,
   GitBranch,
@@ -10,9 +9,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react-native'
-import { useMemo, useState } from 'react'
-import { Platform, useWindowDimensions, View } from 'react-native'
-import { RenderHTML } from 'react-native-render-html'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { View } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
 
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/icon'
@@ -20,13 +24,10 @@ import { IconAction } from '@/components/ui/icon-action'
 import { Text } from '@/components/ui/text'
 import { Textarea } from '@/components/ui/textarea'
 import type { EntryMetadata, StoryEntry } from '@/lib/db'
-import {
-  narrativeCustomHTMLElementModels,
-  narrativeTagsStyles,
-  renderNarrativeHtml,
-} from '@/lib/markdown'
-import { useTheme } from '@/lib/themes'
+import { detectRichEntryHtml, parseMarkdownToHtml, sanitizeHtml } from '@/lib/markdown'
 import { cn } from '@/lib/utils'
+
+import { RichEntryContent } from './rich-entry-content'
 
 type EntryKind = StoryEntry['kind'] | 'streaming'
 
@@ -60,6 +61,8 @@ type EntryCardProps = {
 
   // system-only:
   detail?: string
+  /** Kind-specific recovery route (e.g. "Fix profile" → settings); precedes Retry. */
+  fixAction?: { label: string; onPress: () => void }
   onRetry?: () => void
   onDismiss?: () => void
 
@@ -81,36 +84,48 @@ const KIND_BUBBLE: Record<EntryKind, string> = {
   ai_reply: 'bg-bg-raised border-border',
   opening: 'bg-bg-raised border-border',
   system: 'bg-bg-base border-warning',
-  streaming: 'bg-bg-raised border-border border-dashed',
+  // Near-parity with ai_reply: the commit swap should not visually re-frame
+  // the card (reader note, 2026-07-19).
+  streaming: 'bg-bg-raised border-border',
 }
 
-function NarrativeContent({ text, muted }: { text: string; muted?: boolean }) {
-  const { width } = useWindowDimensions()
-  const { theme } = useTheme()
-  const html = useMemo(() => renderNarrativeHtml(text), [text])
-  const mutedBaseStyle = useMemo(
-    () => (muted ? { fontStyle: 'italic' as const, color: theme.colors['--fg-muted'] } : undefined),
-    [muted, theme],
-  )
+// Tailwind's animate-pulse doesn't run on native, so the "model is thinking"
+// indication loops opacity through Reanimated instead.
+function Pulsing({ children }: { children: ReactNode }) {
+  const opacity = useSharedValue(1)
+  useEffect(() => {
+    opacity.set(withRepeat(withTiming(0.3, { duration: 600 }), -1, true))
+  }, [opacity])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }))
+  return <Animated.View style={style}>{children}</Animated.View>
+}
 
-  if (Platform.OS === 'web') {
-    return (
-      <div
-        className={cn('narrative-html', muted && 'italic text-fg-muted')}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    )
-  }
-
+function PlainNarrative({ marked, muted }: { marked: string; muted?: boolean }) {
+  const html = useMemo(() => sanitizeHtml(marked), [marked])
   return (
-    <RenderHTML
-      contentWidth={width}
-      source={{ html }}
-      tagsStyles={narrativeTagsStyles}
-      customHTMLElementModels={narrativeCustomHTMLElementModels}
-      baseStyle={mutedBaseStyle}
+    <div
+      className={cn('narrative-html', muted && 'italic text-fg-muted')}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   )
+}
+
+function NarrativeContent({
+  text,
+  muted,
+  allowRich,
+}: {
+  text: string
+  muted?: boolean
+  allowRich?: boolean
+}) {
+  const marked = useMemo(() => parseMarkdownToHtml(text), [text])
+  // Verdict is per-render, memoized alongside the HTML memo — never persisted,
+  // so detector improvements reclassify old entries retroactively.
+  const rich = useMemo(() => allowRich === true && detectRichEntryHtml(marked), [allowRich, marked])
+
+  if (!rich) return <PlainNarrative marked={marked} muted={muted} />
+  return <RichEntryContent markedHtml={marked} />
 }
 
 export function EntryCard({
@@ -126,6 +141,7 @@ export function EntryCard({
   onFlipEra,
   streamingPhase,
   detail,
+  fixAction,
   onRetry,
   onDismiss,
   disabled,
@@ -138,7 +154,6 @@ export function EntryCard({
 }: EntryCardProps) {
   const [expanded, setExpanded] = useState(false)
   const hasReasoning = reasoning != null && reasoning.length > 0
-  const isStreamingReasoning = kind === 'streaming' && streamingPhase === 'reasoning'
 
   const showActions = !editing && kind !== 'system' && kind !== 'streaming'
   const showWorldTime = worldTimeLabel != null && kind !== 'system' && kind !== 'streaming'
@@ -166,26 +181,35 @@ export function EntryCard({
               System
             </Text>
           </>
-        ) : kind === 'streaming' ? (
-          <>
-            <Icon as={Brain} size="sm" className="shrink-0 text-fg-muted" />
-            <Text size="xs" variant="muted">
-              {streamingPhase === 'reasoning' ? 'Thinking…' : 'Generating…'}
-            </Text>
-            <Icon as={ArrowRight} size="sm" className="shrink-0 text-fg-muted" />
-          </>
         ) : (
+          // ai_reply / opening / streaming share one header anatomy so the
+          // commit swap only exchanges slot contents, never the layout.
           <>
             <Icon as={Book} size="sm" className="shrink-0 text-fg-muted" />
             {hasReasoning ? (
-              <IconAction
-                icon={Brain}
-                label={expanded ? 'Hide reasoning' : 'Show reasoning'}
-                size="sm"
-                onPress={() => setExpanded((v) => !v)}
-              />
+              kind === 'streaming' && streamingPhase === 'reasoning' ? (
+                <Pulsing>
+                  <IconAction
+                    icon={Brain}
+                    label={expanded ? 'Hide reasoning' : 'Show reasoning'}
+                    size="sm"
+                    onPress={() => setExpanded((v) => !v)}
+                  />
+                </Pulsing>
+              ) : (
+                <IconAction
+                  icon={Brain}
+                  label={expanded ? 'Hide reasoning' : 'Show reasoning'}
+                  size="sm"
+                  onPress={() => setExpanded((v) => !v)}
+                />
+              )
             ) : null}
-            {meta?.tokens != null ? (
+            {kind === 'streaming' ? (
+              <Text size="xs" variant="muted" className="leading-none">
+                {streamingPhase === 'reasoning' ? 'Thinking…' : 'Generating…'}
+              </Text>
+            ) : meta?.tokens != null ? (
               <Text size="xs" variant="muted" className="leading-none">
                 {meta.tokens.completion} tokens
                 {meta.tokens.reasoning != null ? ` (+${meta.tokens.reasoning} reasoning)` : ''}
@@ -195,15 +219,11 @@ export function EntryCard({
         )}
       </View>
 
+      {/* Collapsed by default while streaming too — the pulsing brain signals
+          thinking; expanding shows the reasoning stream live. */}
       {hasReasoning && expanded && !editing ? (
         <View className="mb-3 border-l-2 border-border pl-3">
           <NarrativeContent text={reasoning ?? ''} muted />
-        </View>
-      ) : null}
-
-      {isStreamingReasoning && content.length > 0 ? (
-        <View className="mb-3 border-l-2 border-border pl-3">
-          <NarrativeContent text={content} muted />
         </View>
       ) : null}
 
@@ -236,8 +256,18 @@ export function EntryCard({
               {detail}
             </Text>
           ) : null}
-          {(onRetry != null || onDismiss != null) && (
+          {(fixAction != null || onRetry != null || onDismiss != null) && (
             <View className="flex-row gap-2">
+              {fixAction != null ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onPress={fixAction.onPress}
+                  disabled={disabled}
+                >
+                  <Text>{fixAction.label}</Text>
+                </Button>
+              ) : null}
               {onRetry != null ? (
                 <Button variant="secondary" size="sm" onPress={onRetry} disabled={disabled}>
                   <Icon as={RefreshCw} size="sm" />
@@ -253,8 +283,11 @@ export function EntryCard({
             </View>
           )}
         </View>
-      ) : kind === 'streaming' && streamingPhase === 'reasoning' ? null : ( // until the stream transitions to 'reply'. // the live preview block above. The reply slot stays empty // Reasoning-phase streaming — content is already shown in
-        <NarrativeContent text={content} />
+      ) : kind === 'streaming' && content.length === 0 ? null : ( // pre-first-chunk / reasoning-phase placeholder: nothing to render yet
+        <NarrativeContent
+          text={content}
+          allowRich={kind === 'user_action' || kind === 'ai_reply' || kind === 'opening'}
+        />
       )}
 
       {showActions ? (
