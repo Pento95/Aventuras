@@ -37,12 +37,58 @@ describe('bundled per-turn template — empty-guard contract', () => {
 
   it('still renders the in-scene character and the entry buffer', () => {
     expect(out).toContain('# Characters in scene')
-    expect(out).toContain('## Aria')
+    expect(out).toContain('## Aria [char_1]')
     expect(out).toContain('The gate groaned open.')
     expect(out).toContain('Aria stepped through.')
   })
 
   it('matches the recorded snapshot', () => {
     expect(out).toMatchSnapshot()
+  })
+
+  it('renders the staged-entities block with promotion instructions when a staged entity exists', () => {
+    const contextWithStaged = {
+      ...m2Context,
+      entities: [
+        ...m2Context.entities,
+        {
+          id: 'char_2',
+          kind: 'character',
+          name: 'Lord Eldrin',
+          description: 'An exiled noble.',
+          status: 'staged',
+          injectionMode: 'auto',
+        },
+      ],
+    }
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, contextWithStaged)
+    expect(rendered).toContain('# Staged characters (introduce when narratively appropriate)')
+    expect(rendered).toContain('- [char_2] Lord Eldrin: An exiled noble.')
+    expect(rendered).toContain('include their bracketed ID in the trailing <scene_entities> block')
+  })
+
+  it('omits the staged-entities block when there are no staged entities', () => {
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, m2Context)
+    expect(rendered).not.toContain('# Staged characters')
+  })
+
+  it('renders the calendar vocabulary section when calendarVocabulary is provided', () => {
+    const contextWithCalendar = {
+      ...m2Context,
+      calendarVocabulary: {
+        baseUnitName: 'second',
+        secondsPerBaseUnit: 1,
+        tiers: [{ name: 'month', labels: ['January', 'February'] }],
+      },
+    }
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, contextWithCalendar)
+    expect(rendered).toContain('# Calendar')
+    expect(rendered).toContain('This story tracks time in seconds (1 seconds per second).')
+    expect(rendered).toContain('month (January and February)')
+  })
+
+  it('omits the calendar section when calendarVocabulary is absent', () => {
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, m2Context)
+    expect(rendered).not.toContain('# Calendar')
   })
 })

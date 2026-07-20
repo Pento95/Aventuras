@@ -2,6 +2,7 @@ import { MACRO_IDS, TEMPLATE_IDS } from '../ids'
 import type { Pack } from '../types'
 import { OUTPUT_FORMAT_NARRATIVE } from './output-format'
 import { PER_TURN_NARRATIVE } from './per-turn'
+import { STATE_EMISSION } from './state-emission'
 import { WIZARD_DESCRIPTION, WIZARD_OPENING, WIZARD_TITLE_CHIPS } from './wizard'
 
 export const bundledPack: Pack = {
@@ -13,5 +14,6 @@ export const bundledPack: Pack = {
   },
   macros: {
     [MACRO_IDS.outputFormatNarrative]: { group: 'staticContent', source: OUTPUT_FORMAT_NARRATIVE },
+    [MACRO_IDS.stateEmission]: { group: 'staticContent', source: STATE_EMISSION },
   },
 }

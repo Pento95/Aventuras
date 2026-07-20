@@ -25,10 +25,25 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 # Characters in scene
 {% for e in entities | active -%}
 {%- if sceneEntities contains e.id %}
-## {{ e.name }}
+## {{ e.name }} [{{ e.id }}]
 {{ e.description }}
 {% endif -%}
 {%- endfor %}
+
+{% endif -%}
+{%- assign stagedList = entities | staged -%}
+{% if stagedList.size > 0 -%}
+# Staged characters (introduce when narratively appropriate)
+{% for e in stagedList %}
+- [{{ e.id }}] {{ e.name }}: {{ e.description }}
+{%- endfor %}
+
+If you introduce any staged character, include their bracketed ID in the trailing <scene_entities> block.
+
+{% endif -%}
+{% if calendarVocabulary -%}
+# Calendar
+This story tracks time in {{ calendarVocabulary.baseUnitName }}s ({{ calendarVocabulary.secondsPerBaseUnit }} seconds per {{ calendarVocabulary.baseUnitName }}). Tiers: {% for t in calendarVocabulary.tiers %}{{ t.name }}{% if t.labels.size > 0 %} ({{ t.labels | prose_join }}){% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}. Convert relative-time prose ("two days later", "the next morning") into a seconds delta on <world_time_delta> using these units.
 
 {% endif -%}
 # Story so far
@@ -36,4 +51,5 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 {% for entry in recentEntries %}
 {{ entry.content }}
 {% endfor %}
-{% include 'macro_output_format_narrative' %}`
+{% include 'macro_output_format_narrative' %}
+{% include 'macro_state_emission' %}`
