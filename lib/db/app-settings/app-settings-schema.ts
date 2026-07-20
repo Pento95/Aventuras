@@ -19,6 +19,7 @@ export const appearanceSchema = z.object({
 const providerCapabilitiesSchema = z.object({
   reasoning: z.boolean().optional(),
   structuredOutput: z.boolean().optional(),
+  taggedBlockReliable: z.boolean().optional(),
   matryoshkaSupported: z.boolean().optional(),
   matryoshkaDims: z.array(z.number()).optional(),
 })
