@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 
 import { streamText } from '@/lib/ai'
-import { storyEntries, type EntryMetadata } from '@/lib/db'
+import { inheritedEntryMetadata, storyEntries, type EntryMetadata } from '@/lib/db'
 import { generateId, IdBiMap } from '@/lib/ids'
 import { renderTemplate, TEMPLATE_IDS } from '@/lib/prompts'
 import { appSettingsStore, currentStoryStore, entitiesStore, entriesStore } from '@/lib/stores'
@@ -129,7 +129,7 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
   // inherited values (see submit-turn.ts). M2 has no classifier, so this
   // propagates the opening's values forward until piggyback/classifier (M3+)
   // emits fresh ones.
-  const worldTime = tail?.metadata?.worldTime ?? 0
+  const inherited = inheritedEntryMetadata(tail?.metadata)
   const metadata: EntryMetadata = {
     ...(usage
       ? {
@@ -145,9 +145,7 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
     model: call.modelId,
     generationTimingMs: Date.now() - startedAt,
     ...(reasoningText ? { reasoning: reasoningText } : {}),
-    sceneEntities: tail?.metadata?.sceneEntities ?? [],
-    currentLocationId: tail?.metadata?.currentLocationId ?? null,
-    worldTime,
+    ...inherited,
   }
 
   const [next] = await ctx.db
