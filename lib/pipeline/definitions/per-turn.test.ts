@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { APP_SETTINGS_DEFAULTS } from '@/lib/db'
 import { makeLogger } from '@/lib/diagnostics'
-import { appSettingsStore, currentStoryStore, entriesStore, resetAllStores } from '@/lib/stores'
+import {
+  appSettingsStore,
+  currentStoryStore,
+  entitiesStore,
+  entriesStore,
+  resetAllStores,
+} from '@/lib/stores'
 
 import { ensurePerTurnPipelineRegistered, PER_TURN_KIND } from './per-turn'
 import { getPipeline } from '../authoring/registry'
@@ -42,6 +48,7 @@ function failingStreamCall() {
   return {
     ok: true,
     modelId: 'model-1',
+    providerId: 'prov-1',
     stream: {
       fullStream: (async function* () {
         throw new Error('stop after call')
@@ -54,17 +61,18 @@ async function runNarrativePhase(abortSignal = new AbortController().signal) {
   ensurePerTurnPipelineRegistered()
   const phase = getPipeline(PER_TURN_KIND).phases[1]
   if (!phase || !('run' in phase)) throw new Error('expected a single-run narrative phase node')
-  return phase
-    .run({
-      actionId: 'act_1',
-      abortSignal,
-      intermediates: {},
-      log: makeLogger('act_1'),
-      db: {} as never,
-      storyId: 's1',
-      branchId: 'b1',
-    })
-    .next()
+  const gen = phase.run({
+    actionId: 'act_1',
+    abortSignal,
+    intermediates: {},
+    log: makeLogger('act_1'),
+    db: {} as never,
+    storyId: 's1',
+    branchId: 'b1',
+  })
+  let next = await gen.next()
+  while (!next.done) next = await gen.next()
+  return next.value
 }
 
 beforeEach(() => {
@@ -74,10 +82,14 @@ beforeEach(() => {
 })
 
 describe('per-turn pipeline declaration', () => {
-  it('registers phase 0 user-action-translation then narrative, aligned to canonical V1', () => {
+  it('registers phase 0 user-action-translation then narrative then piggyback-fallback-classifier, aligned to canonical V1', () => {
     ensurePerTurnPipelineRegistered()
     const p = getPipeline(PER_TURN_KIND)
-    expect(p.phases.map((n) => n.name)).toEqual(['user-action-translation', 'narrative'])
+    expect(p.phases.map((n) => n.name)).toEqual([
+      'user-action-translation',
+      'narrative',
+      'piggyback-fallback-classifier',
+    ])
     expect(p.affordance).toBe('pill-and-banner')
     expect(p.concurrencyPolicy.blockedBy).toEqual(['per-turn', 'chapter-close'])
     // phase 0 declares no resolver: the en short-circuit makes no LLM call
@@ -148,11 +160,8 @@ describe('per-turn pipeline declaration', () => {
     const result = await runNarrativePhase()
 
     expect(result).toEqual({
-      done: true,
-      value: {
-        status: 'failed',
-        error: { kind: 'orchestrator', detail: 'per-turn: no open story for branch' },
-      },
+      status: 'failed',
+      error: { kind: 'orchestrator', detail: 'per-turn: no open story for branch' },
     })
     expect(streamTextMock).not.toHaveBeenCalled()
   })
@@ -169,13 +178,10 @@ describe('per-turn pipeline declaration', () => {
     const result = await runNarrativePhase()
 
     expect(result).toEqual({
-      done: true,
-      value: {
-        status: 'failed',
-        error: {
-          kind: 'orchestrator',
-          detail: 'per-turn: entries store loaded for another branch',
-        },
+      status: 'failed',
+      error: {
+        kind: 'orchestrator',
+        detail: 'per-turn: entries store loaded for another branch',
       },
     })
     expect(streamTextMock).not.toHaveBeenCalled()
@@ -195,6 +201,7 @@ describe('per-turn pipeline declaration', () => {
     streamTextMock.mockReturnValue({
       ok: true,
       modelId: 'model-1',
+      providerId: 'prov-1',
       stream: {
         fullStream: (async function* () {
           controller.abort()
@@ -204,9 +211,7 @@ describe('per-turn pipeline declaration', () => {
 
     const result = await runNarrativePhase(controller.signal)
 
-    // done:true on the FIRST next() proves no delta_emitted was yielded — the
-    // partial entry is discarded, not committed.
-    expect(result).toEqual({ done: true, value: { status: 'aborted' } })
+    expect(result).toEqual({ status: 'aborted' })
   })
 
   it('surfaces a resolve failure as a config-resolver phase error', async () => {
@@ -226,15 +231,127 @@ describe('per-turn pipeline declaration', () => {
     const result = await runNarrativePhase()
 
     expect(result).toEqual({
-      done: true,
-      value: {
-        status: 'failed',
-        error: {
-          kind: 'config-resolver',
-          failure: 'no-profile-assigned',
-          target: 'narrative',
-          phaseName: 'narrative',
+      status: 'failed',
+      error: {
+        kind: 'config-resolver',
+        failure: 'no-profile-assigned',
+        target: 'narrative',
+        phaseName: 'narrative',
+      },
+    })
+  })
+
+  it('applies piggyback actions and sets piggybackOutcome in intermediates when piggyback fires', async () => {
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {}, piggybackMode: 'on' } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    entitiesStore.hydrate('b1', [
+      {
+        id: 'char_1',
+        branchId: 'b1',
+        kind: 'character',
+        status: 'staged',
+        name: 'Hero',
+      } as never,
+    ])
+    vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
+      ...APP_SETTINGS_DEFAULTS,
+      providers: [
+        {
+          ...provider,
+          cachedModels: [
+            {
+              id: 'model-1',
+              capabilities: { taggedBlockReliable: true },
+            },
+          ],
         },
+      ],
+      defaultProviderId: provider.id,
+    })
+
+    streamTextMock.mockReturnValue({
+      ok: true,
+      modelId: 'model-1',
+      providerId: 'prov-1',
+      stream: {
+        fullStream: (async function* () {
+          yield {
+            type: 'text-delta',
+            text: 'The story begins.\n<state><scene_entities>char_1</scene_entities><world_time_delta>15</world_time_delta></state>',
+          }
+        })(),
+      },
+    })
+
+    const intermediates: Record<string, unknown> = {}
+    ensurePerTurnPipelineRegistered()
+    const phase = getPipeline(PER_TURN_KIND).phases[1]
+    if (!phase || !('run' in phase)) throw new Error('expected narrative phase')
+
+    const gen = phase.run({
+      actionId: 'act_1',
+      abortSignal: new AbortController().signal,
+      intermediates,
+      log: makeLogger('act_1'),
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () => Promise.resolve([{ next: 1 }]),
+          }),
+        }),
+      } as never,
+      storyId: 's1',
+      branchId: 'b1',
+    })
+
+    const events = []
+    let next = await gen.next()
+    while (!next.done) {
+      events.push(next.value)
+      next = await gen.next()
+    }
+
+    expect(next.value).toEqual({ status: 'completed' })
+    expect(intermediates.piggybackOutcome).toEqual({ attempted: true, succeeded: true })
+
+    // First stream_chunk event
+    expect(events[0]).toEqual({
+      type: 'stream_chunk',
+      targetEntryId: expect.any(String),
+      text: 'The story begins.\n<state><scene_entities>char_1</scene_entities><world_time_delta>15</world_time_delta></state>',
+      channel: 'text',
+    })
+
+    // Second event: createStoryEntry delta with piggyback metadata
+    expect(events[1]).toEqual({
+      type: 'delta_emitted',
+      entryId: expect.any(String),
+      action: expect.objectContaining({
+        kind: 'createStoryEntry',
+        payload: expect.objectContaining({
+          entry: expect.objectContaining({
+            content: expect.stringContaining('<state>'),
+            metadata: expect.objectContaining({
+              sceneEntities: ['char_1'],
+              worldTime: 15,
+            }),
+          }),
+        }),
+      }),
+    })
+
+    // Third event: piggyback action promoteStagedEntity
+    expect(events[2]).toEqual({
+      type: 'delta_emitted',
+      action: {
+        kind: 'promoteStagedEntity',
+        source: 'ai_classifier',
+        payload: { branchId: 'b1', id: 'char_1' },
       },
     })
   })

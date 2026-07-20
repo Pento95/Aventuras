@@ -1,12 +1,19 @@
 import { eq, sql } from 'drizzle-orm'
 
-import { streamText } from '@/lib/ai'
+import { resolveModelCapabilities, streamText } from '@/lib/ai'
 import { inheritedEntryMetadata, storyEntries, type EntryMetadata } from '@/lib/db'
 import { generateId, IdBiMap } from '@/lib/ids'
+import { buildPiggybackActions, parseStateBlock } from '@/lib/piggyback'
 import { renderTemplate, TEMPLATE_IDS } from '@/lib/prompts'
 import { appSettingsStore, currentStoryStore, entitiesStore, entriesStore } from '@/lib/stores'
 
 import { buildGenerationContext } from './generation-context'
+import {
+  PIGGYBACK_FALLBACK_PHASE_NAME,
+  PIGGYBACK_FALLBACK_RESOLVES,
+  piggybackFallbackClassifierPhase,
+  resolvePiggybackFires,
+} from './per-turn-piggyback'
 import { definePipeline } from '../authoring/define'
 import { getPipeline } from '../authoring/registry'
 import type { PhaseContext, PhaseEmittedEvent, PhaseResult } from '../types'
@@ -124,12 +131,36 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
   const usage = await Promise.resolve(stream.usage).catch(() => undefined)
   const reasoningText = await Promise.resolve(stream.reasoningText).catch(() => undefined)
   const tail = entries.at(-1)
-  // Scene state (membership, location, worldTime) inherits from the tail — by
-  // submitTurn ordering that is the just-written user_action, which carries the
-  // inherited values (see submit-turn.ts). M2 has no classifier, so this
-  // propagates the opening's values forward until piggyback/classifier (M3+)
-  // emits fresh ones.
   const inherited = inheritedEntryMetadata(tail?.metadata)
+
+  const parsedState = parseStateBlock(content)
+  const narrativeCapabilities = resolveModelCapabilities(
+    call.providerId,
+    call.modelId,
+    cfg.providers,
+  )
+  const piggybackShouldFire = resolvePiggybackFires({
+    piggybackMode: open.settings.piggybackMode ?? 'off',
+    narrativeModelCapabilities: narrativeCapabilities,
+  })
+
+  const piggybackParseSucceeded = parsedState.blockFound && parsedState.failures.length === 0
+  let piggybackApplied: ReturnType<typeof buildPiggybackActions> | undefined
+  if (piggybackShouldFire) {
+    piggybackApplied = buildPiggybackActions({
+      entryId,
+      block: parsedState.block,
+      entities,
+      previousMetadata: inherited,
+      branchId,
+    })
+  }
+
+  ctx.intermediates.piggybackOutcome = {
+    attempted: piggybackShouldFire,
+    succeeded: piggybackShouldFire && piggybackParseSucceeded,
+  }
+
   const metadata: EntryMetadata = {
     ...(usage
       ? {
@@ -145,7 +176,7 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
     model: call.modelId,
     generationTimingMs: Date.now() - startedAt,
     ...(reasoningText ? { reasoning: reasoningText } : {}),
-    ...inherited,
+    ...(piggybackApplied?.metadata ?? inherited),
   }
 
   const [next] = await ctx.db
@@ -173,6 +204,13 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
       },
     },
   }
+
+  if (piggybackApplied) {
+    for (const action of piggybackApplied.actions) {
+      yield { type: 'delta_emitted', action }
+    }
+  }
+
   return { status: 'completed' }
 }
 
@@ -201,6 +239,11 @@ export function ensurePerTurnPipelineRegistered(): void {
       phases: [
         { name: 'user-action-translation', run: userActionTranslationPhase },
         { name: 'narrative', run: narrativePhase, resolves: [{ target: 'narrative' }] },
+        {
+          name: PIGGYBACK_FALLBACK_PHASE_NAME,
+          run: piggybackFallbackClassifierPhase,
+          resolves: PIGGYBACK_FALLBACK_RESOLVES,
+        },
       ],
       affordance: 'pill-and-banner',
       gateBehavior: 'hard-gate',
