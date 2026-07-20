@@ -179,4 +179,25 @@ describe('buildGenerationContext', () => {
     expect(prompt).not.toContain('first-line') // outside the 3-entry window
     expect(prompt).not.toContain('second-line')
   })
+
+  it('resolves calendarVocabulary for known calendar id and null for unknown', () => {
+    const knownCtx = buildGenerationContext({
+      entries: [],
+      entities: [],
+      definition: { ...definition, calendarSystemId: 'earth-gregorian' },
+      settings,
+      idMap: new IdBiMap(),
+    })
+    expect(knownCtx.calendarVocabulary).not.toBeNull()
+    expect((knownCtx.calendarVocabulary as { baseUnitName: string }).baseUnitName).toBe('second')
+
+    const unknownCtx = buildGenerationContext({
+      entries: [],
+      entities: [],
+      definition: { ...definition, calendarSystemId: 'nonexistent-calendar' },
+      settings,
+      idMap: new IdBiMap(),
+    })
+    expect(unknownCtx.calendarVocabulary).toBeNull()
+  })
 })

@@ -1,3 +1,4 @@
+import { describeCalendarVocabulary, getCalendar } from '@/lib/calendar'
 import type { Entity, StoryDefinition, StorySettings, StoryEntry } from '@/lib/db'
 import { substituteIds, type IdBiMap } from '@/lib/ids'
 
@@ -37,6 +38,8 @@ export function buildGenerationContext(args: BuildArgs): Record<string, unknown>
     tone: { ...definition.tone, promptBody: blankIfWhitespace(definition.tone.promptBody) },
   }
 
+  const calendar = getCalendar(definition.calendarSystemId)
+
   const context = {
     entries: narrative.map((e) => ({ content: e.content })),
     entities,
@@ -44,6 +47,7 @@ export function buildGenerationContext(args: BuildArgs): Record<string, unknown>
     // non-system tail always carries the current scene state.
     sceneEntities: narrative.at(-1)?.metadata?.sceneEntities ?? [],
     definition: normalizedDefinition,
+    calendarVocabulary: calendar ? describeCalendarVocabulary(calendar) : null,
     userSettings: { partialChapterBuffer: settings.partialChapterBuffer },
     intermediates: {},
   }

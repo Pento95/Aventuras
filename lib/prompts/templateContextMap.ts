@@ -45,6 +45,14 @@ export const VARIABLES: Record<ContextGroup, VariableDef[]> = {
       required: true,
     },
     {
+      name: 'calendarVocabulary',
+      type: 'CalendarVocabulary | null',
+      category: 'Story Config',
+      description:
+        'Vocabulary descriptor (base units, tier names/labels, era names) for the active calendar system.',
+      required: false,
+    },
+    {
       name: 'userSettings',
       type: 'object',
       category: 'Story Config',
@@ -115,7 +123,7 @@ export const TEMPLATE_GROUPS: Record<string, ContextGroup> & Record<TemplateId, 
 export const DISPLAY_GROUPS: Record<string, string[]> = {
   Story: ['entries'],
   Entities: ['entities', 'sceneEntities', 'leadName', 'leadEntityId'],
-  'Story Config': ['definition', 'userSettings'],
+  'Story Config': ['definition', 'calendarVocabulary', 'userSettings'],
   'Generation Results': ['intermediates', 'opening', 'guidance'],
 }
 
