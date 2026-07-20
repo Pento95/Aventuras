@@ -21,3 +21,4 @@ export {
   type ResolveFailureKind,
   type ResolvedParams,
 } from './resolve-model'
+export type { ProviderCapabilities as ModelCapabilities } from '@/lib/db'

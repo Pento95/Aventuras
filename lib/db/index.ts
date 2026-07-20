@@ -61,6 +61,7 @@ export {
   appSettingsConfigSchema,
   appSettingsDiagnosticsSchema,
   modelProfileSchema,
+  providerCapabilitiesSchema,
   providerInstanceSchema,
 } from './app-settings/app-settings-schema'
 export type {
@@ -68,6 +69,7 @@ export type {
   AppSettingsConfig,
   AppSettingsDiagnostics,
   ModelProfile,
+  ProviderCapabilities,
   ProviderInstance,
 } from './app-settings/app-settings-schema'
 export {
