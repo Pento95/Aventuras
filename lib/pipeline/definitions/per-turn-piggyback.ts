@@ -1,12 +1,13 @@
 import { z } from 'zod'
 
-import { generateStructured } from '@/lib/ai'
+import { generateStructured, resolveModel, resolveModelCapabilities } from '@/lib/ai'
 import type { ModelCapabilities } from '@/lib/ai'
 import { buildPiggybackActions } from '@/lib/piggyback'
 import type {
   PhaseContext,
   PhaseEmittedEvent,
   PhaseResult,
+  PreflightSnapshot,
   ResolverInput,
 } from '@/lib/pipeline/types'
 import { appSettingsStore, currentStoryStore, entitiesStore, entriesStore } from '@/lib/stores'
@@ -140,13 +141,29 @@ export async function* piggybackFallbackClassifierPhase(
   return { status: 'completed' }
 }
 
+function resolveNarrativeCapabilities(snapshot: PreflightSnapshot): ModelCapabilities | undefined {
+  const resolved = resolveModel('narrative', {
+    providers: snapshot.appSettings.providers,
+    profiles: snapshot.appSettings.profiles,
+    assignments: snapshot.appSettings.assignments,
+    defaultProviderId: snapshot.appSettings.defaultProviderId,
+    storyModels: snapshot.storySettings?.models,
+  })
+  if (!resolved.ok) return undefined
+  return resolveModelCapabilities(
+    resolved.providerId,
+    resolved.modelId,
+    snapshot.appSettings.providers,
+  )
+}
+
 export const PIGGYBACK_FALLBACK_RESOLVES: readonly ResolverInput[] = [
   {
     target: 'classifier',
     when: (snapshot) =>
       !resolvePiggybackFires({
         piggybackMode: snapshot.storySettings?.piggybackMode ?? 'off',
-        narrativeModelCapabilities: undefined,
+        narrativeModelCapabilities: resolveNarrativeCapabilities(snapshot),
       }),
   },
 ]

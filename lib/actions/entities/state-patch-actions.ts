@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 
 import { entities, entityStateColumnSchema, type CharacterState, type Entity } from '@/lib/db'
+import { entitiesStore } from '@/lib/stores'
 
 import { computeUndoPayload } from '../delta/delta-encoding'
 import type { ActionHandler } from '../delta/registry'
@@ -178,7 +179,9 @@ export const promoteStagedEntityHandler: ActionHandler = async (action, branchId
   const current = await loadCurrent(bid, id, ctx)
   if (!current)
     return { status: 'rejected', reason: `promote target entities ${bid}:${id} not found` }
-  if (current.status !== 'staged') return { status: 'rejected', reason: 'not-staged', code: 'noop' }
+  const storeEntity = entitiesStore.getById(id)
+  if (current.status !== 'staged' || (storeEntity !== undefined && storeEntity.status !== 'staged'))
+    return { status: 'rejected', reason: 'not-staged', code: 'noop' }
   return {
     status: 'ok',
     targetTable: 'entities',

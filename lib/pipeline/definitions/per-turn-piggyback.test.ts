@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { APP_SETTINGS_DEFAULTS } from '@/lib/db'
 import { makeLogger } from '@/lib/diagnostics'
-import {
-  currentStoryStore,
-  entitiesStore,
-  entriesStore,
-  resetAllStores,
-} from '@/lib/stores'
+import { runPreflight } from '@/lib/pipeline/runtime/preflight'
+import type { Pipeline, PreflightSnapshot } from '@/lib/pipeline/types'
+import { currentStoryStore, entitiesStore, entriesStore, resetAllStores } from '@/lib/stores'
 
 import {
   piggybackFallbackClassifierPhase,
@@ -282,23 +280,109 @@ describe('per-turn-piggyback', () => {
     })
   })
 
-  describe('PIGGYBACK_FALLBACK_RESOLVES', () => {
+  describe('PIGGYBACK_FALLBACK_RESOLVES and preflight', () => {
+    const provider = {
+      id: 'prov-1',
+      type: 'anthropic' as const,
+      displayName: 'Anthropic',
+      apiKey: 'key',
+      favoriteModelIds: [],
+      cachedModels: [
+        {
+          id: 'model-reliable',
+          capabilities: { taggedBlockReliable: true },
+        },
+      ],
+    }
+
+    const testPipeline: Pipeline = {
+      kind: 'per-turn-test',
+      phases: [
+        {
+          name: 'piggyback-fallback-classifier',
+          run: piggybackFallbackClassifierPhase,
+          resolves: PIGGYBACK_FALLBACK_RESOLVES,
+        },
+      ],
+      affordance: 'pill-and-banner',
+      gateBehavior: 'hard-gate',
+      concurrencyPolicy: {},
+    }
+
     it('declares resolver targeting classifier when piggyback is off', () => {
       const resolver = PIGGYBACK_FALLBACK_RESOLVES[0]
       expect(resolver.target).toBe('classifier')
 
       expect(
         resolver.when?.({
-          appSettings: {} as never,
+          appSettings: {
+            ...APP_SETTINGS_DEFAULTS,
+            providers: [provider],
+            profiles: [
+              {
+                id: 'prof-narrative',
+                kind: 'narrative',
+                name: 'Narrative',
+                modelRef: { providerId: 'prov-1', modelId: 'model-reliable' },
+              },
+            ],
+            assignments: {},
+            defaultProviderId: provider.id,
+          },
           storySettings: { piggybackMode: 'off' } as never,
         }),
       ).toBe(true)
-      expect(
-        resolver.when?.({
-          appSettings: {} as never,
-          storySettings: { piggybackMode: 'on' } as never,
-        }),
-      ).toBe(true)
+    })
+
+    it('declares classifier resolver input when piggybackMode is off and fails preflight if classifier is unassigned', () => {
+      const snapshot: PreflightSnapshot = {
+        appSettings: {
+          ...APP_SETTINGS_DEFAULTS,
+          providers: [provider],
+          profiles: [
+            {
+              id: 'prof-narrative',
+              kind: 'narrative',
+              name: 'Narrative',
+              modelRef: { providerId: 'prov-1', modelId: 'model-reliable' },
+            },
+          ],
+          assignments: {}, // classifier missing
+          defaultProviderId: provider.id,
+        },
+        storySettings: { piggybackMode: 'off' } as never,
+      }
+
+      const result = runPreflight(testPipeline, snapshot)
+      expect(result).toEqual({
+        kind: 'config-resolver',
+        failure: 'no-profile-assigned',
+        target: 'classifier',
+        phaseName: 'piggyback-fallback-classifier',
+      })
+    })
+
+    it('passes preflight when piggybackMode is on with capability-flagged model even if classifier assignment is missing', () => {
+      const snapshot: PreflightSnapshot = {
+        appSettings: {
+          ...APP_SETTINGS_DEFAULTS,
+          providers: [provider],
+          profiles: [
+            {
+              id: 'prof-narrative',
+              kind: 'narrative',
+              name: 'Narrative',
+              modelRef: { providerId: 'prov-1', modelId: 'model-reliable' },
+            },
+          ],
+          assignments: {}, // classifier missing, but piggyback is on with reliable model
+          defaultProviderId: provider.id,
+        },
+        storySettings: { piggybackMode: 'on' } as never,
+      }
+
+      const result = runPreflight(testPipeline, snapshot)
+      expect(result).toBeNull()
     })
   })
 })

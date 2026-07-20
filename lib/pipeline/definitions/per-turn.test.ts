@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { APP_SETTINGS_DEFAULTS } from '@/lib/db'
-import { makeLogger } from '@/lib/diagnostics'
+import { logger, makeLogger } from '@/lib/diagnostics'
 import {
   appSettingsStore,
   currentStoryStore,
@@ -354,5 +354,168 @@ describe('per-turn pipeline declaration', () => {
         payload: { branchId: 'b1', id: 'char_1' },
       },
     })
+  })
+
+  it('clamps negative worldTimeDelta to 0 and logs classifier.delta_clamped warning', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn')
+
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {}, piggybackMode: 'on' } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    entitiesStore.hydrate('b1', [])
+    vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
+      ...APP_SETTINGS_DEFAULTS,
+      providers: [
+        {
+          ...provider,
+          cachedModels: [
+            {
+              id: 'model-1',
+              capabilities: { taggedBlockReliable: true },
+            },
+          ],
+        },
+      ],
+      defaultProviderId: provider.id,
+    })
+
+    streamTextMock.mockReturnValue({
+      ok: true,
+      modelId: 'model-1',
+      providerId: 'prov-1',
+      stream: {
+        fullStream: (async function* () {
+          yield {
+            type: 'text-delta',
+            text: 'Going back in time?\n<state><world_time_delta>-30</world_time_delta></state>',
+          }
+        })(),
+      },
+    })
+
+    ensurePerTurnPipelineRegistered()
+    const phase = getPipeline(PER_TURN_KIND).phases[1]
+    if (!phase || !('run' in phase)) throw new Error('expected narrative phase')
+
+    const intermediates: Record<string, unknown> = {}
+    const gen = phase.run({
+      actionId: 'act_1',
+      abortSignal: new AbortController().signal,
+      intermediates,
+      log: makeLogger('act_1'),
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () => Promise.resolve([{ next: 1 }]),
+          }),
+        }),
+      } as never,
+      storyId: 's1',
+      branchId: 'b1',
+    })
+
+    let next = await gen.next()
+    while (!next.done) {
+      next = await gen.next()
+    }
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      'classifier.delta_clamped',
+      expect.objectContaining({
+        originalDelta: -30,
+        finalDelta: 0,
+      }),
+    )
+  })
+
+  it('sets piggybackOutcome = { attempted: true, succeeded: false } on a malformed block with a capability-flagged model and triggers fallback classifier phase', async () => {
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {}, piggybackMode: 'on' } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    entitiesStore.hydrate('b1', [])
+    vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
+      ...APP_SETTINGS_DEFAULTS,
+      providers: [
+        {
+          ...provider,
+          cachedModels: [
+            {
+              id: 'model-1',
+              capabilities: { taggedBlockReliable: true },
+            },
+          ],
+        },
+      ],
+      defaultProviderId: provider.id,
+    })
+
+    // Emits a malformed block where visual_changes is truncated
+    streamTextMock.mockReturnValue({
+      ok: true,
+      modelId: 'model-1',
+      providerId: 'prov-1',
+      stream: {
+        fullStream: (async function* () {
+          yield {
+            type: 'text-delta',
+            text: 'Narrative text\n<state><scene_entities>char_1</scene_entities><visual_changes><entity id="char_1" type="attire">torn cloak</state>',
+          }
+        })(),
+      },
+    })
+
+    ensurePerTurnPipelineRegistered()
+    const narrativeNode = getPipeline(PER_TURN_KIND).phases[1]
+    if (!narrativeNode || !('run' in narrativeNode)) throw new Error('expected narrative phase')
+
+    const intermediates: Record<string, unknown> = {}
+    const gen = narrativeNode.run({
+      actionId: 'act_1',
+      abortSignal: new AbortController().signal,
+      intermediates,
+      log: makeLogger('act_1'),
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () => Promise.resolve([{ next: 1 }]),
+          }),
+        }),
+      } as never,
+      storyId: 's1',
+      branchId: 'b1',
+    })
+
+    let next = await gen.next()
+    while (!next.done) {
+      next = await gen.next()
+    }
+
+    expect(intermediates.piggybackOutcome).toEqual({ attempted: true, succeeded: false })
+
+    // Verify fallback classifier phase fires when outcome is { attempted: true, succeeded: false }
+    const fallbackNode = getPipeline(PER_TURN_KIND).phases[2]
+    if (!fallbackNode || !('run' in fallbackNode)) throw new Error('expected fallback phase')
+
+    // Branch has no entries so fallback phase returns completed cleanly without throws
+    const fallbackGen = fallbackNode.run({
+      actionId: 'act_1',
+      abortSignal: new AbortController().signal,
+      intermediates,
+      log: makeLogger('act_1'),
+      db: {} as never,
+      storyId: 's1',
+      branchId: 'b1',
+    })
+
+    const fallbackResult = await fallbackGen.next()
+    expect(fallbackResult).toEqual({ done: true, value: { status: 'completed' } })
   })
 })

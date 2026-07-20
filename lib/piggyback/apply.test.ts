@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Entity } from '@/lib/db'
 
 import { buildPiggybackActions } from './apply'
+import { parseStateBlock } from './parse'
 import type { ParsedStateBlock } from './types'
 
 function mockEntity(overrides: Partial<Entity>): Entity {
@@ -323,5 +324,116 @@ describe('buildPiggybackActions', () => {
         },
       },
     ])
+  })
+
+  describe('malformed block fixture matrix', () => {
+    it('handles truncated tag: worldTime is finite number and valid fields still apply', () => {
+      const raw = `<state>
+  <scene_entities>char_1</scene_entities>
+  <world_time_delta>45</world_time_delta>
+  <visual_changes>
+    <entity id="char_1" type="attire">incomplete string
+</state>`
+      const parsed = parseStateBlock(raw)
+      expect(parsed.blockFound).toBe(true)
+      expect(parsed.failures).toHaveLength(1)
+
+      const result = buildPiggybackActions({
+        entryId: 'entry_1',
+        block: parsed.block,
+        entities: [],
+        previousMetadata,
+        branchId: 'main',
+      })
+
+      expect(Number.isFinite(result.metadata.worldTime)).toBe(true)
+      expect(result.metadata.worldTime).toBe(145)
+      expect(result.metadata.sceneEntities).toEqual(['char_1'])
+    })
+
+    it('handles bad JSON-ish interior: worldTime resolves to finite number via repair and valid fields apply', () => {
+      const raw = `<state>
+  <scene_entities>char_1</scene_entities>
+  <world_time_delta> 90, // seconds </world_time_delta>
+  <summary>Arrival at campsite</summary>
+</state>`
+      const parsed = parseStateBlock(raw)
+      expect(parsed.blockFound).toBe(true)
+
+      const result = buildPiggybackActions({
+        entryId: 'entry_1',
+        block: parsed.block,
+        entities: [],
+        previousMetadata,
+        branchId: 'main',
+      })
+
+      expect(Number.isFinite(result.metadata.worldTime)).toBe(true)
+      expect(result.metadata.worldTime).toBe(190)
+      expect(result.metadata.summary).toBe('Arrival at campsite')
+    })
+
+    it('handles unknown placeholder: worldTime resolves to finite number and valid fields apply', () => {
+      const raw = `<state>
+  <scene_entities>char_1, unknown_entity_id</scene_entities>
+  <world_time_delta>15</world_time_delta>
+  <current_location>loc_2</current_location>
+</state>`
+      const parsed = parseStateBlock(raw)
+
+      const result = buildPiggybackActions({
+        entryId: 'entry_1',
+        block: parsed.block,
+        entities: [],
+        previousMetadata,
+        branchId: 'main',
+      })
+
+      expect(Number.isFinite(result.metadata.worldTime)).toBe(true)
+      expect(result.metadata.worldTime).toBe(115)
+      expect(result.metadata.sceneEntities).toEqual(['char_1', 'unknown_entity_id'])
+      expect(result.metadata.currentLocationId).toBe('loc_2')
+    })
+  })
+
+  it('promotes staged entity on first emission in scene_entities, and produces no promoteStagedEntity action on second emission when entity is already active', () => {
+    const stagedChar = mockEntity({ id: 'char_staged', status: 'staged' })
+
+    const firstBlock: ParsedStateBlock = {
+      sceneEntities: ['char_staged'],
+    }
+
+    const firstResult = buildPiggybackActions({
+      entryId: 'entry_1',
+      block: firstBlock,
+      entities: [stagedChar],
+      previousMetadata,
+      branchId: 'main',
+    })
+
+    const firstPromotes = firstResult.actions.filter((a) => a.kind === 'promoteStagedEntity')
+    expect(firstPromotes).toEqual([
+      {
+        kind: 'promoteStagedEntity',
+        source: 'ai_classifier',
+        payload: { branchId: 'main', id: 'char_staged' },
+      },
+    ])
+
+    const activeChar = mockEntity({ id: 'char_staged', status: 'active' })
+    const secondBlock: ParsedStateBlock = {
+      sceneEntities: ['char_staged'],
+    }
+
+    const secondResult = buildPiggybackActions({
+      entryId: 'entry_2',
+      block: secondBlock,
+      entities: [activeChar],
+      previousMetadata: firstResult.metadata,
+      branchId: 'main',
+    })
+
+    const secondPromotes = secondResult.actions.filter((a) => a.kind === 'promoteStagedEntity')
+    expect(secondPromotes).toEqual([])
   })
 })

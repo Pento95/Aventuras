@@ -300,4 +300,47 @@ describe('promoteStagedEntity', () => {
     const rows = await db.select().from(entities).where(eq(entities.id, 'char_1'))
     expect(rows).toHaveLength(1)
   })
+
+  it('verifies two concurrent promoteStagedEntity dispatches land one ok and one soft rejected (no-op), leaving entity active', async () => {
+    const { db, ctx } = await setup()
+    await applyDeltaAction(
+      {
+        action: { kind: 'createEntity', source: 'user_edit', payload: { entry: CHAR } },
+        actionId: 'act_c',
+        branchId: 'br_1',
+      },
+      ctx,
+    )
+    const res1 = await applyDeltaAction(
+      {
+        action: {
+          kind: 'promoteStagedEntity',
+          source: 'ai_classifier',
+          payload: { branchId: 'br_1', id: 'char_1' },
+        },
+        actionId: 'act_p1',
+        branchId: 'br_1',
+      },
+      ctx,
+    )
+    const res2 = await applyDeltaAction(
+      {
+        action: {
+          kind: 'promoteStagedEntity',
+          source: 'ai_classifier',
+          payload: { branchId: 'br_1', id: 'char_1' },
+        },
+        actionId: 'act_p2',
+        branchId: 'br_1',
+      },
+      ctx,
+    )
+
+    expect(res1.status).toBe('ok')
+    expect(res2).toEqual({ status: 'rejected', reason: 'not-staged', code: 'noop' })
+
+    const row = await rowFor(db, 'char_1')
+    expect(row.status).toBe('active')
+    expect(entitiesStore.getById('char_1')?.status).toBe('active')
+  })
 })
