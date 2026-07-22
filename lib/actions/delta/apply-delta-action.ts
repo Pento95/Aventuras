@@ -26,11 +26,15 @@ function nextLogPosition(branchId: string) {
 const inFlightByKey = new Map<string, Promise<unknown>>()
 
 function withKeyLock<T>(key: string, run: () => Promise<T>): Promise<T> {
-  const settled = (inFlightByKey.get(key) ?? Promise.resolve()).then(run, run)
-  inFlightByKey.set(
-    key,
-    settled.catch(() => undefined),
-  )
+  const prior = inFlightByKey.get(key) ?? Promise.resolve()
+  const settled = prior.then(run, run)
+  const current = settled.catch(() => undefined)
+  inFlightByKey.set(key, current)
+  current.finally(() => {
+    if (inFlightByKey.get(key) === current) {
+      inFlightByKey.delete(key)
+    }
+  })
   return settled
 }
 

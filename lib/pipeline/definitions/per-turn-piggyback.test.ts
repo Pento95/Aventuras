@@ -431,6 +431,142 @@ describe('per-turn-piggyback', () => {
       )
       expect(visualDeltaEvents).toEqual([])
     })
+
+    it('rerolls generateClassifierState when initial result has negative worldTimeDelta and returns second successful result', async () => {
+      currentStoryStore.set({
+        storyId: 's1',
+        branchId: 'b1',
+        definition: {} as never,
+        settings: { models: {} } as never,
+      })
+      entriesStore.hydrate('b1', [
+        {
+          id: 'entry-1',
+          branchId: 'b1',
+          position: 1,
+          content: 'Hero steps into the clearing',
+          metadata: { sceneEntities: [], currentLocationId: null, worldTime: 100 },
+        } as never,
+      ])
+      entitiesStore.hydrate('b1', [])
+
+      generateStructuredMock
+        .mockResolvedValueOnce({
+          status: 'ok',
+          value: {
+            sceneEntities: [],
+            currentLocation: undefined,
+            worldTimeDelta: -10,
+            visualChanges: [],
+            transfers: { items: [], stackables: [] },
+          },
+        })
+        .mockResolvedValueOnce({
+          status: 'ok',
+          value: {
+            sceneEntities: [],
+            currentLocation: undefined,
+            worldTimeDelta: 15,
+            visualChanges: [],
+            transfers: { items: [], stackables: [] },
+          },
+        })
+
+      const ctx = {
+        actionId: 'act_1',
+        abortSignal: new AbortController().signal,
+        intermediates: {},
+        log: makeLogger('act_1'),
+        db: {} as never,
+        storyId: 's1',
+        branchId: 'b1',
+      }
+
+      const gen = piggybackFallbackClassifierPhase(ctx)
+      const events = []
+      let result = await gen.next()
+      while (!result.done) {
+        events.push(result.value)
+        result = await gen.next()
+      }
+
+      expect(result.value).toEqual({ status: 'completed' })
+      expect(generateStructuredMock).toHaveBeenCalledTimes(2)
+      expect(events[0]).toEqual({
+        type: 'delta_emitted',
+        action: expect.objectContaining({
+          kind: 'updateStoryEntryMetadata',
+          payload: expect.objectContaining({
+            metadata: expect.objectContaining({ worldTime: 15 }),
+          }),
+        }),
+      })
+    })
+
+    it('retains original negative result when reroll call fails in generateClassifierState', async () => {
+      currentStoryStore.set({
+        storyId: 's1',
+        branchId: 'b1',
+        definition: {} as never,
+        settings: { models: {} } as never,
+      })
+      entriesStore.hydrate('b1', [
+        {
+          id: 'entry-1',
+          branchId: 'b1',
+          position: 1,
+          content: 'Hero steps into the clearing',
+          metadata: { sceneEntities: [], currentLocationId: null, worldTime: 100 },
+        } as never,
+      ])
+      entitiesStore.hydrate('b1', [])
+
+      generateStructuredMock
+        .mockResolvedValueOnce({
+          status: 'ok',
+          value: {
+            sceneEntities: [],
+            currentLocation: undefined,
+            worldTimeDelta: -10,
+            visualChanges: [],
+            transfers: { items: [], stackables: [] },
+          },
+        })
+        .mockResolvedValueOnce({
+          status: 'failed',
+          detail: 'provider timeout on reroll',
+        })
+
+      const ctx = {
+        actionId: 'act_1',
+        abortSignal: new AbortController().signal,
+        intermediates: {},
+        log: makeLogger('act_1'),
+        db: {} as never,
+        storyId: 's1',
+        branchId: 'b1',
+      }
+
+      const gen = piggybackFallbackClassifierPhase(ctx)
+      const events = []
+      let result = await gen.next()
+      while (!result.done) {
+        events.push(result.value)
+        result = await gen.next()
+      }
+
+      expect(result.value).toEqual({ status: 'completed' })
+      expect(generateStructuredMock).toHaveBeenCalledTimes(2)
+      expect(events[0]).toEqual({
+        type: 'delta_emitted',
+        action: expect.objectContaining({
+          kind: 'updateStoryEntryMetadata',
+          payload: expect.objectContaining({
+            metadata: expect.objectContaining({ worldTime: 0 }),
+          }),
+        }),
+      })
+    })
   })
 
   describe('PIGGYBACK_FALLBACK_RESOLVES and preflight', () => {

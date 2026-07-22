@@ -479,5 +479,28 @@ describe('buildPiggybackActions', () => {
         payload: { branchId: 'main', id: 'char_kael', visual: { attire: 'leather jacket' } },
       },
     ])
+
+    const inventoryActions = result.actions.filter((a) => a.kind === 'updateEntityInventory')
+    expect(inventoryActions).toEqual([
+      {
+        kind: 'updateEntityInventory',
+        source: 'ai_classifier',
+        payload: {
+          branchId: 'main',
+          id: 'char_kael',
+          equipped_items: [],
+          inventory: ['item_blade'],
+        },
+      },
+    ])
+
+    const stackableActions = result.actions.filter((a) => a.kind === 'updateEntityStackables')
+    expect(stackableActions).toEqual([
+      {
+        kind: 'updateEntityStackables',
+        source: 'ai_classifier',
+        payload: { branchId: 'main', id: 'char_kael', stackables: { coins: 5 } },
+      },
+    ])
   })
 })

@@ -148,7 +148,11 @@ export async function* piggybackFallbackClassifierPhase(
     ctx.abortSignal,
   )
   if (result.status !== 'ok') {
-    ctx.log.warn('classifier.piggyback_fallback_failed', { status: result.status })
+    ctx.log.warn('classifier.piggyback_fallback_failed', {
+      status: result.status,
+      ...('kind' in result ? { errorKind: result.kind } : {}),
+      ...('detail' in result ? { errorDetail: result.detail } : {}),
+    })
     return { status: 'completed' }
   }
 
@@ -156,6 +160,7 @@ export async function* piggybackFallbackClassifierPhase(
   if (failures.length > 0) {
     ctx.log.warn('classifier.piggyback_fallback_parse_failed', {
       fields: failures.map((f) => f.field),
+      failures: failures.map((f) => ({ field: f.field, errorDetail: f.detail })),
     })
   }
 
