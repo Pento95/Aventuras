@@ -241,17 +241,18 @@ describe('per-turn pipeline declaration', () => {
     })
   })
 
-  it('applies piggyback actions and sets piggybackOutcome in intermediates when piggyback fires', async () => {
+  it('applies piggyback actions and sets piggybackOutcome in intermediates when piggyback fires, resolving the model-emitted placeholder back to the real entity id', async () => {
     currentStoryStore.set({
       storyId: 's1',
       branchId: 'b1',
       definition,
       settings: { partialChapterBuffer: 3, models: {}, piggybackMode: 'on' } as never,
     })
+    const heroId = 'char_00000000-0000-4000-8000-000000000001'
     entriesStore.hydrate('b1', [])
     entitiesStore.hydrate('b1', [
       {
-        id: 'char_1',
+        id: heroId,
         branchId: 'b1',
         kind: 'character',
         status: 'staged',
@@ -274,6 +275,9 @@ describe('per-turn pipeline declaration', () => {
       defaultProviderId: provider.id,
     })
 
+    // The model sees `heroId` only as the bracketed placeholder 'c1' (the
+    // narrative prompt substitutes real ids), and it emits that placeholder
+    // back verbatim — never the real id.
     streamTextMock.mockReturnValue({
       ok: true,
       modelId: 'model-1',
@@ -282,7 +286,7 @@ describe('per-turn pipeline declaration', () => {
         fullStream: (async function* () {
           yield {
             type: 'text-delta',
-            text: 'The story begins.\n<state><scene_entities>char_1</scene_entities><world_time_delta>15</world_time_delta></state>',
+            text: 'The story begins.\n<state><scene_entities>c1</scene_entities><world_time_delta>15</world_time_delta></state>',
           }
         })(),
       },
@@ -323,11 +327,12 @@ describe('per-turn pipeline declaration', () => {
     expect(events[0]).toEqual({
       type: 'stream_chunk',
       targetEntryId: expect.any(String),
-      text: 'The story begins.\n<state><scene_entities>char_1</scene_entities><world_time_delta>15</world_time_delta></state>',
+      text: 'The story begins.\n<state><scene_entities>c1</scene_entities><world_time_delta>15</world_time_delta></state>',
       channel: 'text',
     })
 
-    // Second event: createStoryEntry delta with piggyback metadata
+    // Second event: createStoryEntry delta with piggyback metadata — the
+    // placeholder 'c1' resolved back to heroId's real UUID.
     expect(events[1]).toEqual({
       type: 'delta_emitted',
       entryId: expect.any(String),
@@ -337,7 +342,7 @@ describe('per-turn pipeline declaration', () => {
           entry: expect.objectContaining({
             content: expect.stringContaining('<state>'),
             metadata: expect.objectContaining({
-              sceneEntities: ['char_1'],
+              sceneEntities: [heroId],
               worldTime: 15,
             }),
           }),
@@ -345,15 +350,158 @@ describe('per-turn pipeline declaration', () => {
       }),
     })
 
-    // Third event: piggyback action promoteStagedEntity
+    // Third event: piggyback action promoteStagedEntity, targeting the real id
     expect(events[2]).toEqual({
       type: 'delta_emitted',
       action: {
         kind: 'promoteStagedEntity',
         source: 'ai_classifier',
-        payload: { branchId: 'b1', id: 'char_1' },
+        payload: { branchId: 'b1', id: heroId },
       },
     })
+  })
+
+  it('drops sceneEntities and falls back to the classifier when the model emits an unresolvable placeholder', async () => {
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {}, piggybackMode: 'on' } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    // 'c99' is never allocated (definition.leadEntityId claims 'c1', nothing
+    // else is character-shaped here), so it's placeholder-shaped but
+    // unresolvable — MalformedPlaceholderError.
+    entitiesStore.hydrate('b1', [])
+    vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
+      ...APP_SETTINGS_DEFAULTS,
+      providers: [
+        {
+          ...provider,
+          cachedModels: [{ id: 'model-1', capabilities: { taggedBlockReliable: true } }],
+        },
+      ],
+      defaultProviderId: provider.id,
+    })
+
+    streamTextMock.mockReturnValue({
+      ok: true,
+      modelId: 'model-1',
+      providerId: 'prov-1',
+      stream: {
+        fullStream: (async function* () {
+          yield {
+            type: 'text-delta',
+            text: 'The story begins.\n<state><scene_entities>c99</scene_entities><world_time_delta>15</world_time_delta></state>',
+          }
+        })(),
+      },
+    })
+
+    const intermediates: Record<string, unknown> = {}
+    ensurePerTurnPipelineRegistered()
+    const phase = getPipeline(PER_TURN_KIND).phases[1]
+    if (!phase || !('run' in phase)) throw new Error('expected narrative phase')
+
+    const gen = phase.run({
+      actionId: 'act_1',
+      abortSignal: new AbortController().signal,
+      intermediates,
+      log: makeLogger('act_1'),
+      db: {
+        select: () => ({ from: () => ({ where: () => Promise.resolve([{ next: 1 }]) }) }),
+      } as never,
+      storyId: 's1',
+      branchId: 'b1',
+    })
+
+    const events = []
+    let next = await gen.next()
+    while (!next.done) {
+      events.push(next.value)
+      next = await gen.next()
+    }
+
+    expect(intermediates.piggybackOutcome).toEqual({ attempted: true, succeeded: false })
+    // Second event: createStoryEntry — sceneEntities falls back to the
+    // (empty) inherited value since the unresolvable placeholder dropped the field.
+    expect(events[1]).toEqual({
+      type: 'delta_emitted',
+      entryId: expect.any(String),
+      action: expect.objectContaining({
+        kind: 'createStoryEntry',
+        payload: expect.objectContaining({
+          entry: expect.objectContaining({
+            metadata: expect.objectContaining({ sceneEntities: [] }),
+          }),
+        }),
+      }),
+    })
+  })
+
+  it('logs classifier.piggyback_parse_failed when a location placeholder fails substitution', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn')
+
+    currentStoryStore.set({
+      storyId: 's1',
+      branchId: 'b1',
+      definition,
+      settings: { partialChapterBuffer: 3, models: {}, piggybackMode: 'on' } as never,
+    })
+    entriesStore.hydrate('b1', [])
+    entitiesStore.hydrate('b1', [])
+    vi.spyOn(appSettingsStore, 'getAppSettings').mockReturnValue({
+      ...APP_SETTINGS_DEFAULTS,
+      providers: [
+        {
+          ...provider,
+          cachedModels: [{ id: 'model-1', capabilities: { taggedBlockReliable: true } }],
+        },
+      ],
+      defaultProviderId: provider.id,
+    })
+
+    streamTextMock.mockReturnValue({
+      ok: true,
+      modelId: 'model-1',
+      providerId: 'prov-1',
+      stream: {
+        fullStream: (async function* () {
+          yield {
+            type: 'text-delta',
+            text: 'The story begins.\n<state><current_location>l999</current_location></state>',
+          }
+        })(),
+      },
+    })
+
+    const intermediates: Record<string, unknown> = {}
+    ensurePerTurnPipelineRegistered()
+    const phase = getPipeline(PER_TURN_KIND).phases[1]
+    if (!phase || !('run' in phase)) throw new Error('expected narrative phase')
+
+    const gen = phase.run({
+      actionId: 'act_1',
+      abortSignal: new AbortController().signal,
+      intermediates,
+      log: logger,
+      db: {
+        select: () => ({ from: () => ({ where: () => Promise.resolve([{ next: 1 }]) }) }),
+      } as never,
+      storyId: 's1',
+      branchId: 'b1',
+    })
+
+    let result = await gen.next()
+    while (!result.done) {
+      result = await gen.next()
+    }
+
+    expect(intermediates.piggybackOutcome).toEqual({ attempted: true, succeeded: false })
+    expect(warnSpy).toHaveBeenCalledWith(
+      'classifier.piggyback_parse_failed',
+      expect.objectContaining({ fields: ['currentLocation'] }),
+    )
   })
 
   it('clamps negative worldTimeDelta to 0 and logs classifier.delta_clamped warning', async () => {

@@ -1,10 +1,11 @@
-import type { PipelineAction } from '@/lib/actions'
+import type { DeltaSource, PipelineAction } from '@/lib/actions'
 import type { CharacterState, Entity } from '@/lib/db'
 
 import type { ParsedStateBlock } from './types'
 import { resolvePiggybackWorldTimeDelta } from './world-time'
 
 type PreviousMetadata = {
+  entryId?: string
   sceneEntities: string[]
   currentLocationId: string | null
   worldTime: number
@@ -16,6 +17,11 @@ type BuildArgs = {
   entities: readonly Entity[]
   previousMetadata: PreviousMetadata
   branchId: string
+  // Which caller produced this block — piggyback's own direct tagged-block
+  // emission ('ai_classifier') or the synchronous per-turn fallback
+  // ('per_turn_classifier'). Not hardcoded here: the two paths are distinct
+  // agents and their deltas' provenance must say so (docs/memory/piggyback.md).
+  source: DeltaSource
 }
 
 type BuildResult = {
@@ -29,7 +35,7 @@ type BuildResult = {
 }
 
 export function buildPiggybackActions(args: BuildArgs): BuildResult {
-  const { entryId, block, entities, previousMetadata, branchId } = args
+  const { entryId, block, entities, previousMetadata, branchId, source } = args
 
   const sceneEntities = block.sceneEntities ?? previousMetadata.sceneEntities
   const currentLocationId = block.currentLocation ?? previousMetadata.currentLocationId
@@ -48,7 +54,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
     if (entity?.status === 'staged') {
       actions.push({
         kind: 'promoteStagedEntity',
-        source: 'ai_classifier',
+        source,
         payload: { branchId, id },
       })
     }
@@ -61,18 +67,18 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
     if (nowInScene.has(character.id) && currentLocationId !== null) {
       actions.push({
         kind: 'updateEntityLocationTracking',
-        source: 'ai_classifier',
+        source,
         payload: { branchId, id: character.id, currentLocationId },
       })
     } else if (wasInScene.has(character.id) && !nowInScene.has(character.id)) {
       actions.push({
         kind: 'updateEntityLocationTracking',
-        source: 'ai_classifier',
+        source,
         payload: {
           branchId,
           id: character.id,
           lastSeenAt: {
-            entryId,
+            entryId: previousMetadata.entryId ?? entryId,
             locationId: previousMetadata.currentLocationId,
             worldTime: previousMetadata.worldTime,
           },
@@ -83,15 +89,17 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
 
   // Visual changes
   for (const note of block.visualChanges ?? []) {
-    actions.push({
-      kind: 'updateEntityVisualState',
-      source: 'ai_classifier',
-      payload: {
-        branchId,
-        id: note.id,
-        visual: { [note.type]: note.text } as Partial<CharacterState['visual']>,
-      },
-    })
+    if (byId.has(note.id)) {
+      actions.push({
+        kind: 'updateEntityVisualState',
+        source,
+        payload: {
+          branchId,
+          id: note.id,
+          visual: { [note.type]: note.text } as Partial<CharacterState['visual']>,
+        },
+      })
+    }
   }
 
   // Item transfers
@@ -106,14 +114,14 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
   }
 
   for (const item of block.transfers?.items ?? []) {
-    if (item.from !== undefined) {
+    if (item.from !== undefined && byId.has(item.from)) {
       const cur = currentInventory(item.from)
       inventoryPatches.set(item.from, {
         equipped_items: cur.equipped_items.filter((i) => i !== item.id),
         inventory: cur.inventory.filter((i) => i !== item.id),
       })
     }
-    if (item.to !== undefined) {
+    if (item.to !== undefined && byId.has(item.to)) {
       const cur = currentInventory(item.to)
       inventoryPatches.set(item.to, {
         ...cur,
@@ -122,11 +130,13 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
     }
   }
   for (const [id, patch] of inventoryPatches) {
-    actions.push({
-      kind: 'updateEntityInventory',
-      source: 'ai_classifier',
-      payload: { branchId, id, ...patch },
-    })
+    if (byId.has(id)) {
+      actions.push({
+        kind: 'updateEntityInventory',
+        source,
+        payload: { branchId, id, ...patch },
+      })
+    }
   }
 
   // Stackable transfers
@@ -137,7 +147,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
   }
 
   for (const transfer of block.transfers?.stackables ?? []) {
-    if (transfer.from !== undefined) {
+    if (transfer.from !== undefined && byId.has(transfer.from)) {
       const cur = currentStackables(transfer.from)
       const next = { ...cur }
       const remaining = Math.max(0, (cur[transfer.key] ?? 0) - transfer.amount)
@@ -145,7 +155,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
       else next[transfer.key] = remaining
       stackablePatches.set(transfer.from, next)
     }
-    if (transfer.to !== undefined) {
+    if (transfer.to !== undefined && byId.has(transfer.to)) {
       const cur = currentStackables(transfer.to)
       stackablePatches.set(transfer.to, {
         ...cur,
@@ -154,11 +164,13 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
     }
   }
   for (const [id, stackables] of stackablePatches) {
-    actions.push({
-      kind: 'updateEntityStackables',
-      source: 'ai_classifier',
-      payload: { branchId, id, stackables },
-    })
+    if (byId.has(id)) {
+      actions.push({
+        kind: 'updateEntityStackables',
+        source,
+        payload: { branchId, id, stackables },
+      })
+    }
   }
 
   return { metadata, actions }

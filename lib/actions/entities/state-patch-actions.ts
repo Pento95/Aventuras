@@ -1,6 +1,12 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
-import { entities, entityStateColumnSchema, type CharacterState, type Entity } from '@/lib/db'
+import {
+  entities,
+  entityStateColumnSchema,
+  type CharacterState,
+  type Entity,
+  type EntityState,
+} from '@/lib/db'
 import { entitiesStore } from '@/lib/stores'
 
 import { computeUndoPayload } from '../delta/delta-encoding'
@@ -92,7 +98,7 @@ function buildStatePatchOutcome(
     ops: [
       ctx.db
         .update(entities)
-        .set({ state: sql`json_patch(${entities.state}, ${JSON.stringify(topLevelPatch)})` })
+        .set({ state: mergedState as EntityState })
         .where(and(eq(entities.branchId, branchId), eq(entities.id, id)))
         .toSQL(),
     ],

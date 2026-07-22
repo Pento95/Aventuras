@@ -70,7 +70,7 @@ function assertNotTruncated(segment: string, extractedCount: number, tagLabel: s
 // one entry per changed category (docs/memory/piggyback.md → Trailing block format).
 function parseVisualChanges(segment: string): VisualChangeNote[] {
   const notes: VisualChangeNote[] = []
-  const re = /<entity\s+([^>]*)>([^<]*)<\/entity>/g
+  const re = /<entity\s+([^>]*)>([\s\S]*?)<\/entity>/g
   for (const match of segment.matchAll(re)) {
     const [, attrText, text] = match
     if (attrText === undefined || text === undefined) continue
@@ -153,12 +153,24 @@ export function parseStateBlock(raw: string): ParseStateBlockResult {
     if (segment === undefined) continue
     try {
       const value = parse(segment)
-       
-      ;(block as any)[field] = value
+      // FIELD_PARSERS correlates each `field` with a `parse` producing its
+      // matching value type by construction, but that pairing is erased once
+      // collected into one array — narrower than `any`, still an intentional
+      // escape hatch for a heterogeneous field-descriptor list.
+      ;(block as Record<string, unknown>)[field] = value
     } catch (e) {
       failures.push({ field, detail: e instanceof Error ? e.message : String(e) })
     }
   }
 
   return { block, failures, blockFound: true }
+}
+
+// Separates the narrative prose from any trailing <state>...</state> block.
+export function stripStateBlock(raw: string): { prose: string; stateRaw?: string } {
+  const openIdx = raw.indexOf('<state>')
+  if (openIdx === -1) return { prose: raw }
+  const prose = raw.slice(0, openIdx).trimEnd()
+  const stateRaw = raw.slice(openIdx).trim()
+  return { prose, stateRaw }
 }

@@ -140,7 +140,7 @@ describe('buildGenerationContext', () => {
     expect(ctx.sceneEntities).toEqual([(ctx.entities as { id: string }[])[0]!.id])
 
     const prompt = renderTemplate(TEMPLATE_IDS.perTurnNarrative, ctx)
-    expect(prompt).toContain('# Characters in scene')
+    expect(prompt).toContain('# In scene')
     expect(prompt).toContain('A knight.')
   })
 

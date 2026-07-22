@@ -22,7 +22,7 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 {%- if sceneEntities contains e.id -%}{%- assign hasScene = true -%}{%- endif -%}
 {%- endfor -%}
 {% if hasScene -%}
-# Characters in scene
+# In scene
 {% for e in entities | active -%}
 {%- if sceneEntities contains e.id %}
 ## {{ e.name }} [{{ e.id }}]
@@ -39,6 +39,16 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 {%- endfor %}
 
 If you introduce any staged character, include their bracketed ID in the trailing <scene_entities> block.
+
+{% endif -%}
+{%- assign locationList = entities | active | by_kind: 'location' -%}
+{% if locationList.size > 0 -%}
+# Known locations
+{% for e in locationList %}
+- [{{ e.id }}] {{ e.name }}{% if e.description != blank %}: {{ e.description }}{% endif %}
+{%- endfor %}
+
+Use one of these bracketed IDs for <current_location> if the scene is at one of them; leave it out if the scene moves somewhere not listed here.
 
 {% endif -%}
 {% if calendarVocabulary -%}

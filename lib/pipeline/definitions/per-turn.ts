@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm'
 import { resolveModelCapabilities, streamText } from '@/lib/ai'
 import { inheritedEntryMetadata, storyEntries, type EntryMetadata } from '@/lib/db'
 import { generateId, IdBiMap } from '@/lib/ids'
-import { buildPiggybackActions, parseStateBlock } from '@/lib/piggyback'
+import { buildPiggybackActions, parseStateBlock, substitutePiggybackIds } from '@/lib/piggyback'
 import { renderTemplate, TEMPLATE_IDS } from '@/lib/prompts'
 import { appSettingsStore, currentStoryStore, entitiesStore, entriesStore } from '@/lib/stores'
 
@@ -134,6 +134,14 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
   const inherited = inheritedEntryMetadata(tail?.metadata)
 
   const parsedState = parseStateBlock(content)
+  // Fields inside parsedState.block still carry the model's bracketed-ID
+  // placeholders (c1, l1, i1...); swap them back to real entity ids using the
+  // same idMap the prompt was built with before anything looks them up.
+  const { block: resolvedBlock, failures: substitutionFailures } = substitutePiggybackIds(
+    parsedState.block,
+    idMap,
+  )
+  const parseFailures = [...parsedState.failures, ...substitutionFailures]
   const narrativeCapabilities = resolveModelCapabilities(
     call.providerId,
     call.modelId,
@@ -144,15 +152,25 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
     narrativeModelCapabilities: narrativeCapabilities,
   })
 
-  const piggybackParseSucceeded = parsedState.blockFound && parsedState.failures.length === 0
+  const piggybackParseSucceeded = parsedState.blockFound && parseFailures.length === 0
+  if (piggybackShouldFire && !piggybackParseSucceeded) {
+    ctx.log.warn('classifier.piggyback_parse_failed', {
+      blockFound: parsedState.blockFound,
+      fields: parseFailures.map((f) => f.field),
+    })
+  }
   let piggybackApplied: ReturnType<typeof buildPiggybackActions> | undefined
   if (piggybackShouldFire) {
     piggybackApplied = buildPiggybackActions({
       entryId,
-      block: parsedState.block,
+      block: resolvedBlock,
       entities,
-      previousMetadata: inherited,
+      previousMetadata: {
+        ...inherited,
+        ...(tail?.id ? { entryId: tail.id } : {}),
+      },
       branchId,
+      source: 'ai_classifier',
     })
   }
 

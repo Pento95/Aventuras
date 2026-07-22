@@ -36,7 +36,7 @@ describe('bundled per-turn template — empty-guard contract', () => {
   })
 
   it('still renders the in-scene character and the entry buffer', () => {
-    expect(out).toContain('# Characters in scene')
+    expect(out).toContain('# In scene')
     expect(out).toContain('## Aria [char_1]')
     expect(out).toContain('The gate groaned open.')
     expect(out).toContain('Aria stepped through.')
@@ -90,5 +90,39 @@ describe('bundled per-turn template — empty-guard contract', () => {
   it('omits the calendar section when calendarVocabulary is absent', () => {
     const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, m2Context)
     expect(rendered).not.toContain('# Calendar')
+  })
+
+  it('renders active locations with bracketed IDs regardless of scene membership', () => {
+    const contextWithLocation = {
+      ...m2Context,
+      entities: [
+        ...m2Context.entities,
+        {
+          id: 'loc_1',
+          kind: 'location',
+          name: 'The Keep',
+          description: 'A weathered hilltop fortress.',
+          status: 'active',
+          injectionMode: 'auto',
+        },
+        {
+          id: 'loc_2',
+          kind: 'location',
+          name: 'Old Mill',
+          status: 'active',
+          injectionMode: 'auto',
+        },
+      ],
+    }
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, contextWithLocation)
+    expect(rendered).toContain('# Known locations')
+    expect(rendered).toContain('- [loc_1] The Keep: A weathered hilltop fortress.')
+    expect(rendered).toContain('- [loc_2] Old Mill')
+    expect(rendered).not.toContain('- [loc_2] Old Mill:')
+  })
+
+  it('omits the known-locations block when there are no active locations', () => {
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, m2Context)
+    expect(rendered).not.toContain('# Known locations')
   })
 })

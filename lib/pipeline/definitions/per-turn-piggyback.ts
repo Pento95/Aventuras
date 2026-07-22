@@ -1,8 +1,10 @@
 import { z } from 'zod'
 
 import { generateStructured, resolveModel, resolveModelCapabilities } from '@/lib/ai'
-import type { ModelCapabilities } from '@/lib/ai'
-import { buildPiggybackActions } from '@/lib/piggyback'
+import type { GenerateStructuredResult, ModelCapabilities, ResolveModelConfig } from '@/lib/ai'
+import { inheritedEntryMetadata } from '@/lib/db'
+import { IdBiMap } from '@/lib/ids'
+import { buildPiggybackActions, substitutePiggybackIds } from '@/lib/piggyback'
 import type {
   PhaseContext,
   PhaseEmittedEvent,
@@ -69,6 +71,35 @@ const fallbackClassifierSchema = z.object({
   summary: z.string().optional(),
 })
 
+// architecture.md → Classifier contract — metadata fields: reject a negative
+// worldTimeDelta, re-roll the classification once, then let
+// resolvePiggybackWorldTimeDelta clamp-and-warn if it's still negative. A
+// re-roll here means redoing the whole structured call (this is an isolated
+// classifier call, unlike the narrative path where the delta rides the same
+// call as the prose and can't be re-rolled alone).
+async function generateClassifierState(
+  prompt: string,
+  config: ResolveModelConfig,
+  abortSignal: AbortSignal,
+): Promise<GenerateStructuredResult<z.infer<typeof fallbackClassifierSchema>>> {
+  const first = await generateStructured(
+    'classifier',
+    prompt,
+    fallbackClassifierSchema,
+    config,
+    abortSignal,
+  )
+  if (first.status !== 'ok' || first.value.worldTimeDelta >= 0) return first
+  const reroll = await generateStructured(
+    'classifier',
+    prompt,
+    fallbackClassifierSchema,
+    config,
+    abortSignal,
+  )
+  return reroll.status === 'ok' ? reroll : first
+}
+
 export async function* piggybackFallbackClassifierPhase(
   ctx: PhaseContext,
 ): AsyncGenerator<PhaseEmittedEvent, PhaseResult> {
@@ -88,11 +119,25 @@ export async function* piggybackFallbackClassifierPhase(
   const tail = entries.at(-1)
   if (!tail) return { status: 'completed' }
 
+  const entities = [...entitiesStore.getEntities().values()].filter(
+    (e) => e.branchId === ctx.branchId,
+  )
+
+  // The classifier needs the same bracketed-ID vocabulary the narrative
+  // model gets, or it has nothing valid to reference in its own scene-state
+  // extraction (docs/memory/piggyback.md → Trailing block format).
+  const idMap = new IdBiMap()
+  const referenceable = entities.filter((e) => e.status === 'active' || e.status === 'staged')
+  const entityList = referenceable
+    .map(
+      (e) =>
+        `- [${idMap.allocate(e.id)}] ${e.name} (${e.kind}${e.status === 'staged' ? ', staged' : ''})`,
+    )
+    .join('\n')
+
   const appSettings = appSettingsStore.getAppSettings()
-  const result = await generateStructured(
-    'classifier',
-    `Extract scene state from this reply:\n\n${tail.content}`,
-    fallbackClassifierSchema,
+  const result = await generateClassifierState(
+    `Known entities, referenced only by the bracketed ID shown below — never invent one:\n${entityList || '(none)'}\n\nExtract scene state from this reply:\n\n${tail.content}`,
     {
       providers: appSettings.providers,
       profiles: appSettings.profiles,
@@ -107,27 +152,31 @@ export async function* piggybackFallbackClassifierPhase(
     return { status: 'completed' }
   }
 
-  const entities = [...entitiesStore.getEntities().values()].filter(
-    (e) => e.branchId === ctx.branchId,
-  )
+  const { block: resolvedBlock, failures } = substitutePiggybackIds(result.value, idMap)
+  if (failures.length > 0) {
+    ctx.log.warn('classifier.piggyback_fallback_parse_failed', {
+      fields: failures.map((f) => f.field),
+    })
+  }
+
   const previousEntry = entries.at(-2)
   const { metadata: scenePatch, actions } = buildPiggybackActions({
     entryId: tail.id,
-    block: result.value,
+    block: resolvedBlock,
     entities,
-    previousMetadata: previousEntry?.metadata ?? {
-      sceneEntities: [],
-      currentLocationId: null,
-      worldTime: 0,
+    previousMetadata: {
+      ...inheritedEntryMetadata(previousEntry?.metadata),
+      ...(previousEntry?.id ? { entryId: previousEntry.id } : {}),
     },
     branchId: ctx.branchId,
+    source: 'per_turn_classifier',
   })
 
   yield {
     type: 'delta_emitted',
     action: {
       kind: 'updateStoryEntryMetadata',
-      source: 'periodic_classifier',
+      source: 'per_turn_classifier',
       payload: {
         branchId: ctx.branchId,
         id: tail.id,

@@ -47,6 +47,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_1',
       block,
       entities: [],
@@ -71,6 +72,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_1',
       block,
       entities: [stagedChar, activeChar],
@@ -98,6 +100,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_2',
       block,
       entities: [char1, char2],
@@ -130,6 +133,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_2',
       block,
       entities: [char1, char2],
@@ -162,9 +166,10 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_1',
       block,
-      entities: [],
+      entities: [mockEntity({ id: 'char_1' })],
       previousMetadata,
       branchId: 'main',
     })
@@ -223,6 +228,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_1',
       block,
       entities: [char1, char2],
@@ -296,6 +302,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const result = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_1',
       block,
       entities: [char1, char2],
@@ -339,6 +346,7 @@ describe('buildPiggybackActions', () => {
       expect(parsed.failures).toHaveLength(1)
 
       const result = buildPiggybackActions({
+        source: 'ai_classifier',
         entryId: 'entry_1',
         block: parsed.block,
         entities: [],
@@ -361,6 +369,7 @@ describe('buildPiggybackActions', () => {
       expect(parsed.blockFound).toBe(true)
 
       const result = buildPiggybackActions({
+        source: 'ai_classifier',
         entryId: 'entry_1',
         block: parsed.block,
         entities: [],
@@ -382,6 +391,7 @@ describe('buildPiggybackActions', () => {
       const parsed = parseStateBlock(raw)
 
       const result = buildPiggybackActions({
+        source: 'ai_classifier',
         entryId: 'entry_1',
         block: parsed.block,
         entities: [],
@@ -404,6 +414,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const firstResult = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_1',
       block: firstBlock,
       entities: [stagedChar],
@@ -426,6 +437,7 @@ describe('buildPiggybackActions', () => {
     }
 
     const secondResult = buildPiggybackActions({
+      source: 'ai_classifier',
       entryId: 'entry_2',
       block: secondBlock,
       entities: [activeChar],
@@ -435,5 +447,37 @@ describe('buildPiggybackActions', () => {
 
     const secondPromotes = secondResult.actions.filter((a) => a.kind === 'promoteStagedEntity')
     expect(secondPromotes).toEqual([])
+  })
+
+  it('safely ignores visual changes and transfers for non-existent entity IDs', () => {
+    const activeChar = mockEntity({ id: 'char_kael', status: 'active' })
+    const block: ParsedStateBlock = {
+      visualChanges: [
+        { id: 'Andrea', type: 'attire', text: 'blue cloak' },
+        { id: 'char_kael', type: 'attire', text: 'leather jacket' },
+      ],
+      transfers: {
+        items: [{ id: 'item_blade', from: 'Andrea', to: 'char_kael', slot: 'inventory' }],
+        stackables: [{ key: 'coins', amount: 5, from: 'Andrea', to: 'char_kael' }],
+      },
+    }
+
+    const result = buildPiggybackActions({
+      source: 'ai_classifier',
+      entryId: 'entry_1',
+      block,
+      entities: [activeChar],
+      previousMetadata: { sceneEntities: [], currentLocationId: null, worldTime: 0 },
+      branchId: 'main',
+    })
+
+    const visualActions = result.actions.filter((a) => a.kind === 'updateEntityVisualState')
+    expect(visualActions).toEqual([
+      {
+        kind: 'updateEntityVisualState',
+        source: 'ai_classifier',
+        payload: { branchId: 'main', id: 'char_kael', visual: { attire: 'leather jacket' } },
+      },
+    ])
   })
 })

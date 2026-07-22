@@ -301,7 +301,7 @@ describe('promoteStagedEntity', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('verifies two concurrent promoteStagedEntity dispatches land one ok and one soft rejected (no-op), leaving entity active', async () => {
+  it('verifies two truly interleaved promoteStagedEntity dispatches land one ok and one soft rejected (no-op), leaving entity active', async () => {
     const { db, ctx } = await setup()
     await applyDeltaAction(
       {
@@ -311,33 +311,42 @@ describe('promoteStagedEntity', () => {
       },
       ctx,
     )
-    const res1 = await applyDeltaAction(
-      {
-        action: {
-          kind: 'promoteStagedEntity',
-          source: 'ai_classifier',
-          payload: { branchId: 'br_1', id: 'char_1' },
+    // Promise.all, not sequential awaits: both dispatches start before either
+    // finishes, so their loadCurrent reads can race against each other's
+    // write — the actual TOCTOU window the monotonic-overlap invariant
+    // (cadence.md → Concurrency) guards against.
+    const [res1, res2] = await Promise.all([
+      applyDeltaAction(
+        {
+          action: {
+            kind: 'promoteStagedEntity',
+            source: 'ai_classifier',
+            payload: { branchId: 'br_1', id: 'char_1' },
+          },
+          actionId: 'act_p1',
+          branchId: 'br_1',
         },
-        actionId: 'act_p1',
-        branchId: 'br_1',
-      },
-      ctx,
-    )
-    const res2 = await applyDeltaAction(
-      {
-        action: {
-          kind: 'promoteStagedEntity',
-          source: 'ai_classifier',
-          payload: { branchId: 'br_1', id: 'char_1' },
+        ctx,
+      ),
+      applyDeltaAction(
+        {
+          action: {
+            kind: 'promoteStagedEntity',
+            source: 'ai_classifier',
+            payload: { branchId: 'br_1', id: 'char_1' },
+          },
+          actionId: 'act_p2',
+          branchId: 'br_1',
         },
-        actionId: 'act_p2',
-        branchId: 'br_1',
-      },
-      ctx,
-    )
+        ctx,
+      ),
+    ])
 
-    expect(res1.status).toBe('ok')
-    expect(res2).toEqual({ status: 'rejected', reason: 'not-staged', code: 'noop' })
+    const results = [res1, res2]
+    const oks = results.filter((r) => r.status === 'ok')
+    const rejects = results.filter((r) => r.status === 'rejected')
+    expect(oks).toHaveLength(1)
+    expect(rejects).toEqual([{ status: 'rejected', reason: 'not-staged', code: 'noop' }])
 
     const row = await rowFor(db, 'char_1')
     expect(row.status).toBe('active')

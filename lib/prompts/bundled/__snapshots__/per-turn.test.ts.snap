@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`bundled per-turn template — empty-guard contract > matches the recorded snapshot 1`] = `
-"# Characters in scene
+"# In scene
 
 ## Aria [char_1]
 A wary scout.

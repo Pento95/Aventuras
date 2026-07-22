@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseStateBlock } from './parse'
+import { parseStateBlock, stripStateBlock } from './parse'
 
 const WELL_FORMED = `Some narrative prose here.
 <state>
@@ -113,5 +113,21 @@ describe('parseStateBlock', () => {
     expect(result.blockFound).toBe(true)
     expect(result.block).toEqual({})
     expect(result.failures).toEqual([])
+  })
+
+  describe('stripStateBlock', () => {
+    it('returns raw prose when no <state> block is present', () => {
+      const { prose, stateRaw } = stripStateBlock('Once upon a time...')
+      expect(prose).toBe('Once upon a time...')
+      expect(stateRaw).toBeUndefined()
+    })
+
+    it('separates prose from trailing <state> block', () => {
+      const raw =
+        'The knight drew his sword.\n\n<state>\n<scene_entities>c1</scene_entities>\n</state>'
+      const { prose, stateRaw } = stripStateBlock(raw)
+      expect(prose).toBe('The knight drew his sword.')
+      expect(stateRaw).toBe('<state>\n<scene_entities>c1</scene_entities>\n</state>')
+    })
   })
 })

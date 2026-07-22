@@ -4,6 +4,7 @@ export type { DbCtx } from '@/lib/db'
 
 export type DeltaSource =
   | 'ai_classifier'
+  | 'per_turn_classifier'
   | 'periodic_classifier'
   | 'user_edit'
   | 'lore_agent'

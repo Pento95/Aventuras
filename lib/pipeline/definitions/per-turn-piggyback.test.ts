@@ -266,7 +266,7 @@ describe('per-turn-piggyback', () => {
         type: 'delta_emitted',
         action: expect.objectContaining({
           kind: 'updateStoryEntryMetadata',
-          source: 'periodic_classifier',
+          source: 'per_turn_classifier',
           payload: expect.objectContaining({
             branchId: 'b1',
             id: 'entry-2',
@@ -277,6 +277,159 @@ describe('per-turn-piggyback', () => {
           }),
         }),
       })
+    })
+
+    it('prompts with a bracketed-ID list of active/staged entities and resolves the returned placeholder back to the real id', async () => {
+      const heroId = 'char_00000000-0000-4000-8000-000000000001'
+      currentStoryStore.set({
+        storyId: 's1',
+        branchId: 'b1',
+        definition: {} as never,
+        settings: { models: {} } as never,
+      })
+      entriesStore.hydrate('b1', [
+        {
+          id: 'entry-1',
+          branchId: 'b1',
+          position: 1,
+          content: 'Starting point',
+          metadata: { sceneEntities: [], currentLocationId: null, worldTime: 100 },
+        } as never,
+        {
+          id: 'entry-2',
+          branchId: 'b1',
+          position: 2,
+          content: 'Hero steps into the clearing',
+          metadata: { sceneEntities: [], currentLocationId: null, worldTime: 100 },
+        } as never,
+      ])
+      entitiesStore.hydrate('b1', [
+        {
+          id: heroId,
+          branchId: 'b1',
+          kind: 'character',
+          status: 'active',
+          name: 'Hero',
+        } as never,
+      ])
+
+      // The classifier only ever sees the bracketed placeholder, same as the
+      // narrative model — it emits 'c1' back, never heroId directly.
+      generateStructuredMock.mockResolvedValueOnce({
+        status: 'ok',
+        value: {
+          sceneEntities: ['c1'],
+          currentLocation: undefined,
+          worldTimeDelta: 5,
+          visualChanges: [],
+          transfers: { items: [], stackables: [] },
+        },
+      })
+
+      const ctx = {
+        actionId: 'act_1',
+        abortSignal: new AbortController().signal,
+        intermediates: {},
+        log: makeLogger('act_1'),
+        db: {} as never,
+        storyId: 's1',
+        branchId: 'b1',
+      }
+
+      const gen = piggybackFallbackClassifierPhase(ctx)
+      const events = []
+      let result = await gen.next()
+      while (!result.done) {
+        events.push(result.value)
+        result = await gen.next()
+      }
+
+      expect(generateStructuredMock).toHaveBeenCalledWith(
+        'classifier',
+        expect.stringContaining(`[c1] Hero (character)`),
+        expect.anything(),
+        expect.anything(),
+        ctx.abortSignal,
+      )
+      expect(events[0]).toEqual({
+        type: 'delta_emitted',
+        action: expect.objectContaining({
+          kind: 'updateStoryEntryMetadata',
+          payload: expect.objectContaining({
+            metadata: expect.objectContaining({ sceneEntities: [heroId] }),
+          }),
+        }),
+      })
+    })
+
+    it('safely ignores unknown entity IDs in visualChanges when classifier emits unmapped placeholders', async () => {
+      const heroId = 'char_00000000-0000-4000-8000-000000000001'
+      currentStoryStore.set({
+        storyId: 's1',
+        branchId: 'b1',
+        definition: {} as never,
+        settings: { models: {} } as never,
+      })
+      entriesStore.hydrate('b1', [
+        {
+          id: 'entry-1',
+          branchId: 'b1',
+          position: 1,
+          content: 'Starting point',
+          metadata: { sceneEntities: [], currentLocationId: null, worldTime: 100 },
+        } as never,
+        {
+          id: 'entry-2',
+          branchId: 'b1',
+          position: 2,
+          content: 'Hero steps into the clearing with Andrea',
+          metadata: { sceneEntities: [], currentLocationId: null, worldTime: 100 },
+        } as never,
+      ])
+      entitiesStore.hydrate('b1', [
+        {
+          id: heroId,
+          branchId: 'b1',
+          kind: 'character',
+          status: 'active',
+          name: 'Hero',
+        } as never,
+      ])
+
+      generateStructuredMock.mockResolvedValueOnce({
+        status: 'ok',
+        value: {
+          sceneEntities: ['c1'],
+          currentLocation: undefined,
+          worldTimeDelta: 0,
+          visualChanges: [{ id: 'Andrea', type: 'attire', text: 'red cloak' }],
+          transfers: { items: [], stackables: [] },
+        },
+      })
+
+      const ctx = {
+        actionId: 'act_1',
+        abortSignal: new AbortController().signal,
+        intermediates: {},
+        log: makeLogger('act_1'),
+        db: {} as never,
+        storyId: 's1',
+        branchId: 'b1',
+      }
+
+      const gen = piggybackFallbackClassifierPhase(ctx)
+      const events = []
+      let result = await gen.next()
+      while (!result.done) {
+        events.push(result.value)
+        result = await gen.next()
+      }
+
+      expect(result.value).toEqual({ status: 'completed' })
+      const visualDeltaEvents = events.filter(
+        (e) => e.type === 'delta_emitted' && e.action.kind === 'updateEntityVisualState',
+      )
+      expect(visualDeltaEvents).toEqual([])
     })
   })
 
