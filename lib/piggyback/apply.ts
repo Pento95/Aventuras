@@ -71,19 +71,23 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
         payload: { branchId, id: character.id, currentLocationId },
       })
     } else if (wasInScene.has(character.id) && !nowInScene.has(character.id)) {
-      actions.push({
-        kind: 'updateEntityLocationTracking',
-        source,
-        payload: {
-          branchId,
-          id: character.id,
-          lastSeenAt: {
-            entryId: previousMetadata.entryId ?? entryId,
-            locationId: previousMetadata.currentLocationId,
-            worldTime: previousMetadata.worldTime,
+      // Only emit lastSeenAt when we actually know where the character was;
+      // a null locationId would produce a silently rejected delta (piggyback creates no rows).
+      if (previousMetadata.currentLocationId !== null) {
+        actions.push({
+          kind: 'updateEntityLocationTracking',
+          source,
+          payload: {
+            branchId,
+            id: character.id,
+            lastSeenAt: {
+              entryId: previousMetadata.entryId ?? entryId,
+              locationId: previousMetadata.currentLocationId,
+              worldTime: previousMetadata.worldTime,
+            },
           },
-        },
-      })
+        })
+      }
     }
   }
 

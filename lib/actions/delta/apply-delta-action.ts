@@ -96,5 +96,6 @@ async function applyDeltaActionUnlocked(args: Args, ctx: DbCtx): Promise<Mutatio
     .select({ lp: deltas.logPosition })
     .from(deltas)
     .where(eq(deltas.id, deltaId))
+  if (!row) throw new Error(`delta row not found after insert: ${deltaId}`)
   return { status: 'ok', logPosition: row.lp }
 }

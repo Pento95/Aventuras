@@ -4,7 +4,7 @@ import type { MutationResult } from '@/lib/actions/types'
 import { pipelineRuns, type DbCtx } from '@/lib/db'
 import { logger, makeLogger, turnCaptureSink } from '@/lib/diagnostics'
 import { generateId } from '@/lib/ids'
-import { appSettingsStore, generationStore, type RunState } from '@/lib/stores'
+import { appSettingsStore, currentStoryStore, generationStore, type RunState } from '@/lib/stores'
 
 import { getPipeline, getPipelineSafe } from '../authoring/registry'
 import type {
@@ -396,6 +396,7 @@ export async function runPipeline(kind: string, ctx: RunCtx): Promise<TxResult |
     try {
       preflightError = runPreflight(getPipeline(run.kind), {
         appSettings: appSettingsStore.getAppSettings(),
+        storySettings: currentStoryStore.getCurrentStory()?.settings,
       })
     } catch (e) {
       preflightError = { kind: 'orchestrator', detail: e instanceof Error ? e.message : String(e) }
