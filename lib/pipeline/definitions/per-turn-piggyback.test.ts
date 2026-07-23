@@ -14,6 +14,17 @@ import {
   type PiggybackOutcome,
 } from './per-turn-piggyback'
 
+const definition = {
+  mode: 'adventure' as const,
+  leadEntityId: null,
+  narration: 'first' as const,
+  genre: { label: 'Fantasy', promptBody: '' },
+  tone: { label: 'Wry', promptBody: '' },
+  setting: '',
+  calendarSystemId: 'gregorian',
+  worldTimeOrigin: { year: 0 },
+}
+
 const { generateStructuredMock } = vi.hoisted(() => ({
   generateStructuredMock: vi.fn(),
 }))
@@ -115,7 +126,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { piggybackMode: 'on' } as never,
       })
 
@@ -142,7 +153,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { piggybackMode: 'off' } as never,
       })
       entriesStore.hydrate('b1', [])
@@ -168,7 +179,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { models: {} } as never,
       })
       entriesStore.hydrate('b1', [
@@ -210,7 +221,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { models: {} } as never,
       })
       entriesStore.hydrate('b1', [
@@ -234,7 +245,7 @@ describe('per-turn-piggyback', () => {
       generateStructuredMock.mockResolvedValueOnce({
         status: 'ok',
         value: {
-          sceneEntities: ['ent-1'],
+          sceneEntities: [],
           currentLocation: undefined,
           worldTimeDelta: 5,
           visualChanges: [],
@@ -271,7 +282,7 @@ describe('per-turn-piggyback', () => {
             branchId: 'b1',
             id: 'entry-2',
             metadata: expect.objectContaining({
-              sceneEntities: ['ent-1'],
+              sceneEntities: [],
               worldTime: 105,
             }),
           }),
@@ -284,7 +295,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { models: {} } as never,
       })
       entriesStore.hydrate('b1', [
@@ -367,7 +378,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { models: {} } as never,
       })
       entriesStore.hydrate('b1', [
@@ -436,7 +447,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { models: {} } as never,
       })
       entriesStore.hydrate('b1', [
@@ -507,7 +518,7 @@ describe('per-turn-piggyback', () => {
       currentStoryStore.set({
         storyId: 's1',
         branchId: 'b1',
-        definition: {} as never,
+        definition,
         settings: { models: {} } as never,
       })
       entriesStore.hydrate('b1', [

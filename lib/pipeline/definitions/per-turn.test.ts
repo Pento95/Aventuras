@@ -272,6 +272,14 @@ describe('per-turn pipeline declaration', () => {
           ],
         },
       ],
+      profiles: [
+        {
+          id: 'prof-narrative',
+          kind: 'narrative',
+          name: 'Narrative',
+          modelRef: { providerId: provider.id, modelId: 'model-1' },
+        },
+      ],
       defaultProviderId: provider.id,
     })
 
@@ -355,7 +363,7 @@ describe('per-turn pipeline declaration', () => {
       type: 'delta_emitted',
       action: {
         kind: 'promoteStagedEntity',
-        source: 'ai_classifier',
+        source: 'piggyback_tagged_block',
         payload: { branchId: 'b1', id: heroId },
       },
     })
@@ -379,6 +387,14 @@ describe('per-turn pipeline declaration', () => {
         {
           ...provider,
           cachedModels: [{ id: 'model-1', capabilities: { taggedBlockReliable: true } }],
+        },
+      ],
+      profiles: [
+        {
+          id: 'prof-narrative',
+          kind: 'narrative',
+          name: 'Narrative',
+          modelRef: { providerId: provider.id, modelId: 'model-1' },
         },
       ],
       defaultProviderId: provider.id,
@@ -458,6 +474,14 @@ describe('per-turn pipeline declaration', () => {
           cachedModels: [{ id: 'model-1', capabilities: { taggedBlockReliable: true } }],
         },
       ],
+      profiles: [
+        {
+          id: 'prof-narrative',
+          kind: 'narrative',
+          name: 'Narrative',
+          modelRef: { providerId: provider.id, modelId: 'model-1' },
+        },
+      ],
       defaultProviderId: provider.id,
     })
 
@@ -526,6 +550,14 @@ describe('per-turn pipeline declaration', () => {
               capabilities: { taggedBlockReliable: true },
             },
           ],
+        },
+      ],
+      profiles: [
+        {
+          id: 'prof-narrative',
+          kind: 'narrative',
+          name: 'Narrative',
+          modelRef: { providerId: provider.id, modelId: 'model-1' },
         },
       ],
       defaultProviderId: provider.id,
@@ -600,6 +632,14 @@ describe('per-turn pipeline declaration', () => {
               capabilities: { taggedBlockReliable: true },
             },
           ],
+        },
+      ],
+      profiles: [
+        {
+          id: 'prof-narrative',
+          kind: 'narrative',
+          name: 'Narrative',
+          modelRef: { providerId: provider.id, modelId: 'model-1' },
         },
       ],
       defaultProviderId: provider.id,

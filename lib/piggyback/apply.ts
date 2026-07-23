@@ -18,7 +18,7 @@ type BuildArgs = {
   previousMetadata: PreviousMetadata
   branchId: string
   // Which caller produced this block — piggyback's own direct tagged-block
-  // emission ('ai_classifier') or the synchronous per-turn fallback
+  // emission ('piggyback_tagged_block') or the synchronous per-turn fallback
   // ('per_turn_classifier'). Not hardcoded here: the two paths are distinct
   // agents and their deltas' provenance must say so (docs/memory/piggyback.md).
   source: DeltaSource

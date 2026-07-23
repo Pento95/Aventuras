@@ -263,7 +263,7 @@ erDiagram
         text entry_id FK "survival anchor: reverse this delta iff this entry is reversed. Foreground turn delta → its own turn; periodic_classifier fact → its provenance entry; translation → its target's content-defining-delta anchor; null (chapter close, user direct edit) → reverse positionally by own commit position. See Entry mutability & rollback → Survival anchor"
         text action_id "groups deltas into one user-visible action (used for CTRL-Z batching)"
         integer log_position "append-only ordering within branch"
-        text source "ai_classifier | per_turn_classifier | periodic_classifier | user_edit | lore_agent | chapter_close"
+        text source "ai_classifier | piggyback_tagged_block | per_turn_classifier | periodic_classifier | user_edit | lore_agent | chapter_close"
         text target_table "story_entries | entities | lore | threads | happenings | happening_involvements | happening_awareness | character_relationships | chapters | entry_assets | translations | branch_era_flips"
         text target_id "id in target_table"
         text op "create | update | delete"
@@ -2245,8 +2245,8 @@ by the same user-visible operation. Action boundaries:
 - **User direct edit** — one delta, one fresh `action_id`. CTRL-Z
   reverses that single delta.
 - **AI reply** — the `story_entries` create delta plus the per-turn
-  piggyback deltas (`source = ai_classifier` on the direct tagged-block
-  path, `source = per_turn_classifier` on the synchronous fallback —
+  piggyback deltas (`source = piggyback_tagged_block` on the direct
+  tagged-block path, `source = per_turn_classifier` on the synchronous fallback —
   see [`memory/piggyback.md → Capability gate`](./memory/piggyback.md#capability-gate))
   share one `action_id`. Undoing it is a **positional suffix
   reversal** from the turn's start, not merely its `action_id` group,

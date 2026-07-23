@@ -25,12 +25,13 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 # In scene
 {% for e in entities | active -%}
 {%- if sceneEntities contains e.id %}
-## {{ e.name }} [{{ e.id }}]
+## {{ e.name }}{% if piggybackFires %} [{{ e.id }}]{% endif %}
 {{ e.description }}
 {% endif -%}
 {%- endfor %}
 
 {% endif -%}
+{%- if piggybackFires -%}
 {%- assign stagedList = entities | staged -%}
 {% if stagedList.size > 0 -%}
 # Staged characters (introduce when narratively appropriate)
@@ -38,7 +39,7 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 - [{{ e.id }}] {{ e.name }}: {{ e.description }}
 {%- endfor %}
 
-If you introduce any staged character, include their bracketed ID in the trailing <scene_entities> block.
+If you introduce any staged character, include their ID (without brackets) in the trailing <scene_entities> block.
 
 {% endif -%}
 {%- assign locationList = entities | active | by_kind: 'location' -%}
@@ -48,7 +49,7 @@ If you introduce any staged character, include their bracketed ID in the trailin
 - [{{ e.id }}] {{ e.name }}{% if e.description != blank %}: {{ e.description }}{% endif %}
 {%- endfor %}
 
-Use one of these bracketed IDs for <current_location> if the scene is at one of them; leave it out if the scene moves somewhere not listed here.
+Use one of these IDs (without brackets) for <current_location> if the scene is at one of them; leave it out if the scene moves somewhere not listed here.
 
 {% endif -%}
 {% if calendarVocabulary -%}
@@ -56,10 +57,13 @@ Use one of these bracketed IDs for <current_location> if the scene is at one of 
 This story tracks time in {{ calendarVocabulary.baseUnitName }}s ({{ calendarVocabulary.secondsPerBaseUnit }} seconds per {{ calendarVocabulary.baseUnitName }}). Tiers: {% for t in calendarVocabulary.tiers %}{{ t.name }}{% if t.labels.size > 0 %} ({{ t.labels | prose_join }}){% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}. Convert relative-time prose ("two days later", "the next morning") into a seconds delta on <world_time_delta> using these units.
 
 {% endif -%}
+{%- endif -%}
 # Story so far
 {%- assign recentEntries = entries | recent: userSettings.partialChapterBuffer %}
 {% for entry in recentEntries %}
 {{ entry.content }}
 {% endfor %}
 {% include 'macro_output_format_narrative' %}
-{% include 'macro_state_emission' %}`
+{% if piggybackFires -%}
+{% include 'macro_state_emission' %}
+{%- endif %}`

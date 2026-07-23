@@ -24,6 +24,7 @@ const m2Context = {
   sceneEntities: ['char_1'],
   entries: [{ content: 'The gate groaned open.' }, { content: 'Aria stepped through.' }],
   userSettings: { partialChapterBuffer: 10 },
+  piggybackFires: true,
 }
 
 describe('bundled per-turn template — empty-guard contract', () => {
@@ -64,7 +65,9 @@ describe('bundled per-turn template — empty-guard contract', () => {
     const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, contextWithStaged)
     expect(rendered).toContain('# Staged characters (introduce when narratively appropriate)')
     expect(rendered).toContain('- [char_2] Lord Eldrin: An exiled noble.')
-    expect(rendered).toContain('include their bracketed ID in the trailing <scene_entities> block')
+    expect(rendered).toContain(
+      'include their ID (without brackets) in the trailing <scene_entities> block',
+    )
   })
 
   it('omits the staged-entities block when there are no staged entities', () => {
@@ -124,5 +127,58 @@ describe('bundled per-turn template — empty-guard contract', () => {
   it('omits the known-locations block when there are no active locations', () => {
     const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, m2Context)
     expect(rendered).not.toContain('# Known locations')
+  })
+})
+
+describe('bundled per-turn template — piggybackFires gating', () => {
+  const contextWithEverything = {
+    ...m2Context,
+    piggybackFires: false,
+    entities: [
+      ...m2Context.entities,
+      {
+        id: 'char_2',
+        kind: 'character',
+        name: 'Lord Eldrin',
+        description: 'An exiled noble.',
+        status: 'staged',
+        injectionMode: 'auto',
+      },
+      {
+        id: 'loc_1',
+        kind: 'location',
+        name: 'The Keep',
+        description: 'A weathered hilltop fortress.',
+        status: 'active',
+        injectionMode: 'auto',
+      },
+    ],
+    calendarVocabulary: {
+      baseUnitName: 'second',
+      secondsPerBaseUnit: 1,
+      tiers: [{ name: 'month', labels: ['January', 'February'] }],
+    },
+  }
+
+  it('drops the in-scene ID bracket, staged/locations/calendar sections, and the state-emission macro when the fallback classifier will fire anyway', () => {
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, contextWithEverything)
+    expect(rendered).toContain('## Aria')
+    expect(rendered).not.toContain('## Aria [char_1]')
+    expect(rendered).not.toContain('# Staged characters')
+    expect(rendered).not.toContain('# Known locations')
+    expect(rendered).not.toContain('# Calendar')
+    expect(rendered).not.toContain('<state>')
+  })
+
+  it('renders all of it when piggybackFires is true', () => {
+    const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, {
+      ...contextWithEverything,
+      piggybackFires: true,
+    })
+    expect(rendered).toContain('## Aria [char_1]')
+    expect(rendered).toContain('# Staged characters')
+    expect(rendered).toContain('# Known locations')
+    expect(rendered).toContain('# Calendar')
+    expect(rendered).toContain('<state>')
   })
 })

@@ -6,6 +6,7 @@ export const BUNDLED_PACK_ID = 'pack_bundled_default'
 // constants only — never inline string literals (enforced by a grep test).
 export const TEMPLATE_IDS = {
   perTurnNarrative: 'tmpl_per_turn_narrative',
+  piggybackFallbackClassifier: 'tmpl_piggyback_fallback_classifier',
   wizardOpening: 'tmpl_wizard_opening',
   wizardTitleChips: 'tmpl_wizard_title_chips',
   wizardDescription: 'tmpl_wizard_description',

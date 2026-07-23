@@ -10,6 +10,7 @@ type DeltaOp = 'create' | 'update' | 'delete'
 // is frozen, so the two won't drift.
 type DeltaSource =
   | 'ai_classifier'
+  | 'piggyback_tagged_block'
   | 'per_turn_classifier'
   | 'periodic_classifier'
   | 'user_edit'
@@ -54,6 +55,7 @@ const OP_STYLES: Record<DeltaOp, { container: string; label: string }> = {
 
 const SOURCE_LABEL: Record<DeltaSource, string> = {
   ai_classifier: 'classifier',
+  piggyback_tagged_block: 'piggyback',
   per_turn_classifier: 'per-turn classifier',
   periodic_classifier: 'periodic classifier',
   user_edit: 'user',

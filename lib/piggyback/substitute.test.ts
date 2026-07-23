@@ -82,11 +82,25 @@ describe('substitutePiggybackIds', () => {
     expect(result.failures).toEqual([{ field: 'sceneEntities', detail: expect.any(String) }])
   })
 
-  it('passes non-placeholder-shaped garbage through unchanged rather than failing the field', () => {
+  it('drops sceneEntities and records a failure for non-placeholder-shaped garbage', () => {
     const idMap = new IdBiMap()
     const result = substitutePiggybackIds({ sceneEntities: ['not-a-placeholder-!!'] }, idMap)
-    expect(result.block.sceneEntities).toEqual(['not-a-placeholder-!!'])
+    expect(result.block.sceneEntities).toBeUndefined()
+    expect(result.failures).toEqual([{ field: 'sceneEntities', detail: expect.any(String) }])
+  })
+
+  it('resolves a bracket-wrapped placeholder the same as the bare form', () => {
+    const idMap = mapWith(['char_00000000-0000-4000-8000-000000000001'])
+    const result = substitutePiggybackIds({ sceneEntities: ['[c1]'] }, idMap)
     expect(result.failures).toEqual([])
+    expect(result.block.sceneEntities).toEqual(['char_00000000-0000-4000-8000-000000000001'])
+  })
+
+  it('drops currentLocation and records a failure when the bracketed form has no match', () => {
+    const idMap = new IdBiMap()
+    const result = substitutePiggybackIds({ currentLocation: '[l9]' }, idMap)
+    expect(result.block.currentLocation).toBeUndefined()
+    expect(result.failures).toEqual([{ field: 'currentLocation', detail: expect.any(String) }])
   })
 
   it('drops transfers when a nested item id is an unresolvable placeholder', () => {

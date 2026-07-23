@@ -158,8 +158,8 @@ No curation/detection pipeline for the capability flag exists yet —
 until one does, every model resolves to the first bullet.
 
 **Delta provenance distinguishes the two paths.** The direct
-tagged-block path stamps its deltas `source = ai_classifier`; the
-per-turn fallback classifier stamps `source = per_turn_classifier` —
+tagged-block path stamps its deltas `source = piggyback_tagged_block`;
+the per-turn fallback classifier stamps `source = per_turn_classifier` —
 a distinct value from the periodic (background) classifier's
 `source = periodic_classifier`, since it's neither the narrative
 model's own inline emission nor a lagging background pass. It always

@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 
-import { resolveModelCapabilities, streamText } from '@/lib/ai'
+import { resolveModel, resolveModelCapabilities, streamText } from '@/lib/ai'
 import { inheritedEntryMetadata, storyEntries, type EntryMetadata } from '@/lib/db'
 import { generateId, IdBiMap } from '@/lib/ids'
 import { buildPiggybackActions, parseStateBlock, substitutePiggybackIds } from '@/lib/piggyback'
@@ -44,6 +44,34 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
     .sort((a, b) => a.position - b.position)
   const entities = [...entitiesStore.getEntities().values()].filter((e) => e.branchId === branchId)
 
+  const cfg = appSettingsStore.getAppSettings()
+
+  // Resolved ahead of the call (not just from the post-call providerId/modelId)
+  // so the prompt itself can skip the state-emission apparatus when we already
+  // know this turn's tagged block would be thrown away — piggyback off, or the
+  // resolved model isn't capability-flagged reliable, means the per-turn
+  // fallback classifier redoes the extraction from scratch regardless
+  // (docs/memory/piggyback.md → Capability gate). Pure resolution over the same
+  // config streamText resolves internally, so the two can't disagree.
+  const resolvedNarrativeModel = resolveModel('narrative', {
+    providers: cfg.providers,
+    profiles: cfg.profiles,
+    assignments: cfg.assignments,
+    defaultProviderId: cfg.defaultProviderId,
+    storyModels: open.settings.models,
+  })
+  const narrativeCapabilities = resolvedNarrativeModel.ok
+    ? resolveModelCapabilities(
+        resolvedNarrativeModel.providerId,
+        resolvedNarrativeModel.modelId,
+        cfg.providers,
+      )
+    : undefined
+  const piggybackShouldFire = resolvePiggybackFires({
+    piggybackMode: open.settings.piggybackMode ?? 'off',
+    narrativeModelCapabilities: narrativeCapabilities,
+  })
+
   const idMap = new IdBiMap()
   ctx.intermediates.idMap = idMap
   const context = buildGenerationContext({
@@ -52,10 +80,10 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
     definition: open.definition,
     settings: open.settings,
     idMap,
+    piggybackFires: piggybackShouldFire,
   })
   const prompt = renderTemplate(TEMPLATE_IDS.perTurnNarrative, context)
 
-  const cfg = appSettingsStore.getAppSettings()
   const entryId = generateId('entry')
   const startedAt = Date.now()
   let streamError: unknown
@@ -142,15 +170,6 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
     idMap,
   )
   const parseFailures = [...parsedState.failures, ...substitutionFailures]
-  const narrativeCapabilities = resolveModelCapabilities(
-    call.providerId,
-    call.modelId,
-    cfg.providers,
-  )
-  const piggybackShouldFire = resolvePiggybackFires({
-    piggybackMode: open.settings.piggybackMode ?? 'off',
-    narrativeModelCapabilities: narrativeCapabilities,
-  })
 
   const piggybackParseSucceeded = parsedState.blockFound && parseFailures.length === 0
   if (piggybackShouldFire && !piggybackParseSucceeded) {
@@ -170,7 +189,7 @@ async function* narrativePhase(ctx: PhaseContext): AsyncGenerator<PhaseEmittedEv
         ...(tail?.id ? { entryId: tail.id } : {}),
       },
       branchId,
-      source: 'ai_classifier',
+      source: 'piggyback_tagged_block',
     })
   }
 

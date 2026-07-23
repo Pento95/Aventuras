@@ -11,6 +11,12 @@ type BuildArgs = {
   definition: StoryDefinition
   settings: StorySettings
   idMap: IdBiMap
+  // Whether THIS turn's tagged block will actually be consumed — only the
+  // narrative phase knows this (piggybackMode + resolved model capability),
+  // so it's caller-supplied rather than computed here. Defaults false for
+  // every other generationContext consumer, which never emits state-emission
+  // instructions in the first place.
+  piggybackFires?: boolean
 }
 
 // Defense-in-depth: emit '' for whitespace-only definitional prose so a header
@@ -25,7 +31,7 @@ function blankIfWhitespace(value: string): string {
 // agent's phase calls this and its template picks from the same variable set
 // (pinned in templateContextMap; parity-tested here).
 export function buildGenerationContext(args: BuildArgs): Record<string, unknown> {
-  const { entries, entities, definition, settings, idMap } = args
+  const { entries, entities, definition, settings, idMap, piggybackFires = false } = args
 
   // System entries are technical-only rows (removed on generate) — templates
   // must never see them, so exclusion is unconditional defense-in-depth.
@@ -50,6 +56,7 @@ export function buildGenerationContext(args: BuildArgs): Record<string, unknown>
     calendarVocabulary: calendar ? describeCalendarVocabulary(calendar) : null,
     userSettings: { partialChapterBuffer: settings.partialChapterBuffer },
     intermediates: {},
+    piggybackFires,
   }
 
   // Data-side, pre-render substitution: entity `id` (char_/loc_/... UUIDs) becomes

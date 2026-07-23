@@ -12,7 +12,10 @@ import type {
   PreflightSnapshot,
   ResolverInput,
 } from '@/lib/pipeline/types'
+import { renderTemplate, TEMPLATE_IDS } from '@/lib/prompts'
 import { appSettingsStore, currentStoryStore, entitiesStore, entriesStore } from '@/lib/stores'
+
+import { buildGenerationContext } from './generation-context'
 
 export const PIGGYBACK_FALLBACK_PHASE_NAME = 'piggyback-fallback-classifier'
 
@@ -123,21 +126,22 @@ export async function* piggybackFallbackClassifierPhase(
     (e) => e.branchId === ctx.branchId,
   )
 
-  // The classifier needs the same bracketed-ID vocabulary the narrative
-  // model gets, or it has nothing valid to reference in its own scene-state
-  // extraction (docs/memory/piggyback.md → Trailing block format).
+  // Same context builder + template pattern as the narrative phase
+  // (lib/pipeline/definitions/per-turn.ts) — the classifier is a
+  // story-related prompt like any other, not a special case.
   const idMap = new IdBiMap()
-  const referenceable = entities.filter((e) => e.status === 'active' || e.status === 'staged')
-  const entityList = referenceable
-    .map(
-      (e) =>
-        `- [${idMap.allocate(e.id)}] ${e.name} (${e.kind}${e.status === 'staged' ? ', staged' : ''})`,
-    )
-    .join('\n')
+  const context = buildGenerationContext({
+    entries: [tail],
+    entities,
+    definition: open.definition,
+    settings: open.settings,
+    idMap,
+  })
+  const prompt = renderTemplate(TEMPLATE_IDS.piggybackFallbackClassifier, context)
 
   const appSettings = appSettingsStore.getAppSettings()
   const result = await generateClassifierState(
-    `Known entities, referenced only by the bracketed ID shown below — never invent one:\n${entityList || '(none)'}\n\nExtract scene state from this reply:\n\n${tail.content}`,
+    prompt,
     {
       providers: appSettings.providers,
       profiles: appSettings.profiles,
