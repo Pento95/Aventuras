@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { generateStructured, resolveModel, resolveModelCapabilities } from '@/lib/ai'
 import type { GenerateStructuredResult, ModelCapabilities, ResolveModelConfig } from '@/lib/ai'
 import { inheritedEntryMetadata } from '@/lib/db'
-import { IdBiMap } from '@/lib/ids'
+import type { IdBiMap } from '@/lib/ids'
 import { buildPiggybackActions, substitutePiggybackIds, VISUAL_CHANGE_TYPES } from '@/lib/piggyback'
 import type {
   PhaseContext,
@@ -121,6 +121,7 @@ export async function* piggybackFallbackClassifierPhase(
     .sort((a, b) => a.position - b.position)
   const tail = entries.at(-1)
   if (!tail) return { status: 'completed' }
+  const previousEntry = entries.at(-2)
 
   const entities = [...entitiesStore.getEntities().values()].filter(
     (e) => e.branchId === ctx.branchId,
@@ -128,10 +129,14 @@ export async function* piggybackFallbackClassifierPhase(
 
   // Same context builder + template pattern as the narrative phase
   // (lib/pipeline/definitions/per-turn.ts) — the classifier is a
-  // story-related prompt like any other, not a special case.
-  const idMap = new IdBiMap()
+  // story-related prompt like any other, not a special case. Reuses the
+  // narrative phase's idMap (ctx.intermediates) so placeholder IDs stay
+  // consistent across the turn instead of being renumbered from scratch.
+  const idMap = ctx.intermediates.idMap as IdBiMap
   const context = buildGenerationContext({
-    entries: [tail],
+    // The user's action can itself carry state changes ("I put the sword
+    // away"), not just the AI's reply — both entries go to the classifier.
+    entries: previousEntry ? [previousEntry, tail] : [tail],
     entities,
     definition: open.definition,
     settings: open.settings,
@@ -168,7 +173,6 @@ export async function* piggybackFallbackClassifierPhase(
     })
   }
 
-  const previousEntry = entries.at(-2)
   const { metadata: scenePatch, actions } = buildPiggybackActions({
     entryId: tail.id,
     block: resolvedBlock,

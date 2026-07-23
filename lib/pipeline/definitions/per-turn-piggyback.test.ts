@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { APP_SETTINGS_DEFAULTS } from '@/lib/db'
 import { makeLogger } from '@/lib/diagnostics'
+import { IdBiMap } from '@/lib/ids'
 import { runPreflight } from '@/lib/pipeline/runtime/preflight'
 import type { Pipeline, PreflightSnapshot } from '@/lib/pipeline/types'
 import { currentStoryStore, entitiesStore, entriesStore, resetAllStores } from '@/lib/stores'
@@ -103,7 +104,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -161,7 +162,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -197,7 +198,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -256,7 +257,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -340,7 +341,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -421,7 +422,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -486,7 +487,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
@@ -551,7 +552,7 @@ describe('per-turn-piggyback', () => {
       const ctx = {
         actionId: 'act_1',
         abortSignal: new AbortController().signal,
-        intermediates: {},
+        intermediates: { idMap: new IdBiMap() },
         log: makeLogger('act_1'),
         db: {} as never,
         storyId: 's1',
