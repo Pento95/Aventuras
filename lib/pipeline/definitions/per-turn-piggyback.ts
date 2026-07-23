@@ -4,7 +4,7 @@ import { generateStructured, resolveModel, resolveModelCapabilities } from '@/li
 import type { GenerateStructuredResult, ModelCapabilities, ResolveModelConfig } from '@/lib/ai'
 import { inheritedEntryMetadata } from '@/lib/db'
 import { IdBiMap } from '@/lib/ids'
-import { buildPiggybackActions, substitutePiggybackIds } from '@/lib/piggyback'
+import { buildPiggybackActions, substitutePiggybackIds, VISUAL_CHANGE_TYPES } from '@/lib/piggyback'
 import type {
   PhaseContext,
   PhaseEmittedEvent,
@@ -42,7 +42,7 @@ const fallbackClassifierSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        type: z.enum(['physique', 'face', 'hair', 'eyes', 'attire', 'distinguishing']),
+        type: z.enum(VISUAL_CHANGE_TYPES),
         text: z.string(),
       }),
     )

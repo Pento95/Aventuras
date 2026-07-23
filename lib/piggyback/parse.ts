@@ -1,6 +1,7 @@
 import { jsonrepair } from 'jsonrepair'
 
 import { STATE_ROOT_TAG, STATE_TAGS } from './tags'
+import { VISUAL_CHANGE_TYPES } from './types'
 import type {
   ItemTransfer,
   ParseFieldFailure,
@@ -9,7 +10,12 @@ import type {
   ParseStateBlockResult,
   StackableTransfer,
   VisualChangeNote,
+  VisualChangeType,
 } from './types'
+
+function isVisualChangeType(value: string): value is VisualChangeType {
+  return (VISUAL_CHANGE_TYPES as readonly string[]).includes(value)
+}
 
 // Segment isolation: extract the raw inner text of one top-level tag from a
 // well-formed-or-truncated outer block. Returns undefined if the OPEN tag
@@ -75,7 +81,8 @@ function parseVisualChanges(segment: string): VisualChangeNote[] {
     const [, attrText, text] = match
     if (attrText === undefined || text === undefined) continue
     const attrs = parseAttributes(attrText)
-    if (attrs.id === undefined || attrs.type === undefined) continue
+    if (attrs.id === undefined || attrs.type === undefined || !isVisualChangeType(attrs.type))
+      continue
     notes.push({ id: attrs.id, type: attrs.type, text: text.trim() })
   }
   assertNotTruncated(segment, notes.length, 'visual_changes')

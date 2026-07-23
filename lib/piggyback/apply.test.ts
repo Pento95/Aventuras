@@ -503,4 +503,48 @@ describe('buildPiggybackActions', () => {
       },
     ])
   })
+
+  it('drops visual changes and transfers targeting a non-character entity even though it exists', () => {
+    const activeChar = mockEntity({ id: 'char_kael', status: 'active' })
+    const location = mockEntity({
+      id: 'loc_keep',
+      kind: 'location',
+      status: 'active',
+      state: { parent_location_id: null },
+    })
+    const block: ParsedStateBlock = {
+      visualChanges: [{ id: 'loc_keep', type: 'attire', text: 'weathered stonework' }],
+      transfers: {
+        items: [{ id: 'item_blade', from: 'char_kael', to: 'loc_keep', slot: 'inventory' }],
+        stackables: [{ key: 'coins', amount: 5, from: 'char_kael', to: 'loc_keep' }],
+      },
+    }
+
+    const result = buildPiggybackActions({
+      source: 'ai_classifier',
+      entryId: 'entry_1',
+      block,
+      entities: [activeChar, location],
+      previousMetadata: { sceneEntities: [], currentLocationId: null, worldTime: 0 },
+      branchId: 'main',
+    })
+
+    expect(result.actions.filter((a) => a.kind === 'updateEntityVisualState')).toEqual([])
+    // char_kael is still the `from` side of both transfers — draining its
+    // inventory/stackables is valid even though the `to` side (a location) is dropped.
+    expect(result.actions.filter((a) => a.kind === 'updateEntityInventory')).toEqual([
+      {
+        kind: 'updateEntityInventory',
+        source: 'ai_classifier',
+        payload: { branchId: 'main', id: 'char_kael', equipped_items: [], inventory: [] },
+      },
+    ])
+    expect(result.actions.filter((a) => a.kind === 'updateEntityStackables')).toEqual([
+      {
+        kind: 'updateEntityStackables',
+        source: 'ai_classifier',
+        payload: { branchId: 'main', id: 'char_kael', stackables: {} },
+      },
+    ])
+  })
 })

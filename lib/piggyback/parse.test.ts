@@ -63,6 +63,34 @@ describe('parseStateBlock', () => {
     expect(result.failures).toEqual([{ field: 'visualChanges', detail: expect.any(String) }])
   })
 
+  it('drops a visual_changes entry whose type is not one of the six known categories', () => {
+    const invalidType = `<state>
+  <scene_entities>c1</scene_entities>
+  <visual_changes>
+    <entity id="c1" type="clothing">a garbled category the model invented</entity>
+  </visual_changes>
+</state>`
+    const result = parseStateBlock(invalidType)
+    expect(result.blockFound).toBe(true)
+    expect(result.block.visualChanges).toBeUndefined()
+    expect(result.failures).toEqual([{ field: 'visualChanges', detail: expect.any(String) }])
+  })
+
+  it('keeps a well-formed sibling entry when another entry in the same block has an invalid type', () => {
+    const mixed = `<state>
+  <scene_entities>c1</scene_entities>
+  <visual_changes>
+    <entity id="c1" type="clothing">a garbled category</entity>
+    <entity id="c1" type="attire">a leather jacket</entity>
+  </visual_changes>
+</state>`
+    const result = parseStateBlock(mixed)
+    expect(result.block.visualChanges).toEqual([
+      { id: 'c1', type: 'attire', text: 'a leather jacket' },
+    ])
+    expect(result.failures).toEqual([])
+  })
+
   it('isolates a truncated <transfers> segment without blocking sceneEntities', () => {
     const truncated = `<state>
   <scene_entities>c1</scene_entities>

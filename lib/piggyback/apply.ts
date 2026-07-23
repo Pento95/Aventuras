@@ -47,6 +47,11 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
 
   const actions: PipelineAction[] = []
   const byId = new Map(entities.map((e) => [e.id, e]))
+  // visual/inventory/stackables only exist on CharacterState (entity-state-schema.ts) —
+  // an id that resolves but belongs to a location/item/faction would otherwise get
+  // those fields merged onto its state unvalidated (state-patch-actions.ts never
+  // parses the merged result against the target's own kind-specific schema).
+  const isCharacter = (id: string): boolean => byId.get(id)?.kind === 'character'
 
   // Auto-promote staged entities named in sceneEntities
   for (const id of sceneEntities) {
@@ -93,7 +98,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
 
   // Visual changes
   for (const note of block.visualChanges ?? []) {
-    if (byId.has(note.id)) {
+    if (isCharacter(note.id)) {
       actions.push({
         kind: 'updateEntityVisualState',
         source,
@@ -118,14 +123,14 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
   }
 
   for (const item of block.transfers?.items ?? []) {
-    if (item.from !== undefined && byId.has(item.from)) {
+    if (item.from !== undefined && isCharacter(item.from)) {
       const cur = currentInventory(item.from)
       inventoryPatches.set(item.from, {
         equipped_items: cur.equipped_items.filter((i) => i !== item.id),
         inventory: cur.inventory.filter((i) => i !== item.id),
       })
     }
-    if (item.to !== undefined && byId.has(item.to)) {
+    if (item.to !== undefined && isCharacter(item.to)) {
       const cur = currentInventory(item.to)
       inventoryPatches.set(item.to, {
         ...cur,
@@ -134,7 +139,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
     }
   }
   for (const [id, patch] of inventoryPatches) {
-    if (byId.has(id)) {
+    if (isCharacter(id)) {
       actions.push({
         kind: 'updateEntityInventory',
         source,
@@ -151,7 +156,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
   }
 
   for (const transfer of block.transfers?.stackables ?? []) {
-    if (transfer.from !== undefined && byId.has(transfer.from)) {
+    if (transfer.from !== undefined && isCharacter(transfer.from)) {
       const cur = currentStackables(transfer.from)
       const next = { ...cur }
       const remaining = Math.max(0, (cur[transfer.key] ?? 0) - transfer.amount)
@@ -159,7 +164,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
       else next[transfer.key] = remaining
       stackablePatches.set(transfer.from, next)
     }
-    if (transfer.to !== undefined && byId.has(transfer.to)) {
+    if (transfer.to !== undefined && isCharacter(transfer.to)) {
       const cur = currentStackables(transfer.to)
       stackablePatches.set(transfer.to, {
         ...cur,
@@ -168,7 +173,7 @@ export function buildPiggybackActions(args: BuildArgs): BuildResult {
     }
   }
   for (const [id, stackables] of stackablePatches) {
-    if (byId.has(id)) {
+    if (isCharacter(id)) {
       actions.push({
         kind: 'updateEntityStackables',
         source,
