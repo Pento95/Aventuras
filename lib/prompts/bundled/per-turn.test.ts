@@ -160,13 +160,22 @@ describe('bundled per-turn template — piggybackFires gating', () => {
     },
   }
 
-  it('drops the in-scene ID bracket, staged/locations/calendar sections, and the state-emission macro when the fallback classifier will fire anyway', () => {
+  it('keeps the staged/locations/calendar info sections but drops ID brackets, ID-usage instructions, and the state-emission macro when the fallback classifier will fire anyway', () => {
     const rendered = renderTemplate(TEMPLATE_IDS.perTurnNarrative, contextWithEverything)
     expect(rendered).toContain('## Aria')
     expect(rendered).not.toContain('## Aria [char_1]')
-    expect(rendered).not.toContain('# Staged characters')
-    expect(rendered).not.toContain('# Known locations')
-    expect(rendered).not.toContain('# Calendar')
+    expect(rendered).toContain('# Staged characters')
+    expect(rendered).toContain('- Lord Eldrin: An exiled noble.')
+    expect(rendered).not.toContain('[char_2]')
+    expect(rendered).not.toContain(
+      'include their ID (without brackets) in the trailing <scene_entities> block',
+    )
+    expect(rendered).toContain('# Known locations')
+    expect(rendered).toContain('- The Keep: A weathered hilltop fortress.')
+    expect(rendered).not.toContain('[loc_1]')
+    expect(rendered).not.toContain('Use one of these IDs (without brackets) for <current_location>')
+    expect(rendered).toContain('# Calendar')
+    expect(rendered).not.toContain('<world_time_delta>')
     expect(rendered).not.toContain('<state>')
   })
 

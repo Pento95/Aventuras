@@ -31,33 +31,35 @@ export const PER_TURN_NARRATIVE = `{% if definition.setting != blank -%}
 {%- endfor %}
 
 {% endif -%}
-{%- if piggybackFires -%}
 {%- assign stagedList = entities | staged -%}
 {% if stagedList.size > 0 -%}
 # Staged characters (introduce when narratively appropriate)
 {% for e in stagedList %}
-- [{{ e.id }}] {{ e.name }}: {{ e.description }}
+- {% if piggybackFires %}[{{ e.id }}] {% endif %}{{ e.name }}: {{ e.description }}
 {%- endfor %}
+{% if piggybackFires -%}
 
 If you introduce any staged character, include their ID (without brackets) in the trailing <scene_entities> block.
+{% endif -%}
 
 {% endif -%}
 {%- assign locationList = entities | active | by_kind: 'location' -%}
 {% if locationList.size > 0 -%}
 # Known locations
 {% for e in locationList %}
-- [{{ e.id }}] {{ e.name }}{% if e.description != blank %}: {{ e.description }}{% endif %}
+- {% if piggybackFires %}[{{ e.id }}] {% endif %}{{ e.name }}{% if e.description != blank %}: {{ e.description }}{% endif %}
 {%- endfor %}
+{% if piggybackFires -%}
 
 Use one of these IDs (without brackets) for <current_location> if the scene is at one of them; leave it out if the scene moves somewhere not listed here.
+{% endif -%}
 
 {% endif -%}
 {% if calendarVocabulary -%}
 # Calendar
-This story tracks time in {{ calendarVocabulary.baseUnitName }}s ({{ calendarVocabulary.secondsPerBaseUnit }} seconds per {{ calendarVocabulary.baseUnitName }}). Tiers: {% for t in calendarVocabulary.tiers %}{{ t.name }}{% if t.labels.size > 0 %} ({{ t.labels | prose_join }}){% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}. Convert relative-time prose ("two days later", "the next morning") into a seconds delta on <world_time_delta> using these units.
+This story tracks time in {{ calendarVocabulary.baseUnitName }}s ({{ calendarVocabulary.secondsPerBaseUnit }} seconds per {{ calendarVocabulary.baseUnitName }}). Tiers: {% for t in calendarVocabulary.tiers %}{{ t.name }}{% if t.labels.size > 0 %} ({{ t.labels | prose_join }}){% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}.{% if piggybackFires %} Convert relative-time prose ("two days later", "the next morning") into a seconds delta on <world_time_delta> using these units.{% endif %}
 
 {% endif -%}
-{%- endif -%}
 # Story so far
 {%- assign recentEntries = entries | recent: userSettings.partialChapterBuffer %}
 {% for entry in recentEntries %}
