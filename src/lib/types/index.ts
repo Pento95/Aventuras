@@ -1,3 +1,4 @@
+import type { RetrievalSnapshot } from '$lib/services/ai/retrieval/retrievalSnapshot'
 // Core entity types for Aventura
 export type StoryMode = 'adventure' | 'creative-writing'
 export type POV = 'first' | 'second' | 'third'
@@ -109,6 +110,9 @@ export interface MemoryConfig {
   summaryDetail?: SummaryDetail // Detail level for chapter summaries (default: 'auto')
 }
 
+/** Target narration length for a turn. Drives `{{ lengthInstruction }}` in the prompt. */
+export type TargetLength = 'short' | 'medium' | 'long' | 'dynamic'
+
 export interface StorySettings {
   model?: string
   temperature?: number
@@ -121,6 +125,7 @@ export interface StorySettings {
   imageGenerationMode?: 'none' | 'agentic' | 'inline' // Image generation strategy
   backgroundImagesEnabled?: boolean
   referenceMode?: boolean
+  targetLength?: TargetLength
   customSystemPrompt?: string // Per-story Liquid template override; bypasses pack template when set
 }
 
@@ -159,6 +164,8 @@ export interface EntryMetadata {
   timeEnd?: TimeTracker // Story time after classification applied time progression
   // Translation fields (for backwards compatibility, also stored in columns)
   originalInput?: string // For translateInput: original user text before translation to English
+  /** What retrieval put in the prompt for this turn. Diagnostic only — nothing reads it back. */
+  retrievalSnapshot?: RetrievalSnapshot
 }
 
 export interface Character {

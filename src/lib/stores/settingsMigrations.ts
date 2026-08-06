@@ -23,6 +23,7 @@
  *   that is no longer the default.
  */
 
+import { parseImageSpec, type ImageSpec } from '$lib/utils/image'
 import { ENTRY_RETRIEVAL_DEFAULTS } from '$lib/services/ai/core/defaults'
 
 /** Default of the removed `maxEntriesPerTier` slider, for telling tuned from untouched. */
@@ -70,4 +71,47 @@ export function migrateWorldStateInjection<
 export function migrateEntryRetrieval<T extends { maxTier3Entries: number }>(merged: T): T {
   if (merged.maxTier3Entries > 0) return merged
   return { ...merged, maxTier3Entries: ENTRY_RETRIEVAL_DEFAULTS.maxTier3Entries }
+}
+
+/**
+ * `llmThreshold` counted world-state *records*; the control that replaced it counts
+ * *words*, the same unit Entry Retrieval already used.
+ *
+ * The stored number is dropped rather than converted: 30 records and 500 words describe the
+ * same boundary only because a record happens to average ~16 words, and someone who raised
+ * the count to 100 was not asking for 1600 words of anything. The new default is calibrated
+ * to do what the old default did, which is a better answer than a guessed conversion.
+ *
+ * Dropping the key matters beyond tidiness: the store merges what is on disk over the
+ * defaults, so an unread key would be written back into every future save.
+ */
+export function migrateWorldStateBudget<T extends { tier3WholesaleWordBudget: number }>(
+  merged: T & { llmThreshold?: number },
+): T {
+  if (!('llmThreshold' in merged)) return merged
+  const { llmThreshold: _dropped, ...rest } = merged
+  return rest as T
+}
+
+/**
+ * Image sizes used to be `WIDTHxHEIGHT` strings and are now `ImageSpec` objects.
+ *
+ * `parseImageSpec` reads both, so this only normalises what is already on disk into the
+ * shape the rest of the app expects. Idempotent: a spec parses back to itself.
+ */
+export function migrateImageGeneration<
+  T extends {
+    size: ImageSpec | string
+    referenceSize: ImageSpec | string
+    portraitSize: ImageSpec | string
+    backgroundSize: ImageSpec | string
+  },
+>(merged: T): T {
+  return {
+    ...merged,
+    size: parseImageSpec(merged.size),
+    referenceSize: parseImageSpec(merged.referenceSize),
+    portraitSize: parseImageSpec(merged.portraitSize),
+    backgroundSize: parseImageSpec(merged.backgroundSize),
+  }
 }

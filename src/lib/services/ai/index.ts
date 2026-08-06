@@ -54,7 +54,7 @@ import type {
   Tense,
   TimeTracker,
 } from '$lib/types'
-import { normalizeImageDataUrl, parseImageSize } from '$lib/utils/image'
+import { normalizeImageDataUrl, expectedPixels, type ImageSpec } from '$lib/utils/image'
 import type { StreamChunk } from './core'
 import { serviceFactory } from './core/factory'
 import {
@@ -72,13 +72,15 @@ import {
 import type {
   ClassificationContext,
   WorldStateInjectorConfig,
+  WorldStateInjectorOptions,
   WorldStateInjectionResult,
   RetrievalContext,
   StyleReviewResult,
   WorldStateContext,
 } from './generation'
 import { EntryRetrievalService, getEntryRetrievalConfigFromSettings } from './retrieval'
-import type { TimelineFillResult, EntryRetrievalResult, ActivationTracker } from './retrieval'
+export { clearTier3SelectionCache } from './retrieval'
+import type { TimelineFillResult, EntryRetrievalResult, EntryRetrievalOptions } from './retrieval'
 import type {
   RetrievalResult as AgenticRetrievalResult,
   RetrievalContext as AgenticRetrievalContext,
@@ -114,11 +116,11 @@ export interface TimelineFillSettings {
 export interface ImageGenerationServiceSettings {
   // Profile-based image generation (profiles must have supportsImageGeneration capability)
   profileId: string | null // API profile for standard image generation
-  size: string // Regular image size
+  size: ImageSpec // Regular image size
 
   // Reference model settings (for image-to-image with portrait references)
   referenceProfileId: string | null // API profile for image-to-image with portrait references
-  referenceSize: string // Reference image size
+  referenceSize: ImageSpec // Reference image size
 
   // General story image settings
   styleId: string // Selected image style template
@@ -127,7 +129,7 @@ export interface ImageGenerationServiceSettings {
   // Portrait model settings (character reference images)
   portraitProfileId: string | null // API profile for generating character portraits
   portraitStyleId: string // Selected character portrait style template
-  portraitSize: string // Portrait image size
+  portraitSize: ImageSpec // Portrait image size
 
   // Scene analysis model settings (for identifying imageable scenes)
   promptProfileId: string | null // API profile for scene analysis
@@ -139,7 +141,7 @@ export interface ImageGenerationServiceSettings {
 
   // Background image settings
   backgroundProfileId: string | null // API profile for background image generation
-  backgroundSize: string // Background image size (default: '1280x720')
+  backgroundSize: ImageSpec // Background image size
   backgroundBlur: number // Background blur amount in pixels (default: 0)
 }
 
@@ -536,13 +538,12 @@ class AIService {
     userInput: string,
     recentEntries: StoryEntry[],
     config?: Partial<WorldStateInjectorConfig>,
-    signal?: AbortSignal,
-    activationTracker?: ActivationTracker,
+    options: WorldStateInjectorOptions = {},
   ): Promise<WorldStateInjectionResult> {
     log('buildWorldStateContext called', {
       userInputLength: userInput.length,
       recentEntriesCount: recentEntries.length,
-      hasActivationTracker: !!activationTracker,
+      hasActivationTracker: !!options.activationTracker,
     })
 
     // Read from settings when the caller does not override, same as
@@ -552,13 +553,7 @@ class AIService {
     const injector = serviceFactory.createWorldStateInjector(
       config ?? getWorldStateInjectorConfigFromSettings(),
     )
-    const result = await injector.buildContext(
-      worldState,
-      userInput,
-      recentEntries,
-      signal,
-      activationTracker,
-    )
+    const result = await injector.buildContext(worldState, userInput, recentEntries, options)
 
     log('buildWorldStateContext complete', {
       tier1: result.tier1.length,
@@ -577,13 +572,12 @@ class AIService {
     entries: Entry[],
     userInput: string,
     recentStoryEntries: StoryEntry[],
-    activationTracker?: ActivationTracker,
-    signal?: AbortSignal,
+    options: EntryRetrievalOptions = {},
   ): Promise<EntryRetrievalResult> {
     log('getRelevantLorebookEntries called', {
       totalEntries: entries.length,
       userInputLength: userInput.length,
-      hasActivationTracker: !!activationTracker,
+      hasActivationTracker: !!options.activationTracker,
     })
 
     const config = getEntryRetrievalConfigFromSettings()
@@ -592,8 +586,7 @@ class AIService {
       entries,
       userInput,
       recentStoryEntries,
-      activationTracker,
-      signal,
+      options,
     )
 
     log('getRelevantLorebookEntries complete', {
@@ -1027,7 +1020,7 @@ class AIService {
     const stylePrompt = await this.getStylePrompt(styleId)
     const fullPrompt = `${scene.prompt}. ${stylePrompt}`
 
-    const { width, height } = parseImageSize(sizeToUse)
+    const { width, height } = expectedPixels(sizeToUse)
     // Create pending record in database
     const embeddedImage: Omit<EmbeddedImage, 'createdAt'> = {
       id: imageId,
@@ -1079,7 +1072,7 @@ class AIService {
     prompt: string,
     profileId: string,
     model: string,
-    size: string,
+    size: ImageSpec,
     entryId: string,
     scene: ImageableScene,
     presentCharacters: Character[],

@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { migrateEntryRetrieval, migrateWorldStateInjection } from './settingsMigrations'
+import {
+  migrateEntryRetrieval,
+  migrateImageGeneration,
+  migrateWorldStateBudget,
+  migrateWorldStateInjection,
+} from './settingsMigrations'
 import {
   ENTRY_RETRIEVAL_DEFAULTS,
   WORLD_STATE_INJECTION_DEFAULTS,
 } from '$lib/services/ai/core/defaults'
 
 interface MergedWorldState {
-  llmThreshold: number
+  tier3WholesaleWordBudget: number
   maxTier2Entries: number
   maxTier3Entries: number
   enableLLMSelection: boolean
@@ -21,7 +26,7 @@ interface MergedWorldState {
 const merged = (
   over: Partial<{ maxTier2Entries: number; maxTier3Entries: number }> = {},
 ): MergedWorldState => ({
-  llmThreshold: WORLD_STATE_INJECTION_DEFAULTS.llmThreshold,
+  tier3WholesaleWordBudget: WORLD_STATE_INJECTION_DEFAULTS.tier3WholesaleWordBudget,
   maxTier2Entries: WORLD_STATE_INJECTION_DEFAULTS.maxTier2Entries,
   maxTier3Entries: WORLD_STATE_INJECTION_DEFAULTS.maxTier3Entries,
   enableLLMSelection: true,
@@ -53,12 +58,12 @@ describe('migrateWorldStateInjection', () => {
 
   it('preserves every other setting it does not migrate', () => {
     const source = merged()
-    source.llmThreshold = 90
+    source.tier3WholesaleWordBudget = 900
     source.recentEntriesCount = 12
 
     const result = migrateWorldStateInjection({ maxEntriesPerTier: 7 }, source)
 
-    expect(result.llmThreshold).toBe(90)
+    expect(result.tier3WholesaleWordBudget).toBe(900)
     expect(result.recentEntriesCount).toBe(12)
     expect(result.enableLLMSelection).toBe(true)
   })
@@ -147,5 +152,60 @@ describe('migrateEntryRetrieval', () => {
     expect(migrateEntryRetrieval({ maxTier3Entries: -5 }).maxTier3Entries).toBe(
       ENTRY_RETRIEVAL_DEFAULTS.maxTier3Entries,
     )
+  })
+})
+
+describe('migrateImageGeneration', () => {
+  const legacy = {
+    size: '1024x1024',
+    referenceSize: '1024x1024',
+    portraitSize: '512x512',
+    backgroundSize: '1280x720',
+  }
+
+  it('turns the WIDTHxHEIGHT strings older builds stored into specs', () => {
+    expect(migrateImageGeneration(legacy)).toEqual({
+      size: { orientation: 'square', size: 'small' },
+      referenceSize: { orientation: 'square', size: 'small' },
+      portraitSize: { orientation: 'square', size: 'tiny' },
+      backgroundSize: { orientation: 'landscape', size: 'small' },
+    })
+  })
+
+  it('is idempotent', () => {
+    const once = migrateImageGeneration(legacy)
+    expect(migrateImageGeneration(once)).toEqual(once)
+  })
+
+  it('preserves the other settings', () => {
+    expect(migrateImageGeneration({ ...legacy, backgroundBlur: 2 }).backgroundBlur).toBe(2)
+  })
+})
+
+describe('migrateWorldStateBudget', () => {
+  it('drops the record-count threshold the word budget replaced', () => {
+    // Not converted: 30 records and 500 words coincide only because a record averages ~16
+    // words, so a raised count would translate into a number nobody asked for.
+    const result = migrateWorldStateBudget({
+      tier3WholesaleWordBudget: WORLD_STATE_INJECTION_DEFAULTS.tier3WholesaleWordBudget,
+      llmThreshold: 100,
+    })
+
+    expect(result).not.toHaveProperty('llmThreshold')
+    expect(result.tier3WholesaleWordBudget).toBe(
+      WORLD_STATE_INJECTION_DEFAULTS.tier3WholesaleWordBudget,
+    )
+  })
+
+  it('leaves a settings object that never had one alone', () => {
+    const clean = { tier3WholesaleWordBudget: 700, maxTier2Entries: 40 }
+
+    expect(migrateWorldStateBudget(clean)).toBe(clean)
+  })
+
+  it('is idempotent', () => {
+    const once = migrateWorldStateBudget({ tier3WholesaleWordBudget: 500, llmThreshold: 30 })
+
+    expect(migrateWorldStateBudget(once)).toEqual(once)
   })
 })

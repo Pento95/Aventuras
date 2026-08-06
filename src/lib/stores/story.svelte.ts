@@ -47,6 +47,7 @@ import { aiService } from '$lib/services/ai'
 import { ChapterBatchService, type WorldState } from '$lib/services/generation'
 import { createLogger } from '$lib/log'
 import { grammarService } from '$lib/services/grammar'
+import { clearTier3SelectionCache } from '$lib/services/ai'
 
 const log = createLogger('StoryStore')
 
@@ -509,6 +510,7 @@ class StoryStore {
     this.invalidateWordCountCache()
     this.invalidateChapterCache()
     grammarService.clearEntityWords()
+    clearTier3SelectionCache()
   }
 
   // Close the current story and reset state
@@ -534,6 +536,9 @@ class StoryStore {
     // Clean up any orphaned embedded_images before loading
     // (fixes FK constraint issues from older data)
     await database.cleanupOrphanedEmbeddedImages()
+
+    // Whatever the previous story left cached is about a pool this one does not have.
+    clearTier3SelectionCache()
 
     this.currentStory = story
     this.currentBgImage = await database.getBackgroundForBranch(storyId, story.currentBranchId)

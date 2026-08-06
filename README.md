@@ -89,8 +89,10 @@ A cross-story library, separate from any single playthrough:
 - Nine image backends (`src/lib/services/ai/image/providers/`): NanoGPT, OpenAI, OpenRouter,
   Google, Chutes, Zhipu, Pollinations, plus local ComfyUI (workflow-based) and A1111
 - Character portrait support for visual consistency
-- Configurable image size — the available sizes are per provider (Pollinations, for example,
-  offers 512×512, 1024×1024 and 1536×1536)
+- Resolution is chosen as an **intent** — orientation (1:1 / 16:9 / 9:16) plus one of four
+  size steps — and each provider adapter turns it into what that backend accepts: an aspect
+  ratio for Google and OpenRouter, the model's own published resolution list for NanoGPT,
+  real dimensions for ComfyUI/A1111/Pollinations (`src/lib/utils/image.ts`)
 - Images are stored as base64 in SQLite; export/import of a story with images (`.avt`) is handled
   natively in Rust so the payloads never enter the WebView heap
 
@@ -667,16 +669,31 @@ aventuras/
 
 #### Cutting a New Release
 
-`npm run release <patch|minor|major|prerelease|x.y.z>` (wraps `scripts/release.js`) automates version
-bumps:
+`npm run release -- <patch|minor|major|prerelease|x.y.z> [--dry-run] [--no-merge-back]`
+(wraps `scripts/release.js`) automates version bumps:
 
 1. Creates a `release/vX.Y.Z` branch.
 2. Bumps the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `Cargo.toml`,
    and `Cargo.lock`.
 3. Commits, tags `vX.Y.Z`, and pushes the branch + tag together.
+4. Fast-forwards the branch it was run from onto the bump and pushes it, so the version on `master`
+   is the version released. Skip with `--no-merge-back`.
+
+Note the `--`: without it npm consumes the flags before the script sees them.
+
+Every precondition — a clean tree, a version that moves forward, and a tag/branch that does not
+already exist locally **or on the remote** — is checked before anything is written, and a failure
+after that point deletes the branch and tag it created and returns to the original branch. Use
+`--dry-run` to run the checks and stop.
+
+Only `X.Y.Z` and `X.Y.Z-pre.N` are accepted. Other pre-release spellings are valid semver but match
+neither workflow trigger, so they would tag and build nothing.
 
 Pushing a stable tag (`vX.Y.Z`) triggers `release.yml`; pushing a pre-release tag (`vX.Y.Z-pre.N`, via the
 `prerelease` bump type) triggers `ci.yml`. See [Continuous Integration](#continuous-integration) above.
+
+`scripts/version.js` holds the version arithmetic and `scripts/version.test.js` covers it
+(`vitest.config.ts` includes `scripts/**/*.test.js` for this).
 
 #### Building Desktop
 

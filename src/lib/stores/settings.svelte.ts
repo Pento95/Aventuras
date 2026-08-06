@@ -24,7 +24,12 @@ import {
   MAX_LOREBOOK_ENTRIES_FOR_SUGGESTIONS,
   WORLD_STATE_INJECTION_DEFAULTS,
 } from '$lib/services/ai/core/defaults'
-import { migrateEntryRetrieval, migrateWorldStateInjection } from './settingsMigrations'
+import {
+  migrateEntryRetrieval,
+  migrateImageGeneration,
+  migrateWorldStateBudget,
+  migrateWorldStateInjection,
+} from './settingsMigrations'
 import { ui } from '$lib/stores/ui.svelte'
 import { getTheme } from '../../themes/themes'
 import { LLM_TIMEOUT_DEFAULT, LLM_TIMEOUT_MIN, LLM_TIMEOUT_MAX } from '$lib/constants/timeout'
@@ -562,6 +567,8 @@ export interface EntryRetrievalSettings {
   maxTier2Entries: number
   /** Cap on Tier 3 (LLM selected) */
   maxTier3Entries: number
+  /** Words of leftover that still go in whole, above which the LLM is asked instead */
+  tier3WholesaleWordBudget: number
   maxWordsPerEntry: number // 0 = unlimited
   enableLLMSelection: boolean
   /** Recent story entries scanned for Tier 2 name/keyword matching and included in the Tier 3 prompt */
@@ -585,6 +592,7 @@ export function getDefaultEntryRetrievalSettingsForProvider(
     temperature: 0.2,
     maxTier2Entries: ENTRY_RETRIEVAL_DEFAULTS.maxTier2Entries,
     maxTier3Entries: ENTRY_RETRIEVAL_DEFAULTS.maxTier3Entries,
+    tier3WholesaleWordBudget: ENTRY_RETRIEVAL_DEFAULTS.tier3WholesaleWordBudget,
     maxWordsPerEntry: 0,
     enableLLMSelection: true,
     recentEntriesCount: 5,
@@ -599,8 +607,8 @@ export function getDefaultEntryRetrievalSettingsForProvider(
 // distinction). Model/temperature/profile are NOT stored here -- they come from
 // the 'worldStateInjection' Agent Profile assignment, same as every other AI task.
 export interface WorldStateInjectionSettings {
-  /** Number of not-yet-selected live entities that triggers Tier 3 LLM selection */
-  llmThreshold: number
+  /** Words of leftover that still go in whole, above which the LLM is asked instead */
+  tier3WholesaleWordBudget: number
   /**
    * Cap on Tier 2 (name matched).
    *
@@ -618,7 +626,7 @@ export interface WorldStateInjectionSettings {
 
 export function getDefaultWorldStateInjectionSettings(): WorldStateInjectionSettings {
   return {
-    llmThreshold: WORLD_STATE_INJECTION_DEFAULTS.llmThreshold,
+    tier3WholesaleWordBudget: WORLD_STATE_INJECTION_DEFAULTS.tier3WholesaleWordBudget,
     maxTier2Entries: WORLD_STATE_INJECTION_DEFAULTS.maxTier2Entries,
     maxTier3Entries: WORLD_STATE_INJECTION_DEFAULTS.maxTier3Entries,
     enableLLMSelection: true,
@@ -641,9 +649,11 @@ export function getDefaultImageGenerationSettings(): ImageGenerationServiceSetti
     profileId: null, // User must select an image-capable profile
     styleId: 'image-style-soft-anime',
     portraitStyleId: 'image-style-soft-anime',
-    size: '1024x1024',
-    referenceSize: '1024x1024',
-    portraitSize: '512x512',
+    // Same pixels as the `WIDTHxHEIGHT` defaults these replace: 1024x1024, 1024x1024,
+    // 512x512, 1024x576 (was 1280x720, the nearest tier). See `$lib/utils/image`.
+    size: { orientation: 'square', size: 'small' },
+    referenceSize: { orientation: 'square', size: 'small' },
+    portraitSize: { orientation: 'square', size: 'tiny' },
     maxImagesPerMessage: 3,
     portraitProfileId: null,
     referenceProfileId: null,
@@ -654,7 +664,7 @@ export function getDefaultImageGenerationSettings(): ImageGenerationServiceSetti
     reasoningEffort: 'high',
     manualBody: '',
     backgroundProfileId: null,
-    backgroundSize: '1280x720',
+    backgroundSize: { orientation: 'landscape', size: 'small' },
     backgroundBlur: 2, // Default blur for atmosphere
   }
 }
@@ -1692,11 +1702,16 @@ class SettingsStore {
               ...defaults.entryRetrieval,
               ...loaded.entryRetrieval,
             }),
-            worldStateInjection: migrateWorldStateInjection(loaded.worldStateInjection, {
-              ...defaults.worldStateInjection,
-              ...loaded.worldStateInjection,
+            worldStateInjection: migrateWorldStateBudget(
+              migrateWorldStateInjection(loaded.worldStateInjection, {
+                ...defaults.worldStateInjection,
+                ...loaded.worldStateInjection,
+              }),
+            ),
+            imageGeneration: migrateImageGeneration({
+              ...defaults.imageGeneration,
+              ...loaded.imageGeneration,
             }),
-            imageGeneration: { ...defaults.imageGeneration, ...loaded.imageGeneration },
             tts: { ...defaults.tts, ...loaded.tts },
             characterCardImport: { ...defaults.characterCardImport, ...loaded.characterCardImport },
             interactiveVault: {
